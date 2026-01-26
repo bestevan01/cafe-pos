@@ -16,6 +16,8 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
+const isProduction = process.env.NODE_ENV === "production";
+
 // 1. 데이터베이스 연결 설정 (본인 환경에 맞게 수정 필요!)
 const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
@@ -28,7 +30,7 @@ const pool = mysql.createPool({
     queueLimit: 0,
     ssl: {
         minVersion: 'TLSv1.2',
-        rejectUnauthorized: true
+        rejectUnauthorized: isProduction
     }
 });
 
