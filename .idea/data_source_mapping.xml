@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/SAMPLE_DATA/bulk_data.sql" value="026ee053-62f2-42e7-b7a8-173ddcf251d7" />
+    <file url="file://$PROJECT_DIR$/SAMPLE_DATA/make_data.js" value="026ee053-62f2-42e7-b7a8-173ddcf251d7" />
     <file url="file://$PROJECT_DIR$/server/server.js" value="026ee053-62f2-42e7-b7a8-173ddcf251d7" />
     <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/026ee053-62f2-42e7-b7a8-173ddcf251d7/console.sql" value="026ee053-62f2-42e7-b7a8-173ddcf251d7" />
     <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/026ee053-62f2-42e7-b7a8-173ddcf251d7/console_1.sql" value="026ee053-62f2-42e7-b7a8-173ddcf251d7" />

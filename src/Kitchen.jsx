@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { socket } from './socket';
 
-function Kitchen() {
+function Kitchen({onBack}) {
     const [orderGroups, setOrderGroups] = useState([]);
 
     useEffect(() => {
@@ -91,7 +91,17 @@ function Kitchen() {
 
     return (
         <div style={containerStyle}>
-            <h2 style={headerStyle}>👨‍🍳 음료 제조 리스트</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', borderBottom: '3px solid #555', paddingBottom: '15px', marginBottom: '20px' }}>
+                {/* 뒤로가기 버튼 */}
+                <button onClick={onBack} style={backBtnStyle}>
+                    ⬅ 나가기
+                </button>
+
+                {/* 제목 */}
+                <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: '800', color: '#fff' }}>
+                    👨‍🍳 음료 제조 리스트
+                </h1>
+            </div>
 
             <div style={orderGridStyle}>
                 <AnimatePresence>
@@ -178,6 +188,18 @@ const paidBadgeStyle = {
 };
 const unpaidBadgeStyle = {
     color: 'orange', fontWeight: 'bold', border: '2px solid orange', padding: '5px 10px', borderRadius: '5px', fontSize: '0.9rem'
+};
+
+const backBtnStyle = {
+    padding: '10px 20px',
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    backgroundColor: '#6c757d', // 회색
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: '0.2s'
 };
 
 export default Kitchen;

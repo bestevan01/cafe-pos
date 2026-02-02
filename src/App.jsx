@@ -1,76 +1,225 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { socket } from './socket';
 import OnePersonMode from './OnePersonMode';
 import Kitchen from './Kitchen';
 import RoleSelection from './RoleSelection';
+import Login from './Login';
+import Register from './Register';
+import AdminDashboard from './AdminDashboard';
+import CashSettlement from "./CashSettlement.jsx";
 
 function App() {
-    const [userCount, setUserCount] = useState(0);
-    const [myRole, setMyRole] = useState(null); // 'cashier' | 'kitchen' | null
-    const [isCashierTaken, setIsCashierTaken] = useState(false);
+    // 1. 로그인 상태 관리
+    const [auth, setAuth] = useState({
+        isLoggedIn: false,
+        user: null, // { name: '홍길동', role: 'staff' }
+        view: 'login' // 'login', 'register', 'app'
+    });
 
+    const SESSION_TIMEOUT = 1 * 60 * 60 * 1000;
+
+    const handleAutoLogout = useCallback(() => {
+        alert("보안을 위해 1시간 동안 활동이 없어 자동 로그아웃되었습니다.");
+        handleLogout();
+    }, []);
+
+    // 2. 기존 앱 상태 관리
+    const [userCount, setUserCount] = useState(0);
+    const [myRole, setMyRole] = useState(null);
+    const [isCashierTaken, setIsCashierTaken] = useState(false);
+    const [showSettlement, setShowSettlement] = useState(false);
+
+    // 🔄 새로고침 해도 로그인 유지하기
     useEffect(() => {
-        let disconnectTimer; // ⏳ 타이머를 저장할 변수 (새로고침 방어용)
+        const token = localStorage.getItem('token');
+        const storedUser = localStorage.getItem('user');
+        if (token && storedUser) {
+            setAuth({
+                isLoggedIn: true,
+                user: JSON.parse(storedUser),
+                view: 'app'
+            });
+        }
+    }, []);
+
+    // 소켓 로직 (기존과 동일)
+    useEffect(() => {
+        if (!auth.isLoggedIn) return;
+
+        let lastActivity = Date.now();
+        const updateActivity = () => { lastActivity = Date.now(); };
+
+        window.addEventListener('mousemove', updateActivity);
+        window.addEventListener('keydown', updateActivity);
+        window.addEventListener('click', updateActivity);
+
+        const interval = setInterval(() => {
+            const now = Date.now();
+            if (now - lastActivity > SESSION_TIMEOUT) {
+                handleAutoLogout();
+            }
+        }, 60000); // 1분마다 체크
+
+        return () => {
+            window.removeEventListener('mousemove', updateActivity);
+            window.removeEventListener('keydown', updateActivity);
+            window.removeEventListener('click', updateActivity);
+            clearInterval(interval);
+        };
+    }, [auth.isLoggedIn, handleAutoLogout]);
+
+
+    // ---------------------------------------------------------
+    // 2. [소켓 및 실시간 상태] 로직 (독립된 상자)
+    // ---------------------------------------------------------
+    useEffect(() => {
+        if (!auth.isLoggedIn) return;
+
+        let disconnectTimer;
+
+        // 출석 체크 함수
+        const registerMyUser = () => {
+            if (auth.user && auth.user.username) {
+                console.log(`🙋‍♂️ 서버에 출석 체크: ${auth.user.username}`);
+                socket.emit('register_user', {
+                    username: auth.user.username,
+                    role: auth.user.role
+                });
+            }
+        };
+
+        // 소켓 이벤트 리스너 등록
+        if (socket.connected) registerMyUser();
+        socket.on('connect', registerMyUser);
 
         socket.on('user_count', (count) => {
             setUserCount(count);
-
-            // ✅ [스마트 전환 로직]
-            // 혼자가 되었을 때(count <= 1), 바로 역할을 풀지 않고 "3초" 기다립니다.
             if (count <= 1) {
-                // 혹시 기존에 돌고 있던 타이머가 있다면 끄고 다시 시작 (중복 방지)
                 if (disconnectTimer) clearTimeout(disconnectTimer);
-
-                disconnectTimer = setTimeout(() => {
-                    // 3초 뒤에도 여전히 혼자라면?
-                    // -> 이건 진짜 상대방이 퇴근한 것이므로 통합 모드로 복귀!
-                    setMyRole(null);
-                }, 3000);
-            }
-            // 다시 2명 이상이 되었다면? (상대방이 새로고침해서 금방 돌아온 경우)
-            else {
-                // "아, 다시 왔네? 취소!" -> 타이머 해제하고 현재 화면 유지
+                disconnectTimer = setTimeout(() => { setMyRole(null); }, 3000);
+            } else {
                 if (disconnectTimer) clearTimeout(disconnectTimer);
             }
         });
 
-        // 캐셔 자리 선점 상태 확인
-        socket.on('cashier_status', (isTaken) => {
-            setIsCashierTaken(isTaken);
-        });
-
-        // 접속하자마자 "현재 몇 명이고, 상태는 어떤가요?" 라고 먼저 물어보기
+        socket.on('cashier_status', (isTaken) => setIsCashierTaken(isTaken));
         socket.emit('request_state');
 
+        // 청소하기 (모든 리스너 해제)
         return () => {
+            socket.off('connect', registerMyUser);
             socket.off('user_count');
             socket.off('cashier_status');
-            // 컴포넌트가 꺼질 때 타이머도 같이 정리
             if (disconnectTimer) clearTimeout(disconnectTimer);
         };
-    }, []);
+    }, [auth.isLoggedIn, auth.user]);
 
-    // 1️⃣ 내가 이미 역할을 골랐다면? -> 접속자 수 변동(새로고침)에 흔들리지 않고 화면 유지
-    if (myRole === 'cashier') {
-        return <OnePersonMode onlyOrder={false} />;
+    // --- 로그인/로그아웃 핸들러 ---
+    const handleLoginSuccess = (userData) => {
+        setAuth({ isLoggedIn: true, user: userData, view: 'app' });
+    };
+
+    const handleLogout = () => {
+        socket.emit('logout');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setAuth({ isLoggedIn: false, user: null, view: 'login' });
+        setMyRole(null);
+    };
+
+    // --- 화면 렌더링 로직 ---
+
+    // 1. 로그인 전이라면?
+    if (!auth.isLoggedIn) {
+        if (auth.view === 'register') {
+            return <Register onSwitchToLogin={() => setAuth({ ...auth, view: 'login' })} />;
+        }
+        return <Login onLoginSuccess={handleLoginSuccess} onSwitchToRegister={() => setAuth({ ...auth, view: 'register' })} />;
     }
 
-    if (myRole === 'kitchen') {
-        return <Kitchen />;
+    // 2. 로그인 후: 관리자라면?
+    if (auth.user.role === 'admin') {
+        return <AdminDashboard onLogout={handleLogout} />;
     }
 
-    // 2️⃣ 역할이 없을 때만 인원수 체크
-    // 혼자 있으면(그리고 3초가 지나서 myRole이 초기화됐다면) -> 자동 통합 모드
-    if (userCount <= 1) {
-        return <OnePersonMode />;
-    }
+    // 3. 로그인 후: 직원이면? (기존 로직 실행)
+    const renderContent = () => {
+        if (myRole === 'cashier') {
+            return <OnePersonMode onlyOrder={false} isCashier={true} onBack={() => { socket.emit('release_cashier'); setMyRole(null); }} />;
+        }
+        if (myRole === 'kitchen') {
+            return <Kitchen onBack={() => setMyRole(null)} />;
+        }
+        if (userCount <= 1) {
+            // 혼자 하기 모드에서도 로그아웃 버튼 하나 추가해주면 좋음 (일단 생략)
+            return <OnePersonMode />;
+        }
+        return <RoleSelection onSelectRole={setMyRole} isCashierTaken={isCashierTaken} />;
+    };
 
-    // 3️⃣ 여럿인데 아직 역할을 안 골랐을 때 -> 선택 화면 (캐셔 상태 전달)
     return (
-        <RoleSelection
-            onSelectRole={(role) => setMyRole(role)}
-            isCashierTaken={isCashierTaken}
-        />
+        <div>
+            {/* 상단 헤더 영역 (이름 + 로그아웃 버튼 있는 곳) */}
+            {auth.isLoggedIn && (
+                <div style={{
+                    position: 'absolute',
+                    top: '10px',
+                    right: '20px',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px' // 요소 간 간격
+                }}>
+
+                    {/* ✅ 3. 시재 점검 버튼 (관리자가 아닐 때만, 혹은 모두에게) */}
+                    {(myRole === 'cashier' || userCount <= 1) && (
+                        <button
+                            onClick={() => setShowSettlement(true)}
+                            style={{
+                                padding: '8px 12px',
+                                backgroundColor: '#28a745', // 초록색 (돈 관련)
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '20px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                            }}
+                        >
+                            💰 시재 점검
+                        </button>
+                    )}
+
+                    {/* 이름 표시 */}
+                    <span style={{ fontWeight: 'bold', color: '#333' }}>
+                        {auth.user.name}님
+                    </span>
+
+                    {/* 로그아웃 버튼 */}
+                    <button
+                        onClick={handleLogout}
+                        style={{
+                            padding: '8px 12px',
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        로그아웃
+                    </button>
+                </div>
+            )}
+
+            {/* ✅ 4. 모달 렌더링 (화면 맨 위에 띄움) */}
+            {showSettlement && (
+                <CashSettlement onClose={() => setShowSettlement(false)} />
+            )}
+
+            {/* 메인 컨텐츠 */}
+            {renderContent()}
+        </div>
     );
 }
 
