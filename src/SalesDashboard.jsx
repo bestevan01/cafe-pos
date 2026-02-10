@@ -63,6 +63,10 @@ function SalesDashboard({ onBack }) {
                 let aValue = a[sortConfig.key];
                 let bValue = b[sortConfig.key];
 
+                // null 값 처리 (혹시 모를 오류 방지)
+                if (aValue === null || aValue === undefined) aValue = '';
+                if (bValue === null || bValue === undefined) bValue = '';
+
                 if (sortConfig.key === 'created_at') {
                     aValue = new Date(aValue);
                     bValue = new Date(bValue);
@@ -97,13 +101,10 @@ function SalesDashboard({ onBack }) {
         setSortConfig({ key, direction });
     };
 
-    // ✅ [수정됨] 헤더에 표시할 기호 (이모티콘 대신 텍스트 기호 사용)
+    // 헤더에 표시할 기호
     const getSortIndicator = (name) => {
-        // 정렬 기준이 아니거나 기본 상태일 때: '-' (하이픈)
         if (sortConfig.key !== name || sortConfig.direction === 'default') return ' -';
-        // 오름차순: '^' (위쪽 꺽쇠)
         if (sortConfig.direction === 'asc') return ' ^';
-        // 내림차순: 'v' (아래쪽 꺽쇠)
         if (sortConfig.direction === 'desc') return ' v';
         return ' -';
     };
@@ -151,7 +152,8 @@ function SalesDashboard({ onBack }) {
             '일일번호': item.daily_number,
             '메뉴명': item.menu_name,
             '수량': item.quantity,
-            '결제금액': item.total_price
+            '결제금액': item.total_price,
+            '담당자': item.staff_name // ✅ 엑셀에도 담당자 추가
         }));
 
         const ws = XLSX.utils.json_to_sheet(excelData);
@@ -314,13 +316,17 @@ function SalesDashboard({ onBack }) {
                             <th style={clickableThStyle} onClick={() => requestSort('total_price')}>
                                 금액 {getSortIndicator('total_price')}
                             </th>
+                            {/* ✅ [추가] 담당자 컬럼 */}
+                            <th style={clickableThStyle} onClick={() => requestSort('staff_name')}>
+                                담당자 {getSortIndicator('staff_name')}
+                            </th>
                             <th style={thStyle}>관리</th>
                         </tr>
                         </thead>
                         <tbody>
                         {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan="6" style={{padding: '30px', textAlign: 'center', color: '#666'}}>
+                                <td colSpan="7" style={{padding: '30px', textAlign: 'center', color: '#666'}}>
                                     데이터가 없습니다.
                                 </td>
                             </tr>
@@ -337,6 +343,8 @@ function SalesDashboard({ onBack }) {
                                     <td style={{...tdStyle, fontWeight:'bold'}}>{item.menu_name}</td>
                                     <td style={tdStyle}>{item.quantity}</td>
                                     <td style={{...tdStyle, color:'#d32f2f'}}>{item.total_price.toLocaleString()}</td>
+                                    {/* ✅ [추가] 담당자 표시 */}
+                                    <td style={{...tdStyle, color: '#1565c0', fontWeight: 'bold'}}>{item.staff_name || '-'}</td>
                                     <td style={tdStyle}>
                                         <button onClick={() => handleDelete(item.id)} style={delBtnStyle}>삭제</button>
                                     </td>

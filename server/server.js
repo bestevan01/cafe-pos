@@ -206,7 +206,7 @@ pool.getConnection()
 // [주문 받기 API] - 여러 메뉴를 한 번에 받아서 저장 (Bulk Insert)
 app.post('/api/orders', async (req, res) => {
     // items는 배열입니다. 예: [{menu_name: '아아', quantity: 2}, {menu_name: '라떼', quantity: 1}]
-    const { items, force, paymentMethod } = req.body;
+    const { items, force, paymentMethod, staff_name } = req.body;
 
     const conn = await pool.getConnection();
 
@@ -248,11 +248,11 @@ app.post('/api/orders', async (req, res) => {
         // 3. [일괄 저장] 반복문으로 모든 메뉴를 DB에 넣음
         // 주의: 모든 메뉴가 같은 daily_number와 formattedID를 가짐
         for (const item of items) {
-            const sql = `INSERT INTO orders (menu_name, quantity, total_price, daily_number, display_id, payment_method) VALUES (?, ?, ?, ?, ?, ?)`;
+            const sql = `INSERT INTO orders (menu_name, quantity, total_price, daily_number, display_id, payment_method, staff_name) VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
             const lineTotal = item.price * item.quantity;
 
-            await conn.query(sql, [item.menu_name, item.quantity, lineTotal, nextDailyNum, formattedID, paymentMethod || 'cash']);
+            await conn.query(sql, [item.menu_name, item.quantity, lineTotal, nextDailyNum, formattedID, paymentMethod || 'cash', staff_name || '키오스크']);
         }
 
         await conn.commit(); // DB 반영
@@ -271,6 +271,7 @@ app.post('/api/orders', async (req, res) => {
             items: socketItems, // 주문한 메뉴 리스트
             created_at: new Date(),
             payment_method: paymentMethod || 'cash',
+            staff_name: staff_name || '키오스크',
             is_paid: 0
         };
 

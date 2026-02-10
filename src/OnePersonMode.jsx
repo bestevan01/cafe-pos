@@ -195,11 +195,15 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
             quantity: item.quantity
         }));
 
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : { name: '익명' };
+
         try {
             const res = await axios.post('/api/orders', {
                 items: itemsToSend,
                 total_price: currentTotalAmount,
-                force: isForced
+                force: isForced,
+                staff_name: user.name
             });
 
             if (res.data.success) {
