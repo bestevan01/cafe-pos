@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const mysql = require('mysql2/promise'); // mysql2 도구 불러오기
@@ -682,7 +683,7 @@ setInterval(() => {
     // 실제 내 배포 주소로 요청을 보냄 (로컬에서는 무시)
     if (process.env.NODE_ENV === 'production') {
         const myUrl = 'https://cafe-server-0qur.onrender.com'; // ⚠️ 본인 Render 주소로 바꾸세요!
-        http.get(myUrl, (res) => {
+        https.get(myUrl, (res) => {
             console.log(`⏰ 셀프 알람: 서버 깨우기 성공 (Status: ${res.statusCode})`);
         }).on('error', (err) => {
             console.error('⏰ 셀프 알람 실패:', err.message);
