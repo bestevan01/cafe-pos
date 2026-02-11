@@ -6,6 +6,12 @@ const cors = require('cors');
 const mysql = require('mysql2/promise'); // mysql2 도구 불러오기
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const {
+    generateRegistrationOptions,
+    verifyRegistrationResponse,
+    generateAuthenticationOptions,
+    verifyAuthenticationResponse
+} = require('@simplewebauthn/server');
 // const {socket} = require("../src/socket");
 
 const JWT_SECRET = "REMOVED_SECRET";
@@ -135,7 +141,8 @@ app.post('/api/login', async (req, res) => {
             token,
             role: user.role,
             name: user.name,
-            username: user.username // 👈 이거 추가!
+            username: user.username, // 👈 이거 추가!
+            id: user.id
         });
 
     } catch (err) {
@@ -674,15 +681,197 @@ app.get('/api/admin/stats', async (req, res) => {
     }
 });
 
+const rpID = process.env.NODE_ENV === 'production'
+    ? 'cafe-server-0qur.onrender.com' // ⚠️ 본인 Render 주소 (https:// 제외)
+    : 'localhost';
+
+const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+const origin = `${protocol}://${rpID}${process.env.NODE_ENV === 'production' ? '' : ':5173'}`;
+
+const currentChallenges = {};
+
+// 1. [기기 등록] 옵션 생성
+app.get('/api/passkey/register-options', async (req, res) => {
+    const { userId } = req.query;
+
+    const conn = await pool.getConnection();
+    const [users] = await conn.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const [userPasskeys] = await conn.query('SELECT id FROM passkeys WHERE user_id = ?', [userId]);
+    conn.release();
+
+    if (users.length === 0) return res.status(400).json({ error: 'User not found' });
+    const user = users[0];
+
+    const options = await generateRegistrationOptions({
+        rpName: 'Cafe POS',
+        rpID,
+        // 문자열을 바이트 배열(Uint8Array)로 변환해서 넣어야 함
+        userID: new Uint8Array(Buffer.from(String(user.id))),
+        userName: user.username,
+        excludeCredentials: userPasskeys.map(key => ({
+            id: key.id,
+            transports: key.transports ? key.transports.split(',') : [],
+        })),
+        authenticatorSelection: {
+            residentKey: 'preferred',
+            userVerification: 'preferred',
+            authenticatorAttachment: 'platform',
+        },
+    });
+
+    currentChallenges[userId] = options.challenge;
+    res.json(options);
+});
+
+// 2. [기기 등록] 검증 및 저장 (✨ 여기가 수정되었습니다!)
+app.post('/api/passkey/register-verify', async (req, res) => {
+    const { userId, body } = req.body;
+    const expectedChallenge = currentChallenges[userId];
+
+    if (!expectedChallenge) return res.status(400).json({ error: 'Challenge not found' });
+
+    try {
+        const verification = await verifyRegistrationResponse({
+            response: body,
+            expectedChallenge,
+            expectedOrigin: req.get('origin'),
+            expectedRPID: rpID,
+        });
+
+        const { verified, registrationInfo } = verification;
+
+        if (verified && registrationInfo) {
+            // 🔍 [수정됨] 로그에 맞춰 데이터 꺼내는 위치 변경
+            // registrationInfo 바로 아래가 아니라, .credential 안에 데이터가 있습니다.
+            const { credential } = registrationInfo;
+            const { id, publicKey, counter } = credential;
+
+            // 1. 공용키 (Uint8Array -> Base64 변환)
+            const pubKeyBase64 = Buffer.from(publicKey).toString('base64');
+
+            // 2. ID (로그를 보니 이미 문자열이므로 그대로 사용하거나, 안전하게 문자열 변환)
+            const credentialIDString = String(id);
+
+            const conn = await pool.getConnection();
+            await conn.query(
+                `INSERT INTO passkeys (id, public_key, counter, user_id, transports) VALUES (?, ?, ?, ?, ?)`,
+                [credentialIDString, pubKeyBase64, counter, userId, 'internal']
+            );
+            conn.release();
+
+            delete currentChallenges[userId];
+            res.json({ success: true });
+        } else {
+            res.status(400).json({ success: false, message: 'Verification failed' });
+        }
+    } catch (error) {
+        console.error("🚨 패스키 등록 에러 발생:", error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// 3. [로그인] 옵션 생성
+app.get('/api/passkey/login-options', async (req, res) => {
+    const options = await generateAuthenticationOptions({
+        rpID,
+        userVerification: 'preferred',
+    });
+
+    currentChallenges[options.challenge] = options.challenge;
+    res.json(options);
+});
+
+// 4. [로그인] 검증 (✨ v13 필수 수정: authenticator -> credential)
+app.post('/api/passkey/login-verify', async (req, res) => {
+    const { body } = req.body;
+
+    const conn = await pool.getConnection();
+    const [rows] = await conn.query('SELECT * FROM passkeys WHERE id = ?', [body.id]);
+
+    if (rows.length === 0) {
+        conn.release();
+        return res.status(400).json({ error: 'Passkey not found' });
+    }
+
+    const passkey = rows[0];
+    const [users] = await conn.query('SELECT * FROM users WHERE id = ?', [passkey.user_id]);
+    conn.release();
+
+    const user = users[0];
+
+    // 1. PublicKey는 Uint8Array로 변환
+    const pubKeyBuffer = Buffer.from(passkey.public_key, 'base64');
+
+    // 2. Credential ID는 문자열 그대로 사용 (v13 기준)
+    const credentialIDString = passkey.id;
+
+    // 3. 인증기 정보 객체 생성
+    const authenticatorObj = {
+        id: credentialIDString,              // v13에서는 'credentialID'가 아니라 'id'로 쓰는 경우가 많음 (둘 다 허용될 수 있으나 id가 표준)
+        publicKey: new Uint8Array(pubKeyBuffer), // v13에서는 'credentialPublicKey' 대신 'publicKey'일 수 있음
+        counter: Number(passkey.counter),
+        transports: passkey.transports ? passkey.transports.split(',') : []
+    };
+
+    // 안전을 위해 구버전 속성명도 같이 넣어줌 (호환성 확보)
+    authenticatorObj.credentialID = authenticatorObj.id;
+    authenticatorObj.credentialPublicKey = authenticatorObj.publicKey;
+
+    console.log("🔍 [v13] 로그인 검증 데이터 준비");
+
+    try {
+        const clientData = JSON.parse(Buffer.from(body.response.clientDataJSON, 'base64').toString('utf-8'));
+        const challengeFromClient = clientData.challenge;
+
+        const verification = await verifyAuthenticationResponse({
+            response: body,
+            expectedChallenge: challengeFromClient,
+            expectedOrigin: req.get('origin'),
+            expectedRPID: rpID,
+            // ⚠️ [핵심 수정] 여기가 'authenticator'가 아니라 'credential'이어야 합니다!!!!
+            credential: authenticatorObj,
+            requireUserVerification: false,
+        });
+
+        const { verified, authenticationInfo } = verification;
+
+        if (verified) {
+            const conn2 = await pool.getConnection();
+            await conn2.query('UPDATE passkeys SET counter = ? WHERE id = ?', [authenticationInfo.newCounter, passkey.id]);
+            conn2.release();
+
+            const token = jwt.sign(
+                { id: user.id, username: user.username, role: user.role, name: user.name },
+                JWT_SECRET,
+                { expiresIn: '12h' }
+            );
+
+            res.json({
+                success: true,
+                token,
+                role: user.role,
+                name: user.name,
+                username: user.username,
+                id: user.id
+            });
+        } else {
+            res.status(400).json({ success: false, message: 'Verification failed' });
+        }
+    } catch (error) {
+        console.error("🚨 패스키 로그인 에러 상세:", error);
+        return res.status(400).json({ error: error.message });
+    }
+});
+
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
     console.log(`🚀 서버 실행 중: http://localhost:${PORT}`);
 });
 
 setInterval(() => {
-    // 실제 내 배포 주소로 요청을 보냄 (로컬에서는 무시)
     if (process.env.NODE_ENV === 'production') {
-        const myUrl = 'https://cafe-server-0qur.onrender.com'; // ⚠️ 본인 Render 주소로 바꾸세요!
+        // ⚠️ 본인 Render 주소로 꼭 수정하세요!
+        const myUrl = 'https://cafe-server-0qur.onrender.com';
         https.get(myUrl, (res) => {
             console.log(`⏰ 셀프 알람: 서버 깨우기 성공 (Status: ${res.statusCode})`);
         }).on('error', (err) => {

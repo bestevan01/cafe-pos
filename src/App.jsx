@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { socket } from './socket';
 import OnePersonMode from './OnePersonMode';
 import Kitchen from './Kitchen';
@@ -7,6 +8,7 @@ import Login from './Login';
 import Register from './Register';
 import AdminDashboard from './AdminDashboard';
 import CashSettlement from "./CashSettlement.jsx";
+import { startRegistration } from "@simplewebauthn/browser";
 
 function App() {
     // 1. 로그인 상태 관리
@@ -157,6 +159,48 @@ function App() {
         return <RoleSelection onSelectRole={setMyRole} isCashierTaken={isCashierTaken} />;
     };
 
+// ... handleLogout 함수 근처 ...
+
+    // 👈 [추가 2] 기기 등록(패스키) 핸들러
+    const handleRegisterPasskey = async () => {
+        // 로그인 정보에 id가 있어야 함 (Login.jsx에서 저장했는지 확인 필요)
+        if (!auth.user || !auth.user.id) {
+            alert("사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.");
+            return;
+        }
+
+        const userId = auth.user.id;
+
+        try {
+            // 1. 등록 옵션 요청
+            const resp = await axios.get(`/api/passkey/register-options?userId=${userId}`);
+
+            // 2. 브라우저 인증(지문/FaceID) 수행
+            let attResp;
+            try {
+                attResp = await startRegistration(resp.data);
+            } catch (error) {
+                if (error.name === 'NotAllowedError') return; // 사용자가 취소함
+                throw error;
+            }
+
+            // 3. 결과 서버로 전송
+            const verificationResp = await axios.post('/api/passkey/register-verify', {
+                userId,
+                body: attResp,
+            });
+
+            if (verificationResp.data.success) {
+                alert('✅ 기기 등록 완료! 다음부터 지문/FaceID로 로그인하세요.');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('기기 등록 실패: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    // --- 화면 렌더링 로직 ---
+
     return (
         <div>
             {/* 상단 헤더 영역 (이름 + 로그아웃 버튼 있는 곳) */}
@@ -189,6 +233,22 @@ function App() {
                             💰 시재 점검
                         </button>
                     )}
+
+                    <button
+                        onClick={handleRegisterPasskey}
+                        style={{
+                            padding: '8px 12px',
+                            backgroundColor: '#6f42c1', // 보라색으로 구분
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '20px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                        }}
+                    >
+                        🔑 기기 등록
+                    </button>
 
                     {/* 이름 표시 */}
                     <span style={{ fontWeight: 'bold', color: '#333' }}>

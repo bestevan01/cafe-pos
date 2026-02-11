@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
 import axios from 'axios';
 
 function Login({ onLoginSuccess, onSwitchToRegister }) {
@@ -18,7 +19,8 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 localStorage.setItem('user', JSON.stringify({
                     name: res.data.name,
                     role: res.data.role,
-                    username: res.data.username
+                    username: res.data.username,
+                    id: res.data.id
                 }));
 
                 // 2. 부모 컴포넌트(App)에 알림
@@ -27,6 +29,42 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         } catch (err) {
             // 403 Forbidden 등 에러 처리
             alert(err.response?.data?.message || "로그인 실패");
+        }
+    };
+
+    const handlePasskeyLogin = async () => {
+        try {
+            // 1. 옵션 받아오기
+            const resp = await axios.get('/api/passkey/login-options');
+
+            // 2. 브라우저/기기 인증 수행 (지문/얼굴 인식 창 뜸)
+            let asseResp;
+            try {
+                asseResp = await startAuthentication(resp.data);
+            } catch (error) {
+                if (error.name === 'NotAllowedError') return; // 취소함
+                throw error;
+            }
+
+            // 3. 결과 서버로 전송
+            const verificationResp = await axios.post('/api/passkey/login-verify', {
+                body: asseResp,
+            });
+
+            if (verificationResp.data.success) {
+                const data = verificationResp.data;
+                // 기존 로그인 성공 처리와 동일
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify({
+                    name: data.name,
+                    role: data.role,
+                    username: data.username
+                }));
+                onLoginSuccess(data);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.");
         }
     };
 
@@ -40,6 +78,19 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                     <input name="password" type="password" placeholder="비밀번호" onChange={handleChange} style={inputStyle} required />
                     <button type="submit" style={btnStyle}>로그인</button>
                 </form>
+                <div style={{width: '100%', marginTop: '10px', display:'flex', flexDirection:'column', gap:'5px'}}>
+                    <div style={{display:'flex', alignItems:'center', margin:'10px 0'}}>
+                        <div style={{flex:1, height:'1px', backgroundColor:'#ddd'}}></div>
+                        <span style={{padding:'0 10px', color:'#999', fontSize:'0.8rem'}}>또는</span>
+                        <div style={{flex:1, height:'1px', backgroundColor:'#ddd'}}></div>
+                    </div>
+                    <button
+                        onClick={handlePasskeyLogin}
+                        style={{...btnStyle, backgroundColor: '#fff', color:'#333', border:'1px solid #ccc', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}
+                    >
+                        🔑 패스키(지문/FaceID)로 로그인
+                    </button>
+                </div>
                 <p style={{ marginTop: '15px', fontSize: '0.9rem', color: '#666' }}>
                     계정이 없으신가요? <span onClick={onSwitchToRegister} style={{ color: '#007bff', cursor: 'pointer', fontWeight: 'bold' }}>회원가입</span>
                 </p>
