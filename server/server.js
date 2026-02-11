@@ -694,6 +694,10 @@ const currentChallenges = {};
 app.get('/api/passkey/register-options', async (req, res) => {
     const { userId } = req.query;
 
+    // ✅ [핵심] 현재 접속한 도메인(hostname)을 자동으로 가져옵니다.
+    // (Localhost든 Render든 상관없이 무조건 현재 주소를 씁니다)
+    const rpID = req.hostname;
+
     const conn = await pool.getConnection();
     const [users] = await conn.query('SELECT * FROM users WHERE id = ?', [userId]);
     const [userPasskeys] = await conn.query('SELECT id FROM passkeys WHERE user_id = ?', [userId]);
@@ -702,31 +706,37 @@ app.get('/api/passkey/register-options', async (req, res) => {
     if (users.length === 0) return res.status(400).json({ error: 'User not found' });
     const user = users[0];
 
-    const options = await generateRegistrationOptions({
-        rpName: 'Cafe POS',
-        rpID,
-        // 문자열을 바이트 배열(Uint8Array)로 변환해서 넣어야 함
-        userID: new Uint8Array(Buffer.from(String(user.id))),
-        userName: user.username,
-        excludeCredentials: userPasskeys.map(key => ({
-            id: key.id,
-            transports: key.transports ? key.transports.split(',') : [],
-        })),
-        authenticatorSelection: {
-            residentKey: 'preferred',
-            userVerification: 'preferred',
-            authenticatorAttachment: 'platform',
-        },
-    });
+    try {
+        const options = await generateRegistrationOptions({
+            rpName: 'Cafe POS',
+            rpID: rpID, // 자동 감지된 주소 사용
+            userID: new Uint8Array(Buffer.from(String(user.id))),
+            userName: user.username,
+            excludeCredentials: userPasskeys.map(key => ({
+                id: key.id,
+                transports: key.transports ? key.transports.split(',') : [],
+            })),
+            authenticatorSelection: {
+                residentKey: 'preferred',
+                userVerification: 'preferred',
+                authenticatorAttachment: 'platform',
+            },
+        });
 
-    currentChallenges[userId] = options.challenge;
-    res.json(options);
+        // 챌린지 저장
+        currentChallenges[userId] = options.challenge;
+        res.json(options);
+    } catch (err) {
+        console.error("옵션 생성 실패:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// 2. [기기 등록] 검증 및 저장 (✨ 여기가 수정되었습니다!)
+// 2. [기기 등록] 검증 및 저장
 app.post('/api/passkey/register-verify', async (req, res) => {
     const { userId, body } = req.body;
     const expectedChallenge = currentChallenges[userId];
+    const rpID = req.hostname; // ✅ 자동 감지
 
     if (!expectedChallenge) return res.status(400).json({ error: 'Challenge not found' });
 
@@ -734,22 +744,17 @@ app.post('/api/passkey/register-verify', async (req, res) => {
         const verification = await verifyRegistrationResponse({
             response: body,
             expectedChallenge,
-            expectedOrigin: req.get('origin'),
-            expectedRPID: rpID,
+            expectedOrigin: req.get('origin'), // 클라이언트가 보낸 Origin 그대로 사용
+            expectedRPID: rpID,                // 자동 감지된 RP ID 사용
         });
 
         const { verified, registrationInfo } = verification;
 
         if (verified && registrationInfo) {
-            // 🔍 [수정됨] 로그에 맞춰 데이터 꺼내는 위치 변경
-            // registrationInfo 바로 아래가 아니라, .credential 안에 데이터가 있습니다.
             const { credential } = registrationInfo;
             const { id, publicKey, counter } = credential;
 
-            // 1. 공용키 (Uint8Array -> Base64 변환)
             const pubKeyBase64 = Buffer.from(publicKey).toString('base64');
-
-            // 2. ID (로그를 보니 이미 문자열이므로 그대로 사용하거나, 안전하게 문자열 변환)
             const credentialIDString = String(id);
 
             const conn = await pool.getConnection();
@@ -765,15 +770,17 @@ app.post('/api/passkey/register-verify', async (req, res) => {
             res.status(400).json({ success: false, message: 'Verification failed' });
         }
     } catch (error) {
-        console.error("🚨 패스키 등록 에러 발생:", error);
+        console.error("🚨 패스키 등록 에러:", error);
         return res.status(500).json({ error: error.message });
     }
 });
 
 // 3. [로그인] 옵션 생성
 app.get('/api/passkey/login-options', async (req, res) => {
+    const rpID = req.hostname; // ✅ 자동 감지
+
     const options = await generateAuthenticationOptions({
-        rpID,
+        rpID: rpID,
         userVerification: 'preferred',
     });
 
@@ -781,9 +788,10 @@ app.get('/api/passkey/login-options', async (req, res) => {
     res.json(options);
 });
 
-// 4. [로그인] 검증 (✨ v13 필수 수정: authenticator -> credential)
+// 4. [로그인] 검증
 app.post('/api/passkey/login-verify', async (req, res) => {
     const { body } = req.body;
+    const rpID = req.hostname; // ✅ 자동 감지
 
     const conn = await pool.getConnection();
     const [rows] = await conn.query('SELECT * FROM passkeys WHERE id = ?', [body.id]);
@@ -798,38 +806,20 @@ app.post('/api/passkey/login-verify', async (req, res) => {
     conn.release();
 
     const user = users[0];
-
-    // 1. PublicKey는 Uint8Array로 변환
     const pubKeyBuffer = Buffer.from(passkey.public_key, 'base64');
 
-    // 2. Credential ID는 문자열 그대로 사용 (v13 기준)
-    const credentialIDString = passkey.id;
-
-    // 3. 인증기 정보 객체 생성
-    const authenticatorObj = {
-        id: credentialIDString,              // v13에서는 'credentialID'가 아니라 'id'로 쓰는 경우가 많음 (둘 다 허용될 수 있으나 id가 표준)
-        publicKey: new Uint8Array(pubKeyBuffer), // v13에서는 'credentialPublicKey' 대신 'publicKey'일 수 있음
-        counter: Number(passkey.counter),
-        transports: passkey.transports ? passkey.transports.split(',') : []
-    };
-
-    // 안전을 위해 구버전 속성명도 같이 넣어줌 (호환성 확보)
-    authenticatorObj.credentialID = authenticatorObj.id;
-    authenticatorObj.credentialPublicKey = authenticatorObj.publicKey;
-
-    console.log("🔍 [v13] 로그인 검증 데이터 준비");
-
     try {
-        const clientData = JSON.parse(Buffer.from(body.response.clientDataJSON, 'base64').toString('utf-8'));
-        const challengeFromClient = clientData.challenge;
-
         const verification = await verifyAuthenticationResponse({
             response: body,
-            expectedChallenge: challengeFromClient,
+            expectedChallenge: (c) => true,
             expectedOrigin: req.get('origin'),
-            expectedRPID: rpID,
-            // ⚠️ [핵심 수정] 여기가 'authenticator'가 아니라 'credential'이어야 합니다!!!!
-            credential: authenticatorObj,
+            expectedRPID: rpID, // ✅ 자동 감지된 주소로 검증
+            credential: {
+                id: passkey.id,
+                publicKey: new Uint8Array(pubKeyBuffer),
+                counter: Number(passkey.counter),
+                transports: passkey.transports ? passkey.transports.split(',') : [],
+            },
             requireUserVerification: false,
         });
 
@@ -858,7 +848,7 @@ app.post('/api/passkey/login-verify', async (req, res) => {
             res.status(400).json({ success: false, message: 'Verification failed' });
         }
     } catch (error) {
-        console.error("🚨 패스키 로그인 에러 상세:", error);
+        console.error("🚨 패스키 로그인 에러:", error);
         return res.status(400).json({ error: error.message });
     }
 });
