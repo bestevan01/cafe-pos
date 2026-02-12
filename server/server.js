@@ -18,6 +18,14 @@ const JWT_SECRET = "REMOVED_SECRET";
 
 const app = express();
 
+const FRONTEND_URL = 'bu-cafe-pos.vercel.app';
+
+const RP_ID = process.env.NODE_ENV === 'production' ? FRONTEND_URL : 'localhost';
+
+const EXPECTED_ORIGIN = process.env.NODE_ENV === 'production'
+    ? `https://${FRONTEND_URL}`
+    : 'http://localhost:5173';
+
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"] }));
@@ -682,7 +690,7 @@ app.get('/api/admin/stats', async (req, res) => {
 });
 
 const rpID = process.env.NODE_ENV === 'production'
-    ? 'cafe-server-0qur.onrender.com' // ⚠️ 본인 Render 주소 (https:// 제외)
+    ? FRONTEND_URL // ⚠️ 본인 Render 주소 (https:// 제외)
     : 'localhost';
 
 const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
@@ -696,7 +704,7 @@ app.get('/api/passkey/register-options', async (req, res) => {
 
     // ✅ [핵심] 현재 접속한 도메인(hostname)을 자동으로 가져옵니다.
     // (Localhost든 Render든 상관없이 무조건 현재 주소를 씁니다)
-    const rpID = req.hostname;
+    // const rpID = req.hostname;
 
     const conn = await pool.getConnection();
     const [users] = await conn.query('SELECT * FROM users WHERE id = ?', [userId]);
@@ -709,7 +717,7 @@ app.get('/api/passkey/register-options', async (req, res) => {
     try {
         const options = await generateRegistrationOptions({
             rpName: 'Cafe POS',
-            rpID: rpID, // 자동 감지된 주소 사용
+            rpID: RP_ID, // 자동 감지된 주소 사용
             userID: new Uint8Array(Buffer.from(String(user.id))),
             userName: user.username,
             excludeCredentials: userPasskeys.map(key => ({
@@ -736,7 +744,7 @@ app.get('/api/passkey/register-options', async (req, res) => {
 app.post('/api/passkey/register-verify', async (req, res) => {
     const { userId, body } = req.body;
     const expectedChallenge = currentChallenges[userId];
-    const rpID = req.hostname; // ✅ 자동 감지
+    // const rpID = req.hostname; // ✅ 자동 감지
 
     if (!expectedChallenge) return res.status(400).json({ error: 'Challenge not found' });
 
@@ -744,8 +752,8 @@ app.post('/api/passkey/register-verify', async (req, res) => {
         const verification = await verifyRegistrationResponse({
             response: body,
             expectedChallenge,
-            expectedOrigin: req.get('origin'), // 클라이언트가 보낸 Origin 그대로 사용
-            expectedRPID: rpID,                // 자동 감지된 RP ID 사용
+            expectedOrigin: EXPECTED_ORIGIN, // 클라이언트가 보낸 Origin 그대로 사용
+            expectedRPID: RP_ID,                // 자동 감지된 RP ID 사용
         });
 
         const { verified, registrationInfo } = verification;
@@ -777,10 +785,10 @@ app.post('/api/passkey/register-verify', async (req, res) => {
 
 // 3. [로그인] 옵션 생성
 app.get('/api/passkey/login-options', async (req, res) => {
-    const rpID = req.hostname; // ✅ 자동 감지
+    // const rpID = req.hostname; // ✅ 자동 감지
 
     const options = await generateAuthenticationOptions({
-        rpID: rpID,
+        rpID: RP_ID,
         userVerification: 'preferred',
     });
 
@@ -791,7 +799,7 @@ app.get('/api/passkey/login-options', async (req, res) => {
 // 4. [로그인] 검증
 app.post('/api/passkey/login-verify', async (req, res) => {
     const { body } = req.body;
-    const rpID = req.hostname; // ✅ 자동 감지
+    // const rpID = req.hostname; // ✅ 자동 감지
 
     const conn = await pool.getConnection();
     const [rows] = await conn.query('SELECT * FROM passkeys WHERE id = ?', [body.id]);
@@ -812,8 +820,8 @@ app.post('/api/passkey/login-verify', async (req, res) => {
         const verification = await verifyAuthenticationResponse({
             response: body,
             expectedChallenge: (c) => true,
-            expectedOrigin: req.get('origin'),
-            expectedRPID: rpID, // ✅ 자동 감지된 주소로 검증
+            expectedOrigin: EXPECTED_ORIGIN,
+            expectedRPID: RP_ID, // ✅ 자동 감지된 주소로 검증
             credential: {
                 id: passkey.id,
                 publicKey: new Uint8Array(pubKeyBuffer),
