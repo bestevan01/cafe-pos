@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from 'axios'; // 삭제해도 되지만, 로그인/로그아웃 등 다른 곳에서 쓸 수 있으니 유지
 import { socket } from './socket';
 import OnePersonMode from './OnePersonMode';
 import Kitchen from './Kitchen';
@@ -8,7 +8,8 @@ import Login from './Login';
 import Register from './Register';
 import AdminDashboard from './AdminDashboard';
 import CashSettlement from "./CashSettlement.jsx";
-import { startRegistration } from "@simplewebauthn/browser";
+import ProfileAuth from './ProfileAuth.jsx';
+import EditProfile from './EditProfile.jsx';
 
 function App() {
     // 1. 로그인 상태 관리
@@ -30,6 +31,10 @@ function App() {
     const [myRole, setMyRole] = useState(null);
     const [isCashierTaken, setIsCashierTaken] = useState(false);
     const [showSettlement, setShowSettlement] = useState(false);
+
+    // ✅ [추가] 내 정보 수정 화면을 보여줄지 여부
+    const [showProfile, setShowProfile] = useState(false);
+    const [isProfileVerified, setIsProfileVerified] = useState(false);
 
     // 🔄 새로고침 해도 로그인 유지하기
     useEffect(() => {
@@ -70,16 +75,12 @@ function App() {
         };
     }, [auth.isLoggedIn, handleAutoLogout]);
 
-
-    // ---------------------------------------------------------
-    // 2. [소켓 및 실시간 상태] 로직 (독립된 상자)
-    // ---------------------------------------------------------
+    // 소켓 및 실시간 상태 로직
     useEffect(() => {
         if (!auth.isLoggedIn) return;
 
         let disconnectTimer;
 
-        // 출석 체크 함수
         const registerMyUser = () => {
             if (auth.user && auth.user.username) {
                 console.log(`🙋‍♂️ 서버에 출석 체크: ${auth.user.username}`);
@@ -90,7 +91,6 @@ function App() {
             }
         };
 
-        // 소켓 이벤트 리스너 등록
         if (socket.connected) registerMyUser();
         socket.on('connect', registerMyUser);
 
@@ -107,7 +107,6 @@ function App() {
         socket.on('cashier_status', (isTaken) => setIsCashierTaken(isTaken));
         socket.emit('request_state');
 
-        // 청소하기 (모든 리스너 해제)
         return () => {
             socket.off('connect', registerMyUser);
             socket.off('user_count');
@@ -127,7 +126,11 @@ function App() {
         localStorage.removeItem('user');
         setAuth({ isLoggedIn: false, user: null, view: 'login' });
         setMyRole(null);
+        setShowProfile(false); // 로그아웃 시 프로필 화면 닫기
+        setIsProfileVerified(false);
     };
+
+    // ❌ 삭제됨: handleRegisterPasskey 함수 (EditProfile로 이동했으므로 필요 없음)
 
     // --- 화면 렌더링 로직 ---
 
@@ -139,12 +142,32 @@ function App() {
         return <Login onLoginSuccess={handleLoginSuccess} onSwitchToRegister={() => setAuth({ ...auth, view: 'register' })} />;
     }
 
-    // 2. 로그인 후: 관리자라면?
+    // ✅ 2. [수정] 내 정보 수정 화면이 켜져있다면? (관리자든 직원이든 볼 수 있게 최상위에 배치)
+    if (showProfile) {
+        if (isProfileVerified) {
+            return <EditProfile onBack={() => {
+                setShowProfile(false);
+                setIsProfileVerified(false);
+            }} />;
+        }
+
+        else {
+            return (
+                <ProfileAuth
+                    currentUser={auth.user}
+                    onSuccess={() => setIsProfileVerified(true)}
+                    onCancel={() => setShowProfile(false)}
+                    />
+            );
+        }
+    }
+
+    // 3. 로그인 후: 관리자라면?
     if (auth.user.role === 'admin') {
         return <AdminDashboard onLogout={handleLogout} />;
     }
 
-    // 3. 로그인 후: 직원이면? (기존 로직 실행)
+    // 4. 로그인 후: 직원이면? (기존 로직 실행)
     const renderContent = () => {
         if (myRole === 'cashier') {
             return <OnePersonMode onlyOrder={false} isCashier={true} onBack={() => { socket.emit('release_cashier'); setMyRole(null); }} />;
@@ -153,57 +176,14 @@ function App() {
             return <Kitchen onBack={() => setMyRole(null)} />;
         }
         if (userCount <= 1) {
-            // 혼자 하기 모드에서도 로그아웃 버튼 하나 추가해주면 좋음 (일단 생략)
             return <OnePersonMode />;
         }
         return <RoleSelection onSelectRole={setMyRole} isCashierTaken={isCashierTaken} />;
     };
 
-// ... handleLogout 함수 근처 ...
-
-    // 👈 [추가 2] 기기 등록(패스키) 핸들러
-    const handleRegisterPasskey = async () => {
-        // 로그인 정보에 id가 있어야 함 (Login.jsx에서 저장했는지 확인 필요)
-        if (!auth.user || !auth.user.id) {
-            alert("사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.");
-            return;
-        }
-
-        const userId = auth.user.id;
-
-        try {
-            // 1. 등록 옵션 요청
-            const resp = await axios.get(`/api/passkey/register-options?userId=${userId}`);
-
-            // 2. 브라우저 인증(지문/FaceID) 수행
-            let attResp;
-            try {
-                attResp = await startRegistration(resp.data);
-            } catch (error) {
-                if (error.name === 'NotAllowedError') return; // 사용자가 취소함
-                throw error;
-            }
-
-            // 3. 결과 서버로 전송
-            const verificationResp = await axios.post('/api/passkey/register-verify', {
-                userId,
-                body: attResp,
-            });
-
-            if (verificationResp.data.success) {
-                alert('✅ 기기 등록 완료! 다음부터 지문/FaceID로 로그인하세요.');
-            }
-        } catch (error) {
-            console.error(error);
-            alert('기기 등록 실패: ' + (error.response?.data?.error || error.message));
-        }
-    };
-
-    // --- 화면 렌더링 로직 ---
-
     return (
         <div>
-            {/* 상단 헤더 영역 (이름 + 로그아웃 버튼 있는 곳) */}
+            {/* 상단 헤더 영역 */}
             {auth.isLoggedIn && (
                 <div style={{
                     position: 'absolute',
@@ -212,16 +192,15 @@ function App() {
                     zIndex: 9999,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '15px' // 요소 간 간격
+                    gap: '15px'
                 }}>
-
-                    {/* ✅ 3. 시재 점검 버튼 (관리자가 아닐 때만, 혹은 모두에게) */}
+                    {/* 시재 점검 버튼 */}
                     {(myRole === 'cashier' || userCount <= 1) && (
                         <button
                             onClick={() => setShowSettlement(true)}
                             style={{
                                 padding: '8px 12px',
-                                backgroundColor: '#28a745', // 초록색 (돈 관련)
+                                backgroundColor: '#28a745',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '20px',
@@ -234,11 +213,12 @@ function App() {
                         </button>
                     )}
 
+                    {/* ✅ [수정] 기기 등록 버튼 -> 내 정보 버튼으로 변경 */}
                     <button
-                        onClick={handleRegisterPasskey}
+                        onClick={() => setShowProfile(true)}
                         style={{
                             padding: '8px 12px',
-                            backgroundColor: '#6f42c1', // 보라색으로 구분
+                            backgroundColor: '#495057', // 회색 계열로 변경 (설정 느낌)
                             color: 'white',
                             border: 'none',
                             borderRadius: '20px',
@@ -247,7 +227,7 @@ function App() {
                             boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
                         }}
                     >
-                        🔑 기기 등록
+                        ⚙️ 내 정보
                     </button>
 
                     {/* 이름 표시 */}
@@ -260,7 +240,7 @@ function App() {
                         onClick={handleLogout}
                         style={{
                             padding: '8px 12px',
-                            backgroundColor: '#6c757d',
+                            backgroundColor: '#dc3545', // 빨간색 계열
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
@@ -272,7 +252,7 @@ function App() {
                 </div>
             )}
 
-            {/* ✅ 4. 모달 렌더링 (화면 맨 위에 띄움) */}
+            {/* 모달 렌더링 */}
             {showSettlement && (
                 <CashSettlement onClose={() => setShowSettlement(false)} />
             )}

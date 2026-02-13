@@ -58,7 +58,8 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 localStorage.setItem('user', JSON.stringify({
                     name: data.name,
                     role: data.role,
-                    username: data.username
+                    username: data.username,
+                    id: data.id
                 }));
                 onLoginSuccess(data);
             }
