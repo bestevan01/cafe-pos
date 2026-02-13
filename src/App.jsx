@@ -40,12 +40,29 @@ function App() {
     useEffect(() => {
         const token = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
+        const lastActivity = localStorage.getItem('lastActivity'); // 👈 추가됨
+
         if (token && storedUser) {
+            const now = Date.now();
+
+            // 마지막 활동 기록이 있고, 1시간(SESSION_TIMEOUT)이 넘게 지났다면?
+            if (lastActivity && (now - parseInt(lastActivity, 10) > SESSION_TIMEOUT)) {
+                console.log("⏰ 브라우저 종료 후 1시간 초과. 자동 로그아웃 처리.");
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('lastActivity');
+                return; // 로그인 상태로 바꾸지 않고 종료
+            }
+
+            // 시간이 안 지났다면 정상적으로 로그인 유지
             setAuth({
                 isLoggedIn: true,
                 user: JSON.parse(storedUser),
                 view: 'app'
             });
+
+            // 켜자마자 마지막 활동 시간을 현재로 갱신
+            localStorage.setItem('lastActivity', now.toString());
         }
     }, []);
 
@@ -53,8 +70,10 @@ function App() {
     useEffect(() => {
         if (!auth.isLoggedIn) return;
 
-        let lastActivity = Date.now();
-        const updateActivity = () => { lastActivity = Date.now(); };
+        // 움직일 때마다 현재 시간을 로컬 스토리지에 기록 (브라우저 꺼져도 남음)
+        const updateActivity = () => {
+            localStorage.setItem('lastActivity', Date.now().toString());
+        };
 
         window.addEventListener('mousemove', updateActivity);
         window.addEventListener('keydown', updateActivity);
@@ -62,6 +81,10 @@ function App() {
 
         const interval = setInterval(() => {
             const now = Date.now();
+            // 로컬 스토리지에 저장된 마지막 활동 시간을 가져옴
+            const lastActivity = parseInt(localStorage.getItem('lastActivity') || now.toString(), 10);
+
+            // 1시간 넘게 조작이 없으면 로그아웃 처리
             if (now - lastActivity > SESSION_TIMEOUT) {
                 handleAutoLogout();
             }
@@ -124,6 +147,7 @@ function App() {
         socket.emit('logout');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('lastActivity');
         setAuth({ isLoggedIn: false, user: null, view: 'login' });
         setMyRole(null);
         setShowProfile(false); // 로그아웃 시 프로필 화면 닫기
