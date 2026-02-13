@@ -174,7 +174,7 @@ function EditProfile({ onBack }) {
 
                         {/* 🔑 패스키 섹션 (이제 공간이 넓어집니다) */}
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-                            <h3 style={styles.subHeader}>🔐 등록된 기기</h3>
+                            <h3 style={styles.subHeader}>🔐 패스키 관리</h3>
                             <button onClick={handleRegisterPasskey} style={styles.addBtn}>
                                 + 기기 등록
                             </button>
