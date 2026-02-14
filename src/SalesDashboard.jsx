@@ -12,6 +12,7 @@ function SalesDashboard({ onBack }) {
     const [selectedYear, setSelectedYear] = useState('all');
     const [selectedMonth, setSelectedMonth] = useState('all');
     const [selectedDay, setSelectedDay] = useState('all');
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
 
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'default' });
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -46,8 +47,11 @@ function SalesDashboard({ onBack }) {
             const day = parseInt(selectedDay);
             target = target.filter(item => new Date(item.created_at).getDate() === day);
         }
+        if (selectedPaymentMethod !== 'all') {
+            target = target.filter(item => item.payment_method === selectedPaymentMethod);
+        }
         return target;
-    }, [salesData, selectedYear, selectedMonth, selectedDay]);
+    }, [salesData, selectedYear, selectedMonth, selectedDay, selectedPaymentMethod]);
 
     const sortedData = useMemo(() => {
         let sortableItems = [...filteredData];
@@ -121,6 +125,7 @@ function SalesDashboard({ onBack }) {
             '메뉴명': item.menu_name,
             '수량': item.quantity,
             '결제금액': item.total_price,
+            '결제수단': item.payment_method === 'bank' ? '계좌이체' : '현금', // 🌟 추가: 엑셀에 결제수단 포함
             '담당자': item.staff_name
         }));
         const ws = XLSX.utils.json_to_sheet(excelData);
@@ -131,6 +136,8 @@ function SalesDashboard({ onBack }) {
         if (selectedYear !== 'all') fileName += `_${selectedYear}년`;
         if (selectedMonth !== 'all') fileName += `_${selectedMonth}월`;
         if (selectedDay !== 'all') fileName += `_${selectedDay}일`;
+        if (selectedPaymentMethod !== 'all') fileName += `_${selectedPaymentMethod === 'bank' ? '계좌이체' : '현금'}`;
+
         XLSX.writeFile(wb, `${fileName}.xlsx`);
     };
 
@@ -149,15 +156,22 @@ function SalesDashboard({ onBack }) {
 
     const resetFilters = () => {
         setSelectedYear('all'); setSelectedMonth('all'); setSelectedDay('all');
+        setSelectedPaymentMethod('all'); // 🌟 추가: 결제 수단 필터 초기화
         setSortConfig({ key: null, direction: 'default' });
     };
 
     const periodLabel = useMemo(() => {
-        if (selectedYear === 'all') return '전체';
-        if (selectedMonth === 'all') return `${selectedYear}년`;
-        if (selectedDay === 'all') return `${selectedYear}년 ${selectedMonth}월`;
-        return `${selectedYear}년 ${selectedMonth}월 ${selectedDay}일`;
-    }, [selectedYear, selectedMonth, selectedDay]);
+        let label = '';
+        if (selectedYear === 'all') label = '전체 기간';
+        else if (selectedMonth === 'all') label = `${selectedYear}년`;
+        else if (selectedDay === 'all') label = `${selectedYear}년 ${selectedMonth}월`;
+        else label = `${selectedYear}년 ${selectedMonth}월 ${selectedDay}일`;
+
+        if (selectedPaymentMethod !== 'all') {
+            label += ` (${selectedPaymentMethod === 'bank' ? '계좌이체' : '현금'})`;
+        }
+        return label;
+    }, [selectedYear, selectedMonth, selectedDay, selectedPaymentMethod]);
 
     if (loading) return <div style={{padding:'50px', textAlign:'center', color: 'var(--text-secondary)'}}>데이터를 불러오는 중입니다...</div>;
     if (showAdvanced) return <AdvancedStats onBack={() => setShowAdvanced(false)} />;
@@ -175,7 +189,6 @@ function SalesDashboard({ onBack }) {
                     transition: background-color 0.3s ease;
                 }
                 
-                /* 상단 헤더 영역 */
                 .sales-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 25px; }
                 .header-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
                 .sales-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; }
@@ -184,7 +197,6 @@ function SalesDashboard({ onBack }) {
                 .btn-advanced { padding: 10px 15px; background-color: #673ab7; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
                 .btn-excel { padding: 10px 15px; background-color: #217346; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
                 
-                /* 요약 통계 카드 영역 */
                 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
                 .stat-card { background-color: var(--card-bg, white); padding: 25px 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; border: 1px solid var(--border-color, transparent); transition: background-color 0.3s ease; }
                 .stat-title { margin: 0 0 10px 0; font-size: 1rem; color: var(--text-secondary, #666); font-weight: bold; }
@@ -192,40 +204,36 @@ function SalesDashboard({ onBack }) {
                 .stat-val.green { color: #2e7d32; }
                 .stat-val.blue { color: #1565c0; }
 
-                /* 상세 내역 카드 영역 */
                 .table-card { background-color: var(--card-bg, white); padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border-color, transparent); }
                 
-                /* 필터 영역 */
                 .filter-area { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
                 .filter-title { margin: 0; font-size: 1.3rem; color: var(--text-primary, #333); display: flex; align-items: center; gap: 10px; }
-                .filter-total { font-size: 1.1rem; color: #2e7d32; }
                 .filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
                 .filter-select { padding: 8px 12px; font-size: 0.95rem; border-radius: 8px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, white); color: var(--text-primary, #333); outline: none; cursor: pointer; }
                 .btn-filter { padding: 8px 15px; border-radius: 8px; border: none; color: white; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
 
-                /* 💻 PC 테이블 뷰 */
                 .table-responsive { max-height: 500px; overflow-y: auto; overflow-x: auto; }
                 .sales-table { width: 100%; border-collapse: collapse; text-align: center; }
                 .sales-table th { padding: 15px; border-bottom: 2px solid var(--border-color, #ddd); font-weight: bold; color: var(--text-secondary, #666); position: sticky; top: 0; background-color: var(--card-bg, white); cursor: pointer; user-select: none; white-space: nowrap; z-index: 10; }
                 .sales-table td { padding: 12px; border-bottom: 1px solid var(--border-color, #eee); color: var(--text-primary, #333); font-size: 0.95rem; white-space: nowrap; }
+                
                 .btn-del { padding: 6px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s; }
                 .btn-del:active { background-color: #f8d7da; }
 
-                /* 📱 모바일 카드 뷰 (기본 숨김) */
+                .pay-badge { padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; display: inline-block; min-width: 60px; text-align: center; }
+                .pay-cash { background-color: rgba(46, 125, 50, 0.1); color: #2e7d32; }
+                .pay-bank { background-color: rgba(237, 108, 2, 0.1); color: #ed6c02; }
+
                 .sales-card-view { display: none; }
 
-                /* 📱 모바일 화면 최적화 (768px 이하) */
                 @media (max-width: 768px) {
                     .sales-container { padding: 15px; }
-                    .stats-grid { grid-template-columns: 1fr; gap: 12px; } /* 요약 통계 세로 정렬 */
+                    .stats-grid { grid-template-columns: 1fr; gap: 12px; } 
                     .stat-card { padding: 20px 15px; }
+                    .table-card { padding: 15px; background-color: transparent; box-shadow: none; border: none; } 
+                    .table-responsive { display: none; } 
+                    .sales-card-view { display: flex; flex-direction: column; gap: 12px; } 
                     
-                    .table-card { padding: 15px; background-color: transparent; box-shadow: none; border: none; } /* 배경 제거하여 가볍게 */
-                    
-                    .table-responsive { display: none; } /* 테이블 숨김 */
-                    .sales-card-view { display: flex; flex-direction: column; gap: 12px; } /* 카드 뷰 표시 */
-                    
-                    /* 모바일 영수증형 카드 디자인 */
                     .mobile-card {
                         background-color: var(--card-bg, white);
                         border-radius: 15px; padding: 15px;
@@ -260,8 +268,7 @@ function SalesDashboard({ onBack }) {
             </div>
 
             <div className="stats-grid">
-                {selectedYear === 'all' ? (
-                    /* 🌟 1. 전체 보기 상태일 때 (오늘/이번달/전체 건수) */
+                {selectedYear === 'all' && selectedPaymentMethod === 'all' ? (
                     <>
                         <div className="stat-card">
                             <h3 className="stat-title">📅 오늘 매출</h3>
@@ -277,12 +284,10 @@ function SalesDashboard({ onBack }) {
                         </div>
                     </>
                 ) : (
-                    /* 🌟 2. 필터가 적용되었을 때 (조회기간/기간총매출/조회건수) */
                     <>
                         <div className="stat-card">
                             <h3 className="stat-title">🔍 조회 기간</h3>
-                            {/* 날짜가 길어질 수 있으므로 글씨 크기를 살짝 줄임 */}
-                            <p className="stat-val" style={{fontSize: '1.4rem'}}>{periodLabel}</p>
+                            <p className="stat-val" style={{fontSize: '1.2rem'}}>{periodLabel}</p>
                         </div>
                         <div className="stat-card">
                             <h3 className="stat-title">💰 기간 총 매출</h3>
@@ -300,9 +305,15 @@ function SalesDashboard({ onBack }) {
                 <div className="filter-area">
                     <h3 className="filter-title">상세 내역</h3>
                     <div className="filter-group">
-                        <button onClick={resetFilters} className="btn-filter" style={{backgroundColor: selectedYear === 'all' ? '#007bff' : '#6c757d'}}>
-                            전체 보기
+                        <button onClick={resetFilters} className="btn-filter" style={{backgroundColor: selectedYear === 'all' && selectedPaymentMethod === 'all' ? '#007bff' : '#6c757d'}}>
+                            초기화
                         </button>
+                        <select value={selectedPaymentMethod} onChange={(e) => setSelectedPaymentMethod(e.target.value)} className="filter-select" style={{borderColor: selectedPaymentMethod !== 'all' ? '#007bff' : 'var(--border-color, #ccc)'}}>
+                            <option value="all">결제수단: 전체</option>
+                            <option value="cash">현금</option>
+                            <option value="bank">계좌이체</option>
+                        </select>
+
                         <select value={selectedYear} onChange={(e) => { setSelectedYear(e.target.value); setSelectedMonth('all'); setSelectedDay('all'); }} className="filter-select">
                             <option value="all">연도 선택</option>
                             {getAvailableYears().map(year => (<option key={year} value={year}>{year}년</option>))}
@@ -318,7 +329,6 @@ function SalesDashboard({ onBack }) {
                     </div>
                 </div>
 
-                {/* 💻 PC 뷰: 기존 테이블 형식 */}
                 <div className="table-responsive">
                     <table className="sales-table">
                         <thead>
@@ -328,13 +338,15 @@ function SalesDashboard({ onBack }) {
                             <th onClick={() => requestSort('menu_name')}>메뉴명 {getSortIndicator('menu_name')}</th>
                             <th onClick={() => requestSort('quantity')}>수량 {getSortIndicator('quantity')}</th>
                             <th onClick={() => requestSort('total_price')}>금액 {getSortIndicator('total_price')}</th>
+                            {/* 🌟 테이블 헤더에 결제수단 추가 */}
+                            <th onClick={() => requestSort('payment_method')}>결제수단 {getSortIndicator('payment_method')}</th>
                             <th onClick={() => requestSort('staff_name')}>담당자 {getSortIndicator('staff_name')}</th>
                             <th>관리</th>
                         </tr>
                         </thead>
                         <tbody>
                         {sortedData.length === 0 ? (
-                            <tr><td colSpan="7" style={{padding: '30px', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터가 없습니다.</td></tr>
+                            <tr><td colSpan="8" style={{padding: '30px', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터가 없습니다.</td></tr>
                         ) : (
                             sortedData.map(item => (
                                 <tr key={item.id}>
@@ -348,6 +360,14 @@ function SalesDashboard({ onBack }) {
                                     <td style={{fontWeight:'bold'}}>{item.menu_name}</td>
                                     <td>{item.quantity}</td>
                                     <td style={{color:'#d32f2f', fontWeight:'bold'}}>{item.total_price.toLocaleString()}원</td>
+
+                                    {/* 🌟 현금/계좌 뱃지 렌더링 */}
+                                    <td>
+                                        <span className={`pay-badge ${item.payment_method === 'bank' ? 'pay-bank' : 'pay-cash'}`}>
+                                            {item.payment_method === 'bank' ? '🏦 계좌' : '💵 현금'}
+                                        </span>
+                                    </td>
+
                                     <td style={{color: '#1565c0', fontWeight: 'bold'}}>{item.staff_name || '-'}</td>
                                     <td>
                                         <button onClick={() => handleDelete(item.id)} className="btn-del">삭제</button>
@@ -359,7 +379,6 @@ function SalesDashboard({ onBack }) {
                     </table>
                 </div>
 
-                {/* 📱 모바일 뷰: 영수증 형태의 카드 뷰 */}
                 <div className="sales-card-view">
                     {sortedData.length === 0 ? (
                         <div style={{textAlign: 'center', padding: '30px', color: 'var(--text-secondary)'}}>데이터가 없습니다.</div>
@@ -383,13 +402,18 @@ function SalesDashboard({ onBack }) {
                                 </div>
                                 <div className="mc-footer">
                                     <span className="mc-staff">👤 {item.staff_name || '-'}</span>
-                                    <button onClick={() => handleDelete(item.id)} className="btn-del">삭제</button>
+                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                        {/* 🌟 모바일 카드에도 뱃지 추가 */}
+                                        <span className={`pay-badge ${item.payment_method === 'bank' ? 'pay-bank' : 'pay-cash'}`}>
+                                            {item.payment_method === 'bank' ? '🏦 계좌' : '💵 현금'}
+                                        </span>
+                                        <button onClick={() => handleDelete(item.id)} className="btn-del">삭제</button>
+                                    </div>
                                 </div>
                             </div>
                         ))
                     )}
                 </div>
-
             </div>
         </div>
     );
