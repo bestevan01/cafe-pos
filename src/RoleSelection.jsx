@@ -1,6 +1,7 @@
+// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
+
 import { socket } from './socket';
 
-// ✅ [수정] 부모로부터 isCashierTaken을 받아옵니다.
 function RoleSelection({ onSelectRole, isCashierTaken }) {
 
     const handleCashierClick = () => {
@@ -12,44 +13,108 @@ function RoleSelection({ onSelectRole, isCashierTaken }) {
     };
 
     return (
-        <div style={containerStyle}>
-            <h1 style={{ marginBottom: '40px', color: '#333' }}>역할을 선택해주세요</h1>
+        <div className="role-container">
+            <style>
+                {`
+                .role-container {
+                    display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    min-height: 100vh; width: 100%;
+                    background-color: var(--bg-color, #f4f6f8);
+                    padding: 40px 20px; box-sizing: border-box;
+                    transition: background-color 0.3s ease;
+                }
+                .role-title {
+                    margin-bottom: 40px; color: var(--text-primary, #333);
+                    font-size: 1.8rem; text-align: center; font-weight: bold;
+                    word-break: keep-all;
+                }
+                
+                .role-grid {
+                    display: flex; flex-direction: row; gap: 20px;
+                    width: 100%; max-width: 800px; justify-content: center;
+                }
+                
+                .role-card {
+                    flex: 1; 
+                    padding: 20px; 
+                    height: 280px; 
+                    border: 1px solid var(--border-color, transparent); 
+                    border-radius: 24px;
+                    background-color: var(--card-bg, white);
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+                    cursor: pointer; 
+                    display: flex; align-items: center; justify-content: center; 
+                    transition: transform 0.1s, background-color 0.3s, opacity 0.3s;
+                    color: var(--text-primary, #333);
+                    box-sizing: border-box;
+                }
+                .role-card:active:not(:disabled) {
+                    transform: scale(0.96);
+                }
+                .role-card:disabled {
+                    cursor: not-allowed; opacity: 0.6;
+                }
 
-            <div style={{ display: 'flex', gap: '30px' }}>
+                .role-content-wrapper {
+                    display: flex; flex-direction: column; align-items: center;
+                }
+                
+                .role-icon { font-size: 4rem; margin-bottom: 15px; }
+                .role-name { font-size: 1.4rem; font-weight: bold; margin: 0 0 8px 0; }
+                .role-status { font-size: 0.95rem; font-weight: bold; margin: 0; }
+                
+                .status-red { color: #dc3545; }
+                .status-green { color: #28a745; }
+
+                /* 📱 모바일 화면 최적화 (768px 이하) */
+                @media (max-width: 768px) {
+                    .role-grid { 
+                        flex-direction: column; 
+                        gap: 20px; 
+                    }
+                    .role-card { 
+                        width: 100%; max-width: 100%;
+                        height: auto; 
+                        padding: 35px 20px; 
+                    }
+                    .role-icon { font-size: 3.5rem; margin-bottom: 10px; }
+                    .role-name { font-size: 1.3rem; }
+                }
+                `}
+            </style>
+
+            <h1 className="role-title">역할을 선택해주세요</h1>
+
+            <div className="role-grid">
                 <button
                     onClick={handleCashierClick}
                     disabled={isCashierTaken}
-                    style={{ ...cardStyle, opacity: isCashierTaken ? 0.5 : 1 }}
+                    className="role-card"
                 >
-                    <div style={{ fontSize: '50px' }}>🛒</div>
-                    <h2>캐셔 (주문)</h2>
-                    {isCashierTaken && <p style={{color:'red'}}>사용 중...</p>}
+                    <div className="role-content-wrapper">
+                        <div className="role-icon">🛒</div>
+                        <h2 className="role-name">캐셔 (주문)</h2>
+                        {/* 🌟 수정된 부분: 투명도를 빼고 status-green 적용! */}
+                        {isCashierTaken
+                            ? <p className="role-status status-red">사용 중...</p>
+                            : <p className="role-status status-green">선택 가능</p>
+                        }
+                    </div>
                 </button>
 
                 <button
                     onClick={() => onSelectRole('kitchen')}
-                    style={cardStyle}
+                    className="role-card"
                 >
-                    <div style={{ fontSize: '50px' }}>👨‍🍳</div>
-                    <h2>주방 (조리)</h2>
-                    <p style={{color:'green'}}>언제나 가능</p>
+                    <div className="role-content-wrapper">
+                        <div className="role-icon">👨‍🍳</div>
+                        <h2 className="role-name">주방 (조리)</h2>
+                        <p className="role-status status-green">언제나 가능</p>
+                    </div>
                 </button>
             </div>
         </div>
     );
 }
-
-const containerStyle = {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    height: '100vh', backgroundColor: '#f4f6f8'
-};
-
-const cardStyle = {
-    width: '300px', height: '400px',
-    border: 'none', borderRadius: '20px',
-    backgroundColor: 'white', boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-    cursor: 'pointer', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold'
-};
 
 export default RoleSelection;

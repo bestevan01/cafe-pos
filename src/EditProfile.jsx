@@ -1,3 +1,5 @@
+// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
+
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { startRegistration } from '@simplewebauthn/browser';
@@ -6,10 +8,7 @@ function EditProfile({ onBack }) {
     const [user, setUser] = useState({ id: null, name: '', username: '' });
     const [passkeys, setPasskeys] = useState([]);
 
-    // 📺 화면 전환용 상태 (false: 메인 정보 화면 / true: 비밀번호 변경 화면)
     const [isChangingPassword, setIsChangingPassword] = useState(false);
-
-    // 🔒 비밀번호 폼 상태
     const [pwForm, setPwForm] = useState({
         currentPassword: '',
         newPassword: '',
@@ -62,7 +61,6 @@ function EditProfile({ onBack }) {
 
             if (res.data.success) {
                 alert("✅ 비밀번호가 성공적으로 변경되었습니다.");
-                // 초기화 및 메인 화면으로 복귀
                 setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
                 setIsChangingPassword(false);
             }
@@ -83,7 +81,7 @@ function EditProfile({ onBack }) {
     };
 
     const handleRegisterPasskey = async () => {
-        if (!window.confirm("현재 기기를 등록하시겠습니까?")) return;
+        // if (!window.confirm("현재 기기를 등록하시겠습니까?")) return;
         try {
             const resp = await axios.get(`/api/passkey/register-options?userId=${user.id}`);
             let attResp;
@@ -98,7 +96,7 @@ function EditProfile({ onBack }) {
                 userId: user.id, body: attResp,
             });
             if (verificationResp.data.success) {
-                alert('🎉 등록 성공!');
+                // alert('🎉 등록 성공!');
                 fetchPasskeys(user.id);
             }
         } catch (error) { console.error(error); }
@@ -111,100 +109,166 @@ function EditProfile({ onBack }) {
     };
 
     return (
-        <div style={styles.container}>
-            <div style={styles.card}>
+        <div className="ep-container">
+            <style>
+                {`
+                .ep-container {
+                    display: flex; justify-content: center; align-items: center;
+                    width: 100%; min-height: 100vh;
+                    padding: 20px; box-sizing: border-box;
+                    background-color: var(--bg-color, #f4f6f8);
+                    transition: background-color 0.3s ease;
+                }
+                .ep-card {
+                    background-color: var(--card-bg, white);
+                    padding: 30px 25px;
+                    border-radius: 25px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+                    width: 100%; max-width: 420px;
+                    display: flex; flex-direction: column; gap: 20px;
+                    border: 1px solid var(--border-color, transparent);
+                    box-sizing: border-box;
+                }
+                .ep-header { margin: 0; text-align: center; color: var(--text-primary, #333); font-size: 1.6rem; }
+                .ep-desc { text-align: center; color: var(--text-secondary, #666); font-size: 0.95rem; margin-bottom: 10px; line-height: 1.4; }
+                
+                .ep-row { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+                .ep-label { font-size: 0.9rem; color: var(--text-secondary, #666); font-weight: bold; }
+                .ep-input { 
+                    padding: 14px; border-radius: 12px; border: 1px solid var(--border-color, #ddd); 
+                    font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333); 
+                    outline: none; box-sizing: border-box; width: 100%; 
+                    -webkit-appearance: none;
+                }
+                .ep-input:focus { border-color: #007bff; }
+                .ep-input:disabled { opacity: 0.7; }
+                
+                .btn-link { 
+                    padding: 14px; background-color: transparent; color: #007bff; 
+                    border: 1px solid #007bff; border-radius: 12px; cursor: pointer; 
+                    font-weight: bold; font-size: 1rem; text-align: center; transition: background-color 0.2s; 
+                    width: 100%; box-sizing: border-box;
+                }
+                .btn-link:active { background-color: rgba(0,123,255,0.1); }
+                
+                .divider { margin: 5px 0; border: none; border-top: 1px solid var(--border-color, #eee); }
+                
+                .passkey-header { display: flex; justify-content: space-between; align-items: center; }
+                .passkey-title { margin: 0; font-size: 1.1rem; color: var(--text-primary, #333); font-weight: bold; }
+                .btn-add { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+                
+                .passkey-list { 
+                    background-color: var(--bg-color, #f8f9fa); border-radius: 15px; padding: 15px; 
+                    border: 1px solid var(--border-color, #eee); max-height: 250px; overflow-y: auto; 
+                    display: flex; flex-direction: column; gap: 10px; 
+                }
+                .passkey-item { 
+                    display: flex; justify-content: space-between; align-items: center; padding: 12px; 
+                    background-color: var(--card-bg, white); border-radius: 10px; 
+                    border: 1px solid var(--border-color, #eee); 
+                }
+                .pk-name { font-weight: bold; color: var(--text-primary, #333); font-size: 1rem; margin-bottom: 4px; }
+                .pk-date { font-size: 0.8rem; color: var(--text-secondary, #888); }
+                .btn-del { padding: 8px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+                
+                .footer-btns { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; }
+                .btn-base { 
+                    flex: 1; padding: 14px; border: none; border-radius: 12px; 
+                    cursor: pointer; font-weight: bold; font-size: 1rem; text-align: center; 
+                    color: white; transition: transform 0.1s; 
+                }
+                .btn-base:active { transform: scale(0.97); }
+                .btn-back { background-color: #6c757d; }
+                .btn-logout { background-color: #dc3545; }
+                .btn-save { background-color: #007bff; }
+                `}
+            </style>
+
+            <div className="ep-card">
 
                 {/* 1️⃣ 비밀번호 변경 화면 */}
                 {isChangingPassword ? (
                     <>
-                        <h2 style={styles.header}>🔒 비밀번호 변경</h2>
-                        <p style={{textAlign: 'center', color: '#666', marginBottom: '20px', fontSize: '0.9rem'}}>
+                        <h2 className="ep-header">🔒 비밀번호 변경</h2>
+                        <p className="ep-desc">
                             안전한 계정 사용을 위해<br/>새로운 비밀번호를 입력해주세요.
                         </p>
 
-                        <div style={styles.passwordBox}>
+                        <div className="ep-row" style={{gap: '12px', margin: '15px 0'}}>
                             <input
                                 type="password"
                                 placeholder="현재 비밀번호"
                                 value={pwForm.currentPassword}
                                 onChange={(e) => setPwForm({...pwForm, currentPassword: e.target.value})}
-                                style={styles.input}
+                                className="ep-input"
                             />
                             <input
                                 type="password"
                                 placeholder="새 비밀번호"
                                 value={pwForm.newPassword}
                                 onChange={(e) => setPwForm({...pwForm, newPassword: e.target.value})}
-                                style={styles.input}
+                                className="ep-input"
+                                autoComplete="new-password"
                             />
                             <input
                                 type="password"
                                 placeholder="새 비밀번호 확인"
                                 value={pwForm.confirmPassword}
                                 onChange={(e) => setPwForm({...pwForm, confirmPassword: e.target.value})}
-                                style={styles.input}
+                                className="ep-input"
+                                autoComplete="new-password"
                             />
                         </div>
 
-                        <div style={styles.footer}>
-                            <button onClick={() => setIsChangingPassword(false)} style={styles.cancelBtn}>취소</button>
-                            <button onClick={handleChangePassword} style={styles.changeBtn}>변경 저장</button>
+                        <div className="footer-btns">
+                            <button onClick={() => setIsChangingPassword(false)} className="btn-base btn-back">취소</button>
+                            <button onClick={handleChangePassword} className="btn-base btn-save">변경 저장</button>
                         </div>
                     </>
                 ) : (
-                    /* 2️⃣ 메인 내 정보 화면 (패스키 목록 넓게 보임) */
+                    /* 2️⃣ 메인 내 정보 화면 */
                     <>
-                        <h2 style={styles.header}>⚙️ 내 정보 수정</h2>
+                        <h2 className="ep-header">⚙️ 내 정보 수정</h2>
 
-                        <div style={styles.infoRow}>
-                            <label style={styles.label}>아이디</label>
-                            <input type="text" value={user.username} disabled style={styles.disabledInput} />
+                        <div className="ep-row">
+                            <label className="ep-label">아이디</label>
+                            <input type="text" value={user.username} disabled className="ep-input" />
                         </div>
-                        <div style={styles.infoRow}>
-                            <label style={styles.label}>이름</label>
-                            <input type="text" value={user.name} disabled style={styles.disabledInput} />
+                        <div className="ep-row">
+                            <label className="ep-label">이름</label>
+                            <input type="text" value={user.name} disabled className="ep-input" />
                         </div>
 
-                        {/* 👉 비밀번호 변경 창으로 넘어가는 버튼 */}
-                        <button onClick={() => setIsChangingPassword(true)} style={styles.goToPwBtn}>
+                        <button onClick={() => setIsChangingPassword(true)} className="btn-link">
                             비밀번호 변경하기 〉
                         </button>
 
-                        <hr style={styles.divider} />
+                        <hr className="divider" />
 
-                        {/* 🔑 패스키 섹션 (이제 공간이 넓어집니다) */}
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-                            <h3 style={styles.subHeader}>🔐 패스키 관리</h3>
-                            <button onClick={handleRegisterPasskey} style={styles.addBtn}>
-                                + 기기 등록
-                            </button>
+                        <div className="passkey-header">
+                            <h3 className="passkey-title">🔐 패스키 관리</h3>
+                            <button onClick={handleRegisterPasskey} className="btn-add">+ 기기 등록</button>
                         </div>
 
-                        <div style={styles.listContainer}>
+                        <div className="passkey-list">
                             {passkeys.length === 0 ? (
-                                <p style={{textAlign:'center', color:'#999', padding:'20px'}}>등록된 기기가 없습니다.</p>
+                                <p style={{textAlign:'center', color:'var(--text-secondary)', padding:'20px 0', margin: 0}}>등록된 기기가 없습니다.</p>
                             ) : (
                                 passkeys.map((key) => (
-                                    <div key={key.id} style={styles.listItem}>
+                                    <div key={key.id} className="passkey-item">
                                         <div>
-                                            <div style={{fontWeight:'bold', color:'#333', fontSize:'0.9rem'}}>
-                                                {key.device_name}
-                                            </div>
-                                            <div style={{fontSize:'0.75rem', color:'#888'}}>
-                                                {new Date(key.created_at).toLocaleDateString()}
-                                            </div>
+                                            <div className="pk-name">{key.device_name}</div>
+                                            <div className="pk-date">{new Date(key.created_at).toLocaleDateString()}</div>
                                         </div>
-                                        <button onClick={() => handleDeletePasskey(key.id)} style={styles.deleteBtn}>
-                                            삭제
-                                        </button>
+                                        <button onClick={() => handleDeletePasskey(key.id)} className="btn-del">삭제</button>
                                     </div>
                                 ))
                             )}
                         </div>
 
-                        <div style={styles.footer}>
-                            <button onClick={onBack} style={styles.backBtn}>뒤로 가기</button>
-                            <button onClick={handleLogout} style={styles.logoutBtn}>로그아웃</button>
+                        <div className="footer-btns">
+                            <button onClick={onBack} className="btn-base btn-back">뒤로 가기</button>
+                            <button onClick={handleLogout} className="btn-base btn-logout">로그아웃</button>
                         </div>
                     </>
                 )}
@@ -212,36 +276,5 @@ function EditProfile({ onBack }) {
         </div>
     );
 }
-
-// 스타일
-const styles = {
-    container: { display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100vw', height: '100vh', backgroundColor: '#eef2f5' },
-    card: { backgroundColor: 'white', padding: '30px', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', width: '450px', display: 'flex', flexDirection: 'column', gap: '15px' },
-    header: { margin: '0 0 10px 0', textAlign: 'center', color: '#333' },
-    subHeader: { margin: '0 0 10px 0', fontSize: '1rem', color: '#555', fontWeight:'bold' },
-    divider: { margin: '15px 0', border: 'none', borderTop: '1px solid #eee' },
-    infoRow: { display: 'flex', flexDirection: 'column', gap: '5px' },
-    label: { fontSize: '0.85rem', color: '#666', fontWeight: 'bold' },
-    disabledInput: { padding: '10px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: '#f9f9f9', color: '#555' },
-
-    // 버튼 전환용 스타일 추가
-    goToPwBtn: { padding: '8px 0', backgroundColor: 'transparent', color: '#007bff', border: '1px solid #007bff', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', marginTop: '5px' },
-
-    // 비밀번호 관련 폼 스타일
-    passwordBox: { display: 'flex', flexDirection: 'column', gap: '12px', margin: '20px 0' },
-    input: { padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem' },
-    changeBtn: { padding: '12px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', flex: 1, marginLeft: '5px' },
-    cancelBtn: { padding: '12px 20px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', flex: 1, marginRight: '5px' },
-
-    // 패스키 리스트 높이 넓게 조정
-    listContainer: { backgroundColor: '#f8f9fa', borderRadius: '10px', padding: '10px', border: '1px solid #eee', overflowY: 'auto' },
-    listItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #eee', backgroundColor: 'white', borderRadius: '8px', marginBottom: '5px' },
-    addBtn: { padding: '5px 10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' },
-    deleteBtn: { padding: '5px 10px', backgroundColor: '#ffebeb', color: '#dc3545', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' },
-
-    footer: { display: 'flex', justifyContent: 'space-between', marginTop: '10px' },
-    backBtn: { padding: '10px 18px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' },
-    logoutBtn: { padding: '10px 18px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight:'bold' }
-};
 
 export default EditProfile;

@@ -215,6 +215,19 @@ app.patch('/api/admin/users/:id/role', async (req, res) => {
     }
 });
 
+// 🗑️ 직원 계정 영구 삭제 API
+app.delete('/api/admin/users/:id', async (req, res) => {
+    try {
+        const conn = await pool.getConnection();
+        await conn.query('DELETE FROM users WHERE id = ?', [req.params.id]);
+        conn.release();
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: '계정 삭제 실패' });
+    }
+});
+
 
 // ==========================================
 // [SECTION 3] Order Handling API
@@ -277,7 +290,7 @@ app.post('/api/orders', async (req, res) => {
 
 app.get('/api/orders', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM orders WHERE is_delivered = 0 ORDER BY id DESC');
+        const [rows] = await pool.query('SELECT * FROM orders WHERE is_delivered = 0 ORDER BY created_at DESC');
         res.json(rows);
     } catch (error) {
         res.status(500).json({ success: false });
@@ -374,7 +387,7 @@ app.get('/api/settlement/status', async (req, res) => {
     try {
         const [todayRows] = await conn.query('SELECT * FROM cash_settlements WHERE date = CURDATE()');
         if (todayRows.length === 0) {
-            const [prevRows] = await conn.query('SELECT closing_amount FROM cash_settlements WHERE is_closed = 1 ORDER BY date DESC, id DESC LIMIT 1');
+            const [prevRows] = await conn.query('SELECT closing_amount FROM cash_settlements WHERE is_closed = 1 ORDER BY date DESC, created_at DESC LIMIT 1');
             const prevClosing = prevRows.length > 0 ? Number(prevRows[0].closing_amount) : 0;
             res.json({ status: 'not_opened', prevClosing });
         } else {

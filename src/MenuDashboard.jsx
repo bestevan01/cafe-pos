@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
+
 import axios from 'axios';
+import { useState, useEffect } from 'react';
 
 function MenuDashboard({ onBack }) {
     const [menuList, setMenuList] = useState([]);
-    const [editingId, setEditingId] = useState(null); // 수정 중인 메뉴 ID
+    const [editingId, setEditingId] = useState(null);
 
-    // 입력 폼 상태 (추가/수정 공용)
     const [formData, setFormData] = useState({ name: '', price: '', type: 'coffee' });
 
     useEffect(() => {
@@ -25,20 +26,18 @@ function MenuDashboard({ onBack }) {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // --- [추가] ---
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
             await axios.post('/api/menu', formData);
             alert("메뉴가 추가되었습니다.");
-            setFormData({ name: '', price: '', type: 'coffee' }); // 초기화
+            setFormData({ name: '', price: '', type: 'coffee' });
             fetchMenu();
         } catch (err) {
             alert("추가 실패");
         }
     };
 
-    // --- [삭제] ---
     const handleDelete = async (id) => {
         if (!window.confirm("정말 이 메뉴를 삭제하시겠습니까?")) return;
         try {
@@ -49,13 +48,13 @@ function MenuDashboard({ onBack }) {
         }
     };
 
-    // --- [수정 모드 진입] ---
     const startEdit = (menu) => {
         setEditingId(menu.id);
         setFormData({ name: menu.name, price: menu.price, type: menu.type });
+        // 모바일 환경에서 수정 버튼 누르면 화면 맨 위(폼 위치)로 스크롤 올려주기
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // --- [수정 저장] ---
     const handleUpdate = async () => {
         try {
             await axios.patch(`/api/menu/${editingId}`, formData);
@@ -68,10 +67,8 @@ function MenuDashboard({ onBack }) {
         }
     };
 
-    // --- [품절 토글] ---
     const toggleSoldOut = async (menu) => {
         try {
-            // 0 -> 1, 1 -> 0 뒤집기
             const newVal = menu.is_soldout ? 0 : 1;
             await axios.patch(`/api/menu/${menu.id}`, { is_soldout: newVal });
             fetchMenu();
@@ -81,25 +78,116 @@ function MenuDashboard({ onBack }) {
     };
 
     return (
-        <div style={containerStyle}>
-            <div style={headerStyle}>
-                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                    <button onClick={onBack} style={backBtnStyle}>⬅ 뒤로</button>
-                    <h1 style={{margin:0}}>📋 메뉴 관리</h1>
-                </div>
+        <div className="menu-container">
+            {/* 반응형 & 다크모드 대응 CSS 삽입 */}
+            <style>
+                {`
+                .menu-container {
+                    padding: 20px;
+                    background-color: var(--bg-color, #f4f6f8);
+                    min-height: 100vh;
+                    display: flex;
+                    flex-direction: column;
+                    box-sizing: border-box;
+                    transition: background-color 0.3s ease;
+                }
+                .menu-header {
+                    display: flex; align-items: center; gap: 15px; margin-bottom: 20px;
+                }
+                .menu-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; }
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+                /* 레이아웃 분할 (PC는 양옆, 모바일은 위아래) */
+                .menu-content {
+                    display: flex; gap: 20px; align-items: flex-start;
+                }
+                
+                /* 왼쪽 폼 영역 */
+                .form-section {
+                    width: 320px; flex-shrink: 0;
+                    background-color: var(--card-bg, white);
+                    padding: 20px; border-radius: 20px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+                    box-sizing: border-box;
+                    position: sticky; top: 20px; /* PC에서는 스크롤 따라오게 */
+                }
+                .form-title { margin-top: 0; margin-bottom: 15px; color: var(--text-primary, #333); }
+                .menu-input {
+                    padding: 12px; border-radius: 10px; border: 1px solid var(--border-color, #ddd); font-size: 1rem;
+                    background-color: var(--bg-color, #f4f6f8); color: var(--text-primary, #333); width: 100%; box-sizing: border-box; margin-bottom: 10px;
+                    -webkit-appearance: none;
+                }
+                .menu-input:focus { outline: none; border-color: #007bff; }
+                
+                .btn-submit { padding: 12px; border-radius: 10px; border: none; font-weight: bold; width: 100%; cursor: pointer; color: white; font-size: 1rem; transition: transform 0.1s;}
+                .btn-submit:active { transform: scale(0.97); }
+                .btn-add { background-color: #007bff; }
+                .btn-update { background-color: #ff9800; }
+                .btn-cancel { padding: 12px; border-radius: 10px; border: none; font-weight: bold; width: 100%; cursor: pointer; background-color: #6c757d; color: white; margin-top: 8px; font-size: 1rem;}
+
+                /* 오른쪽 리스트 영역 */
+                .list-section {
+                    flex: 1; background-color: var(--card-bg, white); padding: 20px; border-radius: 20px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; width: 100%; box-sizing: border-box;
+                }
+                
+                /* PC 테이블 뷰 */
+                .menu-table-view { width: 100%; border-collapse: collapse; }
+                .menu-table-view th { padding: 15px 10px; color: var(--text-secondary, #666); text-align: left; border-bottom: 2px solid var(--border-color, #ddd); white-space: nowrap; }
+                .menu-table-view td { padding: 15px 10px; color: var(--text-primary, #333); border-bottom: 1px solid var(--border-color, #eee); }
+                
+                /* 모바일 카드 뷰 (기본 숨김) */
+                .menu-card-view { display: none; }
+
+                /* 뱃지 및 버튼 공통 */
+                .badge-type { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .btn-sale { padding: 6px 12px; background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem;}
+                .btn-soldout { padding: 6px 12px; background-color: #ffebee; color: #c62828; border: 1px solid #c62828; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem;}
+                .btn-action { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+                .btn-edit { background-color: #ff9800; color: white; margin-right: 5px; }
+                .btn-del { background-color: #ff5252; color: white; }
+
+                /* 📱 모바일 화면 (768px 이하) */
+                @media (max-width: 768px) {
+                    .menu-content { flex-direction: column; } /* 좌우 배치를 상하 배치로! */
+                    .form-section { width: 100%; position: static; } /* 폼 너비 100%로 꽉 채우기 */
+                    .list-section { padding: 0; background-color: transparent; box-shadow: none; } /* 모바일에서는 리스트 배경/패딩 제거 */
+                    
+                    .menu-table-view { display: none; } /* 테이블 뷰 숨기기 */
+                    .menu-card-view { display: flex; flex-direction: column; gap: 15px; } /* 카드 뷰 보이기 */
+                    
+                    .menu-card {
+                        background-color: var(--card-bg, white);
+                        border-radius: 15px; padding: 15px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+                        display: flex; flex-direction: column; gap: 12px;
+                        border: 1px solid var(--border-color, transparent);
+                    }
+                    .menu-card-header { display: flex; justify-content: space-between; align-items: center; }
+                    .menu-card-title { font-size: 1.1rem; font-weight: bold; color: var(--text-primary, #333); }
+                    .menu-card-price { font-size: 1.05rem; color: var(--text-primary, #555); margin-top: 5px; }
+                    
+                    .menu-card-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color, #eee); padding-top: 12px; margin-top: 5px; }
+                }
+                `}
+            </style>
+
+            <div className="menu-header">
+                <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                <h1 className="menu-title">📋 메뉴 관리</h1>
             </div>
 
-            <div style={{display: 'flex', gap: '20px'}}>
-                {/* 왼쪽: 메뉴 추가/수정 폼 */}
-                <div style={formCardStyle}>
-                    <h3 style={{marginTop:0}}>{editingId ? "✏️ 메뉴 수정" : "➕ 메뉴 추가"}</h3>
-                    <form onSubmit={editingId ? (e) => {e.preventDefault(); handleUpdate();} : handleAdd} style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+            <div className="menu-content">
+                {/* 1. 왼쪽/상단: 메뉴 추가 및 수정 폼 */}
+                <div className="form-section">
+                    <h3 className="form-title">{editingId ? "✏️ 메뉴 수정" : "➕ 메뉴 추가"}</h3>
+                    <form onSubmit={editingId ? (e) => {e.preventDefault(); handleUpdate();} : handleAdd}>
                         <input
                             name="name"
                             placeholder="메뉴 이름 (예: 카페라떼)"
                             value={formData.name}
                             onChange={handleInputChange}
-                            style={inputStyle}
+                            className="menu-input"
                             required
                         />
                         <input
@@ -108,88 +196,90 @@ function MenuDashboard({ onBack }) {
                             placeholder="가격 (예: 3000)"
                             value={formData.price}
                             onChange={handleInputChange}
-                            style={inputStyle}
+                            className="menu-input"
                             required
                         />
-                        <select name="type" value={formData.type} onChange={handleInputChange} style={inputStyle}>
+                        <select name="type" value={formData.type} onChange={handleInputChange} className="menu-input">
                             <option value="coffee">커피</option>
                             <option value="tea">티/에이드</option>
                             <option value="dessert">디저트</option>
                         </select>
 
-                        <button type="submit" style={editingId ? updateBtnStyle : addBtnStyle}>
+                        <button type="submit" className={`btn-submit ${editingId ? 'btn-update' : 'btn-add'}`}>
                             {editingId ? "수정 완료" : "추가하기"}
                         </button>
 
                         {editingId && (
-                            <button type="button" onClick={() => {setEditingId(null); setFormData({name:'', price:'', type:'coffee'})}} style={cancelBtnStyle}>
+                            <button type="button" onClick={() => {setEditingId(null); setFormData({name:'', price:'', type:'coffee'})}} className="btn-cancel">
                                 취소
                             </button>
                         )}
                     </form>
                 </div>
 
-                {/* 오른쪽: 메뉴 리스트 */}
-                <div style={{flex: 1, backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)'}}>
-                    <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                {/* 2. 오른쪽/하단: 메뉴 리스트 */}
+                <div className="list-section">
+
+                    {/* 💻 PC 뷰: 기존 테이블 형식 */}
+                    <table className="menu-table-view">
                         <thead>
-                        <tr style={{borderBottom: '2px solid #ddd', textAlign: 'left'}}>
-                            <th style={thStyle}>이름</th>
-                            <th style={thStyle}>가격</th>
-                            <th style={thStyle}>분류</th>
-                            <th style={thStyle}>품절여부</th>
-                            <th style={thStyle}>관리</th>
+                        <tr>
+                            <th>이름</th>
+                            <th>가격</th>
+                            <th>분류</th>
+                            <th>상태 변경</th>
+                            <th>관리</th>
                         </tr>
                         </thead>
                         <tbody>
                         {menuList.map(menu => (
-                            <tr key={menu.id} style={{borderBottom: '1px solid #eee'}}>
-                                <td style={tdStyle}>{menu.name}</td>
-                                <td style={tdStyle}>{menu.price.toLocaleString()}원</td>
-                                <td style={tdStyle}>
-                                    <span style={typeBadgeStyle}>{menu.type}</span>
-                                </td>
-                                <td style={tdStyle}>
-                                    <button
-                                        onClick={() => toggleSoldOut(menu)}
-                                        style={menu.is_soldout ? soldOutBtnStyle : saleBtnStyle}
-                                    >
-                                        {menu.is_soldout ? "🚫 품절중" : "🟢 판매중"}
+                            <tr key={menu.id}>
+                                <td><strong>{menu.name}</strong></td>
+                                <td>{menu.price.toLocaleString()}원</td>
+                                <td><span className="badge-type">{menu.type}</span></td>
+                                <td>
+                                    <button onClick={() => toggleSoldOut(menu)} className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
+                                        {menu.is_soldout ? "🚫 품절" : "🟢 판매중"}
                                     </button>
                                 </td>
-                                <td style={tdStyle}>
-                                    <button onClick={() => startEdit(menu)} style={editBtnStyle}>수정</button>
-                                    <button onClick={() => handleDelete(menu.id)} style={deleteBtnStyle}>삭제</button>
+                                <td>
+                                    <button onClick={() => startEdit(menu)} className="btn-action btn-edit">수정</button>
+                                    <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">삭제</button>
                                 </td>
                             </tr>
                         ))}
                         </tbody>
                     </table>
+
+                    {/* 📱 모바일 뷰: 카드 형식 */}
+                    <div className="menu-card-view">
+                        {menuList.map(menu => (
+                            <div key={menu.id} className="menu-card">
+                                <div>
+                                    <div className="menu-card-header">
+                                        <div className="menu-card-title">{menu.name}</div>
+                                        <span className="badge-type">{menu.type}</span>
+                                    </div>
+                                    <div className="menu-card-price">{menu.price.toLocaleString()}원</div>
+                                </div>
+
+                                <div className="menu-card-actions">
+                                    <button onClick={() => toggleSoldOut(menu)} className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
+                                        {menu.is_soldout ? "🚫 품절중" : "🟢 판매중"}
+                                    </button>
+                                    <div>
+                                        <button onClick={() => startEdit(menu)} className="btn-action btn-edit">수정</button>
+                                        <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">삭제</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
                 </div>
             </div>
         </div>
     );
 }
-
-// 스타일
-const containerStyle = { padding: '30px', backgroundColor: '#f4f6f8', minHeight: '100vh' };
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' };
-const backBtnStyle = { padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' };
-const formCardStyle = { width: '300px', backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', height: 'fit-content' };
-const inputStyle = { padding: '10px', borderRadius: '5px', border: '1px solid #ddd', fontSize: '1rem' };
-const thStyle = { padding: '12px', color: '#555' };
-const tdStyle = { padding: '12px' };
-
-const btnBase = { padding: '8px', borderRadius: '5px', border: 'none', cursor: 'pointer', fontWeight: 'bold', width: '100%' };
-const addBtnStyle = { ...btnBase, backgroundColor: '#007bff', color: 'white' };
-const updateBtnStyle = { ...btnBase, backgroundColor: '#ff9800', color: 'white' };
-const cancelBtnStyle = { ...btnBase, backgroundColor: '#9e9e9e', color: 'white', marginTop: '5px' };
-
-const editBtnStyle = { padding: '5px 10px', backgroundColor: '#ff9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginRight: '5px' };
-const deleteBtnStyle = { padding: '5px 10px', backgroundColor: '#ff5252', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' };
-const typeBadgeStyle = { backgroundColor: '#e3f2fd', color: '#1565c0', padding: '3px 8px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 'bold' };
-
-const saleBtnStyle = { padding: '5px 10px', backgroundColor: '#e8f5e9', color: '#2e7d32', border: '1px solid #2e7d32', borderRadius: '15px', cursor: 'pointer', fontWeight: 'bold' };
-const soldOutBtnStyle = { padding: '5px 10px', backgroundColor: '#ffebee', color: '#c62828', border: '1px solid #c62828', borderRadius: '15px', cursor: 'pointer', fontWeight: 'bold' };
 
 export default MenuDashboard;

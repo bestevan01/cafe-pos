@@ -1,3 +1,6 @@
+// TODO: 모바일 UI 최적화 필요
+// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
+
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 

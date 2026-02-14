@@ -1,3 +1,5 @@
+// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
+
 import { useState } from 'react';
 import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
 import axios from 'axios';
@@ -27,33 +29,27 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 onLoginSuccess(res.data);
             }
         } catch (err) {
-            // 403 Forbidden 등 에러 처리
             alert(err.response?.data?.message || "로그인 실패");
         }
     };
 
     const handlePasskeyLogin = async () => {
         try {
-            // 1. 옵션 받아오기
             const resp = await axios.get('/api/passkey/login-options');
-
-            // 2. 브라우저/기기 인증 수행 (지문/얼굴 인식 창 뜸)
             let asseResp;
             try {
                 asseResp = await startAuthentication(resp.data);
             } catch (error) {
-                if (error.name === 'NotAllowedError') return; // 취소함
+                if (error.name === 'NotAllowedError') return;
                 throw error;
             }
 
-            // 3. 결과 서버로 전송
             const verificationResp = await axios.post('/api/passkey/login-verify', {
                 body: asseResp,
             });
 
             if (verificationResp.data.success) {
                 const data = verificationResp.data;
-                // 기존 로그인 성공 처리와 동일
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify({
                     name: data.name,
@@ -70,39 +66,113 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
     };
 
     return (
-        <div style={containerStyle}>
-            <div style={cardStyle}>
-                <h1 style={{ marginBottom: '30px', fontSize: '3rem' }}>☕</h1>
-                <h2 style={{ marginBottom: '20px', color: '#333' }}>직원 로그인</h2>
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%' }}>
-                    <input name="username" placeholder="아이디" onChange={handleChange} style={inputStyle} required />
-                    <input name="password" type="password" placeholder="비밀번호" onChange={handleChange} style={inputStyle} required />
-                    <button type="submit" style={btnStyle}>로그인</button>
+        <div className="login-container">
+            <style>
+                {`
+                .login-container {
+                    display: flex; justify-content: center; align-items: center;
+                    width: 100%; min-height: 100vh;
+                    background-color: var(--bg-color, #f4f6f8);
+                    padding: 20px; box-sizing: border-box;
+                    transition: background-color 0.3s ease;
+                }
+                .login-card {
+                    background-color: var(--card-bg, white);
+                    width: 100%; max-width: 380px;
+                    padding: 40px 30px;
+                    border-radius: 25px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+                    display: flex; flex-direction: column; align-items: center;
+                    box-sizing: border-box;
+                    border: 1px solid var(--border-color, transparent);
+                    transition: background-color 0.3s ease;
+                }
+                .login-emoji { font-size: 3.5rem; margin: 0 0 10px 0; }
+                .login-title { margin: 0 0 25px 0; color: var(--text-primary, #333); font-size: 1.6rem; font-weight: bold; }
+                
+                .login-form { width: 100%; display: flex; flex-direction: column; gap: 15px; }
+                .login-input {
+                    padding: 14px; border-radius: 12px; border: 1px solid var(--border-color, #ddd);
+                    font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333);
+                    outline: none; box-sizing: border-box; width: 100%;
+                    -webkit-appearance: none;
+                    transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+                }
+                .login-input:focus { border-color: #007bff; }
+                .login-input::placeholder { color: var(--text-secondary, #aaa); }
+                
+                .btn-submit {
+                    padding: 14px; border-radius: 12px; border: none; background-color: #007bff; color: white;
+                    font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;
+                    transition: transform 0.1s, background-color 0.2s;
+                }
+                .btn-submit:active { transform: scale(0.97); background-color: #0056b3; }
+                
+                .divider-container { width: 100%; display: flex; align-items: center; margin: 25px 0 15px 0; }
+                .divider-line { flex: 1; height: 1px; background-color: var(--border-color, #ddd); transition: background-color 0.3s; }
+                .divider-text { padding: 0 15px; color: var(--text-secondary, #999); font-size: 0.85rem; }
+                
+                .btn-passkey {
+                    padding: 14px; border-radius: 12px; border: 1px solid var(--border-color, #ccc);
+                    background-color: var(--card-bg, white); color: var(--text-primary, #333);
+                    font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;
+                    display: flex; align-items: center; justify-content: center; gap: 8px;
+                    transition: transform 0.1s, background-color 0.2s, border-color 0.3s, color 0.3s;
+                }
+                .btn-passkey:active { transform: scale(0.97); background-color: var(--bg-color, #f4f6f8); }
+                
+                .register-text { margin-top: 30px; font-size: 0.95rem; color: var(--text-secondary, #666); }
+                .register-link { color: #007bff; cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
+                .register-link:active { color: #0056b3; }
+                `}
+            </style>
+
+            <div className="login-card">
+                <div className="login-emoji">☕</div>
+                <h2 className="login-title">직원 로그인</h2>
+
+                <form onSubmit={handleSubmit} className="login-form">
+                    <input
+                        id="username"
+                        name="username"
+                        placeholder="아이디"
+                        value={formData.username}
+                        onChange={handleChange}
+                        className="login-input"
+                        autoComplete="username"
+                        required
+                    />
+                    <input
+                        id="current-password"
+                        name="password"
+                        type="password"
+                        placeholder="비밀번호"
+                        value={formData.password}
+                        onChange={handleChange}
+                        className="login-input"
+                        autoComplete="current-password"
+                        required
+                    />
+                    <button type="submit" className="btn-submit">로그인</button>
                 </form>
-                <div style={{width: '100%', marginTop: '10px', display:'flex', flexDirection:'column', gap:'5px'}}>
-                    <div style={{display:'flex', alignItems:'center', margin:'10px 0'}}>
-                        <div style={{flex:1, height:'1px', backgroundColor:'#ddd'}}></div>
-                        <span style={{padding:'0 10px', color:'#999', fontSize:'0.8rem'}}>또는</span>
-                        <div style={{flex:1, height:'1px', backgroundColor:'#ddd'}}></div>
-                    </div>
-                    <button
-                        onClick={handlePasskeyLogin}
-                        style={{...btnStyle, backgroundColor: '#fff', color:'#333', border:'1px solid #ccc', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}
-                    >
-                        🔑 패스키(지문/FaceID)로 로그인
-                    </button>
+
+                <div className="divider-container">
+                    <div className="divider-line"></div>
+                    <span className="divider-text">또는</span>
+                    <div className="divider-line"></div>
                 </div>
-                <p style={{ marginTop: '15px', fontSize: '0.9rem', color: '#666' }}>
-                    계정이 없으신가요? <span onClick={onSwitchToRegister} style={{ color: '#007bff', cursor: 'pointer', fontWeight: 'bold' }}>회원가입</span>
-                </p>
+
+                <button onClick={handlePasskeyLogin} className="btn-passkey">
+                    🔑 패스키(지문/FaceID)로 로그인
+                </button>
+
+                <div className="register-text">
+                    계정이 없으신가요?
+                    <span onClick={onSwitchToRegister} className="register-link">회원가입</span>
+                </div>
             </div>
         </div>
     );
 }
-
-const containerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f0f2f5' };
-const cardStyle = { width: '350px', padding: '40px', backgroundColor: 'white', borderRadius: '15px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center' };
-const inputStyle = { padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem' };
-const btnStyle = { padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#007bff', color: 'white', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' };
 
 export default Login;
