@@ -2,16 +2,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { socket } from './socket';
-import OnePersonMode from './OnePersonMode';
-import Kitchen from './Kitchen';
-import RoleSelection from './RoleSelection';
-import Login from './Login';
-import Register from './Register';
-import AdminDashboard from './AdminDashboard';
-import CashSettlement from "./CashSettlement.jsx";
-import ProfileAuth from './ProfileAuth.jsx';
-import EditProfile from './EditProfile.jsx';
+import { socket } from './utils/socket';
+
+import RoleSelection from './pages/pos/RoleSelection';
+import OnePersonMode from './pages/pos/OnePersonMode';
+import Kitchen from './pages/pos/Kitchen';
+import CashSettlement from "./pages/pos/CashSettlement.jsx";
+
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import ProfileAuth from './pages/auth/ProfileAuth.jsx';
+import EditProfile from './pages/auth/EditProfile.jsx';
+
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 function App() {
     const [auth, setAuth] = useState({

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
-import { socket } from './socket';
+import { socket } from '../../utils/socket';
 
 function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
     const [cart, setCart] = useState([]);

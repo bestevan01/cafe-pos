@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
-import { socket } from './socket';
+import { socket } from '../../utils/socket';
 
 function Kitchen({ onBack }) {
     const [orderGroups, setOrderGroups] = useState([]);

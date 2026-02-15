@@ -1,7 +1,7 @@
 // TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
 
 import { useState } from 'react';
-import { startRegistration, startAuthentication } from "@simplewebauthn/browser";
+import { startAuthentication } from "@simplewebauthn/browser";
 import axios from 'axios';
 
 function Login({ onLoginSuccess, onSwitchToRegister }) {
