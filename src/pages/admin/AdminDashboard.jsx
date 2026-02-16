@@ -1,11 +1,10 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import MenuDashboard from './MenuDashboard';
 import SalesDashboard from './SalesDashboard';
 import SettlementDashboard from './SettlementDashboard';
 import UsersDashboard from './UsersDashboard';
+import ThemeToggle from '../../components/ThemeToggle'; // 🌟 테마 스위치 컴포넌트 불러오기
 
 function AdminDashboard({ onLogout, onEditProfile }) {
     // 1. 초기 화면을 'home'으로 설정 (목록이 아닌 선택 화면)
@@ -59,6 +58,7 @@ function AdminDashboard({ onLogout, onEditProfile }) {
             <div style={containerStyle}>
 
                 <div style={topRightHeaderStyle}>
+                    <ThemeToggle />
                     <button onClick={onEditProfile} style={profileBtnStyle}>
                         ⚙️ 내 정보
                     </button>
@@ -70,14 +70,23 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                 <style>
                     {`
                     .admin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; width: 100%; max-width: 1000px; margin-bottom: 50px; }
-                    .admin-card { background-color: white; border-radius: 20px; padding: 35px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); cursor: pointer; display: flex; flex-direction: column; align-items: center; text-align: center; border: none; transition: transform 0.1s, box-shadow 0.1s; }
+                    
+                    .admin-card { 
+                        background-color: var(--card-bg, white); 
+                        border: 1px solid var(--border-color, transparent);
+                        border-radius: 20px; padding: 35px 20px; 
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
+                        cursor: pointer; display: flex; flex-direction: column; align-items: center; 
+                        text-align: center; transition: transform 0.1s, box-shadow 0.1s, background-color 0.3s; 
+                    }
                     .admin-card:active { transform: scale(0.96); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
                     .card-icon { font-size: 3.5rem; margin-bottom: 15px; }
-                    .card-title { font-size: 1.3rem; font-weight: bold; color: #333; margin-bottom: 8px; }
-                    .card-desc { font-size: 0.95rem; color: #888; word-break: keep-all; }
+                    .card-title { font-size: 1.3rem; font-weight: bold; color: var(--text-primary, #333); margin-bottom: 8px; }
+                    .card-desc { font-size: 0.95rem; color: var(--text-secondary, #888); word-break: keep-all; }
 
                     @media (max-width: 768px) {
-                        .admin-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; }
+                        /* 🌟 모바일 하단 여백을 줄여서 스크롤 발생 확률 추가 차단 */
+                        .admin-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
                         .admin-card { aspect-ratio: 1 / 1; justify-content: center; padding: 10px; border-radius: 18px; }
                         .card-icon { font-size: 2.5rem; margin-bottom: 8px; }
                         .card-title { font-size: 1.05rem; margin-bottom: 5px; word-break: keep-all; }
@@ -87,7 +96,9 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                 </style>
 
                 <div style={homeContentStyle}>
-                    <h1 style={{fontSize: '2.2rem', marginBottom: '30px', color: '#333'}}>🛡️ 관리자 대시보드</h1>
+                    <h1 style={{fontSize: '2.2rem', marginBottom: '30px', color: 'var(--text-primary, #333)'}}>
+                        🛡️ 관리자 대시보드
+                    </h1>
 
                     <div className="admin-grid">
                         <button onClick={() => setView('sales')} className="admin-card">
@@ -118,7 +129,16 @@ function AdminDashboard({ onLogout, onEditProfile }) {
 }
 
 // --- 스타일 ---
-const containerStyle = { padding: '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', display: 'flex', flexDirection: 'column' };
+const containerStyle = {
+    padding: '20px',
+    backgroundColor: 'var(--bg-color, #f4f6f8)',
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    transition: 'background-color 0.3s ease',
+    boxSizing: 'border-box', // 🌟 해결 1: padding 때문에 전체 높이가 100vh를 초과하지 않게 강제 맞춤
+    position: 'relative'     // 🌟 해결 2: 우측 상단 absolute 위치의 팝업과 버튼들이 정확한 위치를 잡도록 기준점 마련
+};
 const homeContentStyle = { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' };
 
 const logoutLinkStyle = {
@@ -137,6 +157,7 @@ const topRightHeaderStyle = {
     right: '20px',
     display: 'flex',
     gap: '10px',
+    alignItems: 'center',
     zIndex: 100
 };
 

@@ -1,5 +1,3 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -91,21 +89,38 @@ function Kitchen({ onBack }) {
             <style>
                 {`
                 .kitchen-container {
+                    position: relative; /* 🌟 핵심 1: 절대 위치의 기준점 */
                     display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh;
-                    background-color: var(--bg-color, #f4f6f8); padding: 20px; box-sizing: border-box;
+                    background-color: var(--bg-color, #f4f6f8); 
+                    padding: 20px; 
+                    padding-top: 65px; /* PC/모바일 모두 상단에 버튼이 뜰 공간을 비워둠 */
+                    box-sizing: border-box;
                     transition: background-color 0.3s ease;
                 }
                 
-                .kitchen-header-bar {
-                    display: flex; align-items: center; gap: 20px; border-bottom: 3px solid var(--text-primary, #333);
-                    padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap;
+                /* 🌟 핵심 2: 나가기 버튼을 문서 흐름에서 빼내어 우측 버튼들과 똑같은 높이에 고정 */
+                .btn-back-floating {
+                    position: absolute;
+                    top: 15px;
+                    left: 20px;
+                    z-index: 10000;
+                    padding: 8px 12px;
+                    font-size: 0.95rem;
+                    font-weight: bold;
+                    background-color: #6c757d; 
+                    color: white;
+                    border: none;
+                    border-radius: 8px; /* App.jsx 우측 버튼들과 통일감 부여 */
+                    cursor: pointer;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+                    transition: transform 0.1s;
                 }
+                .btn-back-floating:active { transform: scale(0.95); }
                 
-                .btn-back {
-                    padding: 10px 15px; font-size: 0.95rem; font-weight: bold; background-color: #6c757d; 
-                    color: white; border: none; border-radius: 8px; cursor: pointer; transition: transform 0.1s;
+                .kitchen-header-bar {
+                    border-bottom: 3px solid var(--text-primary, #333);
+                    padding-bottom: 15px; margin-bottom: 20px;
                 }
-                .btn-back:active { transform: scale(0.95); }
                 
                 .kitchen-title { margin: 0; font-size: 2rem; font-weight: 800; color: var(--text-primary, #333); }
                 
@@ -144,18 +159,28 @@ function Kitchen({ onBack }) {
                 @media (max-width: 768px) {
                     .kitchen-container { 
                         padding: 15px; 
-                        padding-top: 65px; /* 🌟 핵심: 상단 글로벌 버튼(내 정보 등)과의 겹침 방지 */
+                        padding-top: 55px; 
                     } 
-                    .kitchen-header-bar { flex-direction: column; align-items: flex-start; gap: 12px; }
-                    .kitchen-title { font-size: 1.6rem; }
-                    .order-grid { grid-template-columns: 1fr; } /* 모바일에서는 1줄 꽉 차게 */
+                    
+                    /* 🌟 핵심 3: 모바일에서 우측 글로벌 버튼(App.jsx)의 top: 10px, 좌우 여백 10px과 완벽하게 일치시킴 */
+                    .btn-back-floating {
+                        top: 10px;
+                        left: 10px;
+                        padding: 6px 10px;
+                        font-size: 0.85rem;
+                    }
+                    
+                    .kitchen-title { font-size: 1.5rem; }
+                    .order-grid { grid-template-columns: 1fr; } 
                     .receipt-num { font-size: 2rem; }
                 }
                 `}
             </style>
 
+            {/* 🌟 기존 흐름에서 빼내어 플로팅된 버튼 */}
+            <button onClick={onBack} className="btn-back-floating">⬅ 나가기</button>
+
             <div className="kitchen-header-bar">
-                <button onClick={onBack} className="btn-back">⬅ 나가기</button>
                 <h1 className="kitchen-title">👨‍🍳 음료 제조 리스트</h1>
             </div>
 

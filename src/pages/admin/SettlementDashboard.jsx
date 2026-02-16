@@ -1,7 +1,6 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import ThemeToggle from '../../components/ThemeToggle'; // 🌟 테마 스위치 추가
 
 function SettlementDashboard({ onBack }) {
     const [settlements, setSettlements] = useState([]);
@@ -23,7 +22,6 @@ function SettlementDashboard({ onBack }) {
 
     return (
         <div className="settle-container">
-            {/* 반응형 & 다크모드 대응 CSS 삽입 */}
             <style>
                 {`
                 .settle-container {
@@ -35,11 +33,17 @@ function SettlementDashboard({ onBack }) {
                     box-sizing: border-box;
                     transition: background-color 0.3s ease;
                 }
+                
+                /* 🌟 헤더를 Flex로 감싸 스위치와 양쪽 정렬 */
                 .settle-header {
-                    display: flex; align-items: center; gap: 15px; margin-bottom: 20px;
+                    display: flex; justify-content: space-between; align-items: center; 
+                    margin-bottom: 20px; flex-wrap: nowrap; gap: 15px;
                 }
-                .settle-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+                .header-left { display: flex; align-items: center; gap: 15px; }
+                .settle-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+
+                .theme-wrapper { display: flex; align-items: center; }
 
                 .settle-content {
                     background-color: var(--card-bg, white);
@@ -47,6 +51,7 @@ function SettlementDashboard({ onBack }) {
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
                     box-sizing: border-box;
                     width: 100%;
+                    border: 1px solid var(--border-color, transparent);
                 }
 
                 /* 💻 PC 테이블 뷰 */
@@ -60,26 +65,42 @@ function SettlementDashboard({ onBack }) {
                     border-bottom: 1px solid var(--border-color, #eee); white-space: nowrap;
                 }
 
-                /* 📱 모바일 카드 뷰 (기본 숨김) */
                 .settle-card-view { display: none; }
 
-                /* 뱃지 및 차액 스타일 공통 */
+                /* 🌟 뱃지 및 차액 클래스화 (인라인 스타일 대체) */
                 .badge-open { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
                 .badge-closed { background-color: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
                 .diff-good { color: #28a745; font-weight: bold; background-color: #e8f5e9; padding: 5px 10px; border-radius: 15px; display: inline-block; }
                 .diff-bad { color: #dc3545; font-weight: bold; background-color: #ffebee; padding: 5px 10px; border-radius: 15px; display: inline-block; }
+                .text-blue { color: #007bff; font-weight: bold; }
+
+                /* 🌙 다크모드 전용 컬러 오버라이드 */
+                [data-theme='dark'] .badge-open { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
+                [data-theme='dark'] .badge-closed { background-color: rgba(46, 125, 50, 0.2); color: #81c784; }
+                [data-theme='dark'] .diff-good { background-color: rgba(40, 167, 69, 0.15); color: #81c784; }
+                [data-theme='dark'] .diff-bad { background-color: rgba(220, 53, 69, 0.15); color: #ff8a80; }
+                [data-theme='dark'] .text-blue { color: #4facfe; }
 
                 /* 📱 모바일 화면 최적화 (768px 이하) */
                 @media (max-width: 768px) {
-                    .settle-content { padding: 0; background-color: transparent; box-shadow: none; }
-                    .settle-table-view { display: none; } /* 모바일에서는 표 숨김 */
-                    .settle-card-view { display: flex; flex-direction: column; gap: 15px; } /* 카드 뷰 표시 */
+                    .settle-container { padding: 15px; }
+                    
+                    /* 🌟 헤더 밸런스 조정: 제목 옆에 스위치 달기 */
+                    .settle-header { position: relative; flex-direction: column; align-items: flex-start; gap: 12px; }
+                    .header-left { width: 100%; gap: 10px; padding-right: 40px; box-sizing: border-box; }
+                    .settle-title { font-size: 1.5rem; }
+                    .btn-back { padding: 8px 12px; font-size: 0.85rem; }
+                    .theme-wrapper { position: absolute; top: 0; right: 0; height: 36px; display: flex; align-items: center; }
+
+                    .settle-content { padding: 0; background-color: transparent; box-shadow: none; border: none; }
+                    .settle-table-view { display: none; } 
+                    .settle-card-view { display: flex; flex-direction: column; gap: 15px; } 
                     
                     .settle-card {
                         background-color: var(--card-bg, white);
                         border-radius: 15px; padding: 20px;
                         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-                        border: 1px solid var(--border-color, transparent);
+                        border: 1px solid var(--border-color, #eee);
                     }
                     .card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color, #eee); padding-bottom: 12px; margin-bottom: 12px; }
                     .card-date { font-size: 1.1rem; font-weight: bold; color: var(--text-primary, #333); }
@@ -87,10 +108,8 @@ function SettlementDashboard({ onBack }) {
                     .card-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-secondary, #666); }
                     .card-val { color: var(--text-primary, #333); font-weight: bold; }
                     
-                    /* 전산 합계 줄은 조금 더 눈에 띄게 */
                     .card-total-row { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 1px dashed var(--border-color, #ddd); font-size: 1rem; color: #007bff; font-weight: bold; }
                     
-                    /* 실제 마감액 및 차액 영역 */
                     .card-closing-section { margin-top: 15px; padding-top: 15px; border-top: 2px solid var(--border-color, #eee); display: flex; justify-content: space-between; align-items: center; }
                     .closing-label { font-size: 0.95rem; color: var(--text-primary, #333); font-weight: bold; }
                     .closing-val { font-size: 1.1rem; color: var(--text-primary, #333); font-weight: bold; }
@@ -99,14 +118,18 @@ function SettlementDashboard({ onBack }) {
             </style>
 
             <div className="settle-header">
-                <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
-                <h1 className="settle-title">💰 시재/정산 관리</h1>
+                <div className="header-left">
+                    <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                    <h1 className="settle-title">💰 시재/정산 관리</h1>
+                </div>
+                <div className="theme-wrapper">
+                    <ThemeToggle />
+                </div>
             </div>
 
             <div className="settle-content">
                 {loading ? <p style={{color: 'var(--text-secondary)', textAlign: 'center'}}>데이터를 불러오는 중입니다...</p> : (
                     <>
-                        {/* 💻 PC 뷰: 기존 테이블 형식 */}
                         <table className="settle-table-view">
                             <thead>
                             <tr>
@@ -132,7 +155,8 @@ function SettlementDashboard({ onBack }) {
                                         </td>
                                         <td>{item.opening_amount.toLocaleString()}원</td>
                                         <td>{item.sales_cash.toLocaleString()}원</td>
-                                        <td style={{fontWeight:'bold', color:'#007bff'}}>
+                                        {/* 🌟 다크모드 대응을 위해 클래스로 분리 */}
+                                        <td className="text-blue">
                                             {expected.toLocaleString()}원
                                         </td>
                                         <td>
@@ -154,7 +178,6 @@ function SettlementDashboard({ onBack }) {
                             </tbody>
                         </table>
 
-                        {/* 📱 모바일 뷰: 영수증 형태의 카드 뷰 */}
                         <div className="settle-card-view">
                             {settlements.map(item => {
                                 const expected = item.opening_amount + item.sales_cash;
@@ -175,7 +198,7 @@ function SettlementDashboard({ onBack }) {
                                             <span>+ 현금 매출</span>
                                             <span className="card-val">{item.sales_cash.toLocaleString()}원</span>
                                         </div>
-                                        <div className="card-total-row">
+                                        <div className="card-total-row text-blue">
                                             <span>= 전산 합계</span>
                                             <span>{expected.toLocaleString()}원</span>
                                         </div>

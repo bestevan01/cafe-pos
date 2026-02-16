@@ -1,7 +1,6 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import axios from 'axios';
 import { useState, useEffect } from 'react';
+import ThemeToggle from '../../components/ThemeToggle'; // 🌟 테마 스위치 추가
 
 function MenuDashboard({ onBack }) {
     const [menuList, setMenuList] = useState([]);
@@ -79,7 +78,6 @@ function MenuDashboard({ onBack }) {
 
     return (
         <div className="menu-container">
-            {/* 반응형 & 다크모드 대응 CSS 삽입 */}
             <style>
                 {`
                 .menu-container {
@@ -91,11 +89,17 @@ function MenuDashboard({ onBack }) {
                     box-sizing: border-box;
                     transition: background-color 0.3s ease;
                 }
+                
+                /* 🌟 헤더를 Flex로 감싸서 테마 스위치 공간 확보 */
                 .menu-header {
-                    display: flex; align-items: center; gap: 15px; margin-bottom: 20px;
+                    display: flex; justify-content: space-between; align-items: center; 
+                    margin-bottom: 20px; flex-wrap: nowrap; gap: 15px;
                 }
-                .menu-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+                .header-left { display: flex; align-items: center; gap: 15px; }
+                .menu-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+                
+                .theme-wrapper { display: flex; align-items: center; }
 
                 /* 레이아웃 분할 (PC는 양옆, 모바일은 위아래) */
                 .menu-content {
@@ -109,6 +113,7 @@ function MenuDashboard({ onBack }) {
                     padding: 20px; border-radius: 20px;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
                     box-sizing: border-box;
+                    border: 1px solid var(--border-color, transparent);
                     position: sticky; top: 20px; /* PC에서는 스크롤 따라오게 */
                 }
                 .form-title { margin-top: 0; margin-bottom: 15px; color: var(--text-primary, #333); }
@@ -129,6 +134,7 @@ function MenuDashboard({ onBack }) {
                 .list-section {
                     flex: 1; background-color: var(--card-bg, white); padding: 20px; border-radius: 20px;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; width: 100%; box-sizing: border-box;
+                    border: 1px solid var(--border-color, transparent);
                 }
                 
                 /* PC 테이블 뷰 */
@@ -136,32 +142,53 @@ function MenuDashboard({ onBack }) {
                 .menu-table-view th { padding: 15px 10px; color: var(--text-secondary, #666); text-align: left; border-bottom: 2px solid var(--border-color, #ddd); white-space: nowrap; }
                 .menu-table-view td { padding: 15px 10px; color: var(--text-primary, #333); border-bottom: 1px solid var(--border-color, #eee); }
                 
-                /* 모바일 카드 뷰 (기본 숨김) */
                 .menu-card-view { display: none; }
 
-                /* 뱃지 및 버튼 공통 */
+                /* 🌟 뱃지 및 버튼 공통 (다크모드 오버라이드 대비) */
                 .badge-type { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .btn-sale { padding: 6px 12px; background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem;}
-                .btn-soldout { padding: 6px 12px; background-color: #ffebee; color: #c62828; border: 1px solid #c62828; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem;}
-                .btn-action { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; }
+                .btn-sale { padding: 6px 12px; background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;}
+                .btn-soldout { padding: 6px 12px; background-color: #ffebee; color: #c62828; border: 1px solid #c62828; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;}
+                
+                .btn-action { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: background-color 0.2s; }
                 .btn-edit { background-color: #ff9800; color: white; margin-right: 5px; }
-                .btn-del { background-color: #ff5252; color: white; }
+                .btn-del { background-color: #dc3545; color: white; }
+
+                /* 🌙 다크모드 전용 컬러 오버라이드 */
+                [data-theme='dark'] .badge-type { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
+                
+                [data-theme='dark'] .btn-sale { background-color: rgba(46, 125, 50, 0.1); border-color: #4caf50; color: #81c784; }
+                [data-theme='dark'] .btn-soldout { background-color: rgba(220, 53, 69, 0.1); border-color: #ff5252; color: #ff8a80; }
+                
+                [data-theme='dark'] .btn-edit { background-color: rgba(255, 152, 0, 0.2); color: #ffb74d; }
+                [data-theme='dark'] .btn-edit:active { background-color: rgba(255, 152, 0, 0.3); }
+                [data-theme='dark'] .btn-del { background-color: rgba(220, 53, 69, 0.2); color: #ff8a80; }
+                [data-theme='dark'] .btn-del:active { background-color: rgba(220, 53, 69, 0.3); }
+
 
                 /* 📱 모바일 화면 (768px 이하) */
                 @media (max-width: 768px) {
-                    .menu-content { flex-direction: column; } /* 좌우 배치를 상하 배치로! */
-                    .form-section { width: 100%; position: static; } /* 폼 너비 100%로 꽉 채우기 */
-                    .list-section { padding: 0; background-color: transparent; box-shadow: none; } /* 모바일에서는 리스트 배경/패딩 제거 */
+                    .menu-container { padding: 15px; }
                     
-                    .menu-table-view { display: none; } /* 테이블 뷰 숨기기 */
-                    .menu-card-view { display: flex; flex-direction: column; gap: 15px; } /* 카드 뷰 보이기 */
+                    /* 🌟 헤더를 2줄로 분리하고 우측 상단에 스위치 배치 */
+                    .menu-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
+                    .header-left { gap: 10px; padding-right: 40px; box-sizing: border-box; width: 100%; }
+                    .menu-title { font-size: 1.5rem; }
+                    .btn-back { padding: 8px 12px; font-size: 0.85rem; }
+                    .theme-wrapper { position: absolute; top: 0; right: 0; height: 36px; display: flex; align-items: center; }
+
+                    .menu-content { flex-direction: column; } 
+                    .form-section { width: 100%; position: static; } 
+                    .list-section { padding: 0; background-color: transparent; box-shadow: none; border: none; } 
+                    
+                    .menu-table-view { display: none; } 
+                    .menu-card-view { display: flex; flex-direction: column; gap: 15px; } 
                     
                     .menu-card {
                         background-color: var(--card-bg, white);
                         border-radius: 15px; padding: 15px;
                         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
                         display: flex; flex-direction: column; gap: 12px;
-                        border: 1px solid var(--border-color, transparent);
+                        border: 1px solid var(--border-color, #eee);
                     }
                     .menu-card-header { display: flex; justify-content: space-between; align-items: center; }
                     .menu-card-title { font-size: 1.1rem; font-weight: bold; color: var(--text-primary, #333); }
@@ -173,8 +200,13 @@ function MenuDashboard({ onBack }) {
             </style>
 
             <div className="menu-header">
-                <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
-                <h1 className="menu-title">📋 메뉴 관리</h1>
+                <div className="header-left">
+                    <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                    <h1 className="menu-title">📋 메뉴 관리</h1>
+                </div>
+                <div className="theme-wrapper">
+                    <ThemeToggle />
+                </div>
             </div>
 
             <div className="menu-content">
@@ -219,8 +251,6 @@ function MenuDashboard({ onBack }) {
 
                 {/* 2. 오른쪽/하단: 메뉴 리스트 */}
                 <div className="list-section">
-
-                    {/* 💻 PC 뷰: 기존 테이블 형식 */}
                     <table className="menu-table-view">
                         <thead>
                         <tr>
@@ -251,7 +281,6 @@ function MenuDashboard({ onBack }) {
                         </tbody>
                     </table>
 
-                    {/* 📱 모바일 뷰: 카드 형식 */}
                     <div className="menu-card-view">
                         {menuList.map(menu => (
                             <div key={menu.id} className="menu-card">

@@ -1,8 +1,7 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState } from 'react';
 import axios from 'axios';
 import { startAuthentication } from "@simplewebauthn/browser";
+import ThemeToggle from "../../components/ThemeToggle.jsx";
 
 function ProfileAuth({ currentUser, onSuccess, onCancel }) {
     const [password, setPassword] = useState('');
@@ -53,6 +52,11 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
 
     return (
         <div className="auth-overlay">
+
+            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
+                <ThemeToggle />
+            </div>
+
             <style>
                 {`
                 .auth-overlay {

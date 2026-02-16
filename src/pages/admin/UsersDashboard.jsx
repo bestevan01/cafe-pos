@@ -1,7 +1,6 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import ThemeToggle from '../../components/ThemeToggle';
 
 function UsersDashboard({ onBack }) {
     const [users, setUsers] = useState([]);
@@ -33,7 +32,6 @@ function UsersDashboard({ onBack }) {
         }
     };
 
-
     const handleDeleteUser = async (targetUser) => {
         if (targetUser.role === 'pending') {
             if (!window.confirm(`'${targetUser.name}' 님의 가입 신청을 거절하고 계정을 삭제하시겠습니까?`)) return;
@@ -63,48 +61,126 @@ function UsersDashboard({ onBack }) {
     });
 
     return (
-        <div style={containerStyle}>
-            {/* 반응형 CSS 삽입 */}
+        <div className="users-dashboard-wrapper">
             <style>
                 {`
+                .users-dashboard-wrapper {
+                    padding: 20px;
+                    background-color: var(--bg-color, #f4f6f8);
+                    min-height: 100vh;
+                    display: flex;
+                    flex-direction: column;
+                    box-sizing: border-box;
+                    transition: background-color 0.3s ease;
+                }
+                
+                .users-header {
+                    display: flex; justify-content: space-between; align-items: center; 
+                    margin-bottom: 20px; flex-wrap: nowrap; gap: 15px;
+                }
+                .header-left { display: flex; align-items: center; gap: 15px; }
+                .users-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+                
+                .theme-wrapper { display: flex; align-items: center; }
+
                 .users-container {
-                    background-color: white;
+                    background-color: var(--card-bg, white);
                     border-radius: 15px;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-                    overflow: hidden; /* 모서리 둥글게 깎기 위해 */
+                    overflow: hidden; 
+                    border: 1px solid var(--border-color, transparent);
                 }
+
                 .users-table-view { display: table; width: 100%; border-collapse: collapse; }
-                .users-card-view { display: none; } /* 기본은 카드 뷰 숨김 */
+                .users-table-view th { 
+                    padding: 15px; color: var(--text-secondary, #666); text-align: left; 
+                    border-bottom: 2px solid var(--border-color, #ddd); background-color: var(--bg-color, #fafafa); 
+                    white-space: nowrap; font-weight: bold; 
+                }
+                .users-table-view td { 
+                    padding: 15px; color: var(--text-primary, #333); 
+                    border-bottom: 1px solid var(--border-color, #eee); white-space: nowrap;
+                }
+
+                .users-card-view { display: none; } 
+
+                .role-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; display: inline-block; }
+                .role-admin { background-color: #e3f2fd; color: #1565c0; }
+                .role-staff { background-color: #e8f5e9; color: #2e7d32; }
+                .role-pending { background-color: #fff3e0; color: #ef6c00; }
+
+                [data-theme='dark'] .role-admin { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
+                [data-theme='dark'] .role-staff { background-color: rgba(46, 125, 50, 0.2); color: #81c784; }
+                [data-theme='dark'] .role-pending { background-color: rgba(239, 108, 0, 0.2); color: #ffb74d; }
+
+                .btn-action-base { padding: 6px 10px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; border: none; cursor: pointer; color: white; transition: transform 0.1s; }
+                .btn-action-base:active { transform: scale(0.95); }
+                .btn-approve { background-color: #4caf50; }
+                .btn-demote { background-color: #9e9e9e; }
+                .btn-promote { background-color: #2196f3; }
+                .btn-wait { background-color: #ff9800; }
+                .btn-delete { background-color: #d32f2f; }
+                
+                .my-account-label { color: var(--text-blue, #007bff); font-weight: bold; font-size: 0.9rem; padding: 8px; }
+                [data-theme='dark'] .my-account-label { color: #4facfe; }
 
                 /* 📱 모바일 화면 최적화 (768px 이하) */
                 @media (max-width: 768px) {
-                    .users-container { background-color: transparent; box-shadow: none; }
-                    .users-table-view { display: none; } /* 모바일에서는 테이블 숨김 */
-                    .users-card-view { display: flex; flex-direction: column; gap: 15px; } /* 카드 뷰 표시 */
+                    .users-dashboard-wrapper { padding: 15px; }
+                    
+                    .users-header { position: relative; flex-direction: column; align-items: flex-start; gap: 12px; }
+                    .header-left { width: 100%; gap: 10px; padding-right: 40px; box-sizing: border-box; }
+                    .users-title { font-size: 1.5rem; }
+                    .btn-back { padding: 8px 12px; font-size: 0.85rem; }
+                    .theme-wrapper { position: absolute; top: 0; right: 0; height: 36px; display: flex; align-items: center; }
+
+                    .users-container { background-color: transparent; box-shadow: none; border: none; }
+                    .users-table-view { display: none; } 
+                    .users-card-view { display: flex; flex-direction: column; gap: 15px; } 
                     
                     .user-card {
-                        background-color: white;
-                        border-radius: 15px;
-                        padding: 20px;
+                        background-color: var(--card-bg, white);
+                        border-radius: 15px; padding: 20px;
                         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-                        display: flex;
-                        flex-direction: column;
-                        gap: 10px;
+                        display: flex; flex-direction: column; gap: 10px;
+                        border: 1px solid var(--border-color, transparent);
                     }
-                    .user-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-                    .user-name { font-size: 1.1rem; font-weight: bold; color: #333; }
-                    .user-id { font-size: 0.85rem; color: #888; }
-                    .user-card-body { display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; color: #555; }
-                    .user-card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: flex-end; }
-                    .action-btn { flex: 1; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; font-size: 0.9rem; border: none; cursor: pointer;}
+                    .user-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-color, #eee); padding-bottom: 10px; }
+                    .user-name { font-size: 1.1rem; font-weight: bold; color: var(--text-primary, #333); }
+                    .user-id { font-size: 0.85rem; color: var(--text-secondary, #888); }
+                    .user-card-body { display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; color: var(--text-secondary, #555); }
+                    
+                    /* 🌟 픽스: 모바일 액션 버튼 자동 줄바꿈 방지 */
+                    .user-card-actions { 
+                        display: flex; 
+                        gap: 6px; /* 버튼 사이 간격을 살짝 줄임 */
+                        margin-top: 10px; 
+                        flex-wrap: nowrap; /* 공간이 부족해도 다음 줄로 내리지 않음 */
+                        overflow-x: auto; /* 만약 화면보다 넘치면 스크롤 가능하게 처리 */
+                    }
+                    
+                    .btn-action-base { 
+                        flex: 1; 
+                        padding: 10px 2px; /* 좌우 패딩을 확 줄여서 공간 확보 */
+                        text-align: center; 
+                        border-radius: 8px; 
+                        font-size: 0.8rem; /* 폰트 사이즈를 조금 줄임 */
+                        white-space: nowrap; /* 🌟 핵심: 텍스트가 두 줄로 꺾이는 것을 완벽 차단! */
+                    }
+                    
+                    .my-account-label { width: 100%; text-align: right; }
                 }
                 `}
             </style>
 
-            <div style={headerStyle}>
-                <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                    <button onClick={onBack} style={backBtnStyle}>⬅ 뒤로</button>
-                    <h1 style={{margin:0, color: '#333'}}>👥 직원 관리</h1>
+            <div className="users-header">
+                <div className="header-left">
+                    <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                    <h1 className="users-title">👥 직원 관리</h1>
+                </div>
+                <div className="theme-wrapper">
+                    <ThemeToggle />
                 </div>
             </div>
 
@@ -113,28 +189,28 @@ function UsersDashboard({ onBack }) {
                 {/* 1. PC 뷰: 기존 테이블 형식 */}
                 <table className="users-table-view">
                     <thead>
-                    <tr style={{textAlign: 'left', borderBottom: '2px solid #ddd', backgroundColor: '#fafafa'}}>
-                        <th style={thStyle}>이름</th>
-                        <th style={thStyle}>아이디</th>
-                        <th style={thStyle}>가입일</th>
-                        <th style={thStyle}>현재 권한</th>
-                        <th style={thStyle}>권한 변경</th>
+                    <tr>
+                        <th>이름</th>
+                        <th>아이디</th>
+                        <th>가입일</th>
+                        <th>현재 권한</th>
+                        <th>권한 변경</th>
                     </tr>
                     </thead>
                     <tbody>
                     {displayUsers.map(user => (
-                        <tr key={user.id} style={{borderBottom: '1px solid #eee'}}>
-                            <td style={tdStyle}><strong>{user.name}</strong></td>
-                            <td style={tdStyle}>{user.username}</td>
-                            <td style={tdStyle}>{new Date(user.created_at).toLocaleDateString()}</td>
-                            <td style={tdStyle}>
-                                    <span style={getRoleBadgeStyle(user.role)}>
-                                        {getRoleName(user.role)}
-                                    </span>
+                        <tr key={user.id}>
+                            <td><strong>{user.name}</strong></td>
+                            <td>{user.username}</td>
+                            <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                            <td>
+                                <span className={`role-badge ${getRoleClass(user.role)}`}>
+                                    {getRoleName(user.role)}
+                                </span>
                             </td>
-                            <td style={tdStyle}>
+                            <td>
                                 <div style={{display: 'flex', gap: '5px'}}>
-                                    {RenderActionButtons(user, handleRoleChange, handleDeleteUser,false, currentUserId)}
+                                    {RenderActionButtons(user, handleRoleChange, handleDeleteUser, currentUserId)}
                                 </div>
                             </td>
                         </tr>
@@ -151,14 +227,15 @@ function UsersDashboard({ onBack }) {
                                     <div className="user-name">{user.name}</div>
                                     <div className="user-id">@{user.username}</div>
                                 </div>
-                                <span style={getRoleBadgeStyle(user.role)}>{getRoleName(user.role)}</span>
+                                <span className={`role-badge ${getRoleClass(user.role)}`}>
+                                    {getRoleName(user.role)}
+                                </span>
                             </div>
                             <div className="user-card-body">
                                 <div>📅 가입일: {new Date(user.created_at).toLocaleDateString()}</div>
                             </div>
                             <div className="user-card-actions">
-                                {/* 모바일 카드용으로 버튼 렌더링 (클래스 부여) */}
-                                {RenderActionButtons(user, handleRoleChange, handleDeleteUser,true, currentUserId)}
+                                {RenderActionButtons(user, handleRoleChange, handleDeleteUser, currentUserId)}
                             </div>
                         </div>
                     ))}
@@ -169,70 +246,49 @@ function UsersDashboard({ onBack }) {
     );
 }
 
-// 공통 버튼 렌더링 함수 (isMobile 파라미터로 모바일용 꽉 차는 버튼 스타일 지원)
-function RenderActionButtons(user, handleRoleChange, handleDeleteUser, isMobile = false, currentUserId = null) {
+// 버튼 렌더링 함수
+function RenderActionButtons(user, handleRoleChange, handleDeleteUser, currentUserId = null) {
 
-    // 1. 자기 자신(내 계정)인 경우
     if (user.id === currentUserId) {
         return (
-            <div style={{ padding: '8px', color: '#007bff', fontWeight: 'bold', fontSize: '0.9rem', width: '100%', textAlign: isMobile ? 'right' : 'left' }}>
+            <div className="my-account-label">
                 👤 내 계정
             </div>
         );
     }
 
-    const btnClass = isMobile ? "action-btn" : "";
-    const baseStyle = isMobile ? {} : { padding: '6px 10px', borderRadius: '5px', fontSize: '0.8rem', fontWeight: 'bold', border: 'none', cursor: 'pointer' };
-
     return (
         <>
-            {/* 권한 변경 버튼들 */}
             {user.role === 'pending' && (
-                <button className={btnClass} onClick={() => handleRoleChange(user.id, 'staff')} style={{...baseStyle, backgroundColor: '#4caf50', color: 'white'}}>✅ 승인</button>
+                <button className="btn-action-base btn-approve" onClick={() => handleRoleChange(user.id, 'staff')}>✅ 승인</button>
             )}
             {user.role !== 'staff' && user.role !== 'pending' && (
-                <button className={btnClass} onClick={() => handleRoleChange(user.id, 'staff')} style={{...baseStyle, backgroundColor: '#9e9e9e', color: 'white'}}>⬇ 직원 강등</button>
+                <button className="btn-action-base btn-demote" onClick={() => handleRoleChange(user.id, 'staff')}>⬇ 직원 강등</button>
             )}
             {user.role !== 'admin' && (
-                <button className={btnClass} onClick={() => handleRoleChange(user.id, 'admin')} style={{...baseStyle, backgroundColor: '#2196f3', color: 'white'}}>⬆ 관리자 승급</button>
+                <button className="btn-action-base btn-promote" onClick={() => handleRoleChange(user.id, 'admin')}>⬆ 관리자 승급</button>
             )}
             {user.role !== 'pending' && (
-                <button className={btnClass} onClick={() => handleRoleChange(user.id, 'pending')} style={{...baseStyle, backgroundColor: '#ff9800', color: 'white'}}>⏸ 대기로</button>
+                <button className="btn-action-base btn-wait" onClick={() => handleRoleChange(user.id, 'pending')}>⏸ 대기로</button>
             )}
 
-            {/* 🗑️ 삭제 버튼: 'admin'이 아닌 계정에만 렌더링! */}
             {user.role !== 'admin' && (
-                <button
-                    className={btnClass}
-                    onClick={() => handleDeleteUser(user)}
-                    style={{...baseStyle, backgroundColor: '#d32f2f', color: 'white'}}
-                >
-                    🗑️ 삭제
-                </button>
+                <button className="btn-action-base btn-delete" onClick={() => handleDeleteUser(user)}>🗑️ 삭제</button>
             )}
         </>
     );
 }
 
-// 헬퍼 함수
 function getRoleName(role) {
     if (role === 'admin') return '👑 관리자';
     if (role === 'staff') return '☕ 직원';
     return '⏳ 대기중';
 }
 
-function getRoleBadgeStyle(role) {
-    const base = { padding: '5px 10px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold', display: 'inline-block' };
-    if (role === 'admin') return { ...base, backgroundColor: '#e3f2fd', color: '#1565c0' };
-    if (role === 'staff') return { ...base, backgroundColor: '#e8f5e9', color: '#2e7d32' };
-    return { ...base, backgroundColor: '#fff3e0', color: '#ef6c00' };
+function getRoleClass(role) {
+    if (role === 'admin') return 'role-admin';
+    if (role === 'staff') return 'role-staff';
+    return 'role-pending';
 }
-
-// 스타일
-const containerStyle = { padding: '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', display: 'flex', flexDirection: 'column' };
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' };
-const backBtnStyle = { padding: '10px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' };
-const thStyle = { padding: '15px', color: '#666', fontWeight: 'bold', whiteSpace: 'nowrap' };
-const tdStyle = { padding: '15px', color: '#333', whiteSpace: 'nowrap' };
 
 export default UsersDashboard;

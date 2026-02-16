@@ -1,11 +1,32 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // 🌟 useEffect 추가
 import axios from 'axios';
 
 function Register({ onSwitchToLogin }) {
-    // ✅ confirmPassword(비밀번호 확인) 상태 추가
     const [formData, setFormData] = useState({ username: '', password: '', confirmPassword: '', name: '' });
+
+    // 🌟 핵심: 회원가입 화면에서도 항상 시스템 테마(OS 설정)를 따라가도록 강제
+    useEffect(() => {
+        const root = document.documentElement;
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+        const applySystemTheme = (e) => {
+            if (e.matches) {
+                root.setAttribute('data-theme', 'dark');
+            } else {
+                root.setAttribute('data-theme', 'light');
+            }
+        };
+
+        // 컴포넌트가 켜질 때 즉시 시스템 테마 적용
+        applySystemTheme(mediaQuery);
+
+        // 운영체제 테마가 실시간으로 바뀔 때 감지
+        mediaQuery.addEventListener('change', applySystemTheme);
+
+        return () => {
+            mediaQuery.removeEventListener('change', applySystemTheme);
+        };
+    }, []);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -14,20 +35,18 @@ function Register({ onSwitchToLogin }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // ✅ [추가] 비밀번호 일치 여부 검사 로직
         if (formData.password !== formData.confirmPassword) {
             alert("비밀번호가 일치하지 않습니다. 다시 확인해주세요.");
-            return; // 일치하지 않으면 서버로 보내지 않고 여기서 멈춤!
+            return;
         }
 
         try {
-            // 서버로 전송할 때는 confirmPassword 필드를 제외하고 보냅니다.
             const { confirmPassword, ...submitData } = formData;
 
             const res = await axios.post('/api/register', submitData);
             if (res.data.success) {
-                alert(res.data.message); // "관리자 승인을 기다리세요"
-                onSwitchToLogin(); // 로그인 화면으로 이동
+                alert(res.data.message);
+                onSwitchToLogin();
             }
         } catch (err) {
             alert(err.response?.data?.message || "회원가입 실패");
@@ -110,7 +129,6 @@ function Register({ onSwitchToLogin }) {
                         autoComplete="new-password"
                         required
                     />
-                    {/* ✅ 비밀번호 확인 칸 추가! */}
                     <input
                         id="new-password-confirm"
                         name="confirmPassword"

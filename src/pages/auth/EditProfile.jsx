@@ -1,7 +1,6 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import ThemeToggle from '../../components/ThemeToggle'; // ✅ 테마 토글 불러오기
 import { startRegistration } from '@simplewebauthn/browser';
 
 function EditProfile({ onBack }) {
@@ -109,7 +108,14 @@ function EditProfile({ onBack }) {
     };
 
     return (
-        <div className="ep-container">
+        /* 🌟 부모 컨테이너에 relative 속성을 주어 자식 요소의 절대 위치 기준점 마련 */
+        <div className="ep-container" style={{ position: 'relative' }}>
+
+            {/* 🌟 테마 스위치를 우측 상단 모서리에 둥둥 띄우기 */}
+            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
+                <ThemeToggle />
+            </div>
+
             <style>
                 {`
                 .ep-container {

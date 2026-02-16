@@ -1,9 +1,8 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import AdvancedStats from "./AdvancedStats.jsx";
+import ThemeToggle from '../../components/ThemeToggle';
 
 function SalesDashboard({ onBack }) {
     const [salesData, setSalesData] = useState([]);
@@ -219,6 +218,9 @@ function SalesDashboard({ onBack }) {
                 
                 .header-right { display: flex; gap: 10px; align-items: center; }
 
+                /* 🌟 테마 래퍼 (PC에서는 버튼들 옆에 자연스럽게 배치) */
+                .theme-wrapper { display: flex; align-items: center; }
+
                 .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
                 .btn-advanced { padding: 10px 15px; background-color: #673ab7; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
                 .btn-excel { padding: 10px 15px; background-color: #217346; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
@@ -242,12 +244,8 @@ function SalesDashboard({ onBack }) {
                 .filter-group { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
                 .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
                 
-                .filter-select { 
-                    height: 36px; padding: 0 12px; font-size: 0.95rem; border-radius: 8px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, white); color: var(--text-primary, #333); outline: none; cursor: pointer; box-sizing: border-box;
-                }
-                .btn-filter { 
-                    height: 36px; padding: 0 15px; border-radius: 8px; border: none; color: white; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
-                }
+                .filter-select { height: 36px; padding: 0 12px; font-size: 0.95rem; border-radius: 8px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, white); color: var(--text-primary, #333); outline: none; cursor: pointer; box-sizing: border-box; }
+                .btn-filter { height: 36px; padding: 0 15px; border-radius: 8px; border: none; color: white; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
 
                 .table-responsive { flex: 1; overflow-y: auto; overflow-x: auto; min-height: 0; }
                 
@@ -264,72 +262,79 @@ function SalesDashboard({ onBack }) {
 
                 .sales-card-view { display: none; }
 
+                .text-red { color: #d32f2f; }
+                .text-blue { color: #1565c0; }
+                .font-bold { font-weight: bold; }
+                .mc-staff { font-size: 0.85rem; color: #1565c0; font-weight: bold; background-color: rgba(21,101,192,0.1); padding: 4px 8px; border-radius: 6px; }
+
+                /* 🌙 다크모드 오버라이드 */
+                [data-theme='dark'] .stat-val.green { color: #4caf50; }
+                [data-theme='dark'] .stat-val.blue { color: #4facfe; }
+                [data-theme='dark'] .text-red { color: #ff5252; }
+                [data-theme='dark'] .text-blue { color: #4facfe; }
+                [data-theme='dark'] .mc-price { color: #ff5252; }
+                
+                [data-theme='dark'] .pay-cash { background-color: rgba(76, 175, 80, 0.15); color: #81c784; }
+                [data-theme='dark'] .pay-bank { background-color: rgba(255, 152, 0, 0.15); color: #ffb74d; }
+                
+                [data-theme='dark'] .btn-del { background-color: rgba(220, 53, 69, 0.2); color: #ff8a80; }
+                [data-theme='dark'] .btn-del:active { background-color: rgba(220, 53, 69, 0.3); }
+                
+                [data-theme='dark'] .mc-staff { background-color: rgba(79, 172, 254, 0.15); color: #4facfe; }
+
                 /* 📱 모바일 화면 최적화 (768px 이하) */
                 @media (max-width: 768px) {
-                    .sales-container { 
-                        height: auto;
-                        min-height: 100vh;
-                        padding: 15px; 
-                        overflow: visible;
-                    }
+                    .sales-container { height: auto; min-height: 100vh; padding: 15px; overflow: visible; }
                     
+                    /* 🌟 1. 헤더 영역을 relative로 설정하여 플로팅 버튼의 기준점을 만듬 */
                     .sales-header { 
+                        position: relative;
                         flex-direction: column; 
-                        align-items: flex-start; /* 🌟 픽스: 전체를 왼쪽으로 정렬 */
+                        align-items: flex-start; 
                         gap: 12px; 
                     }
-                    .header-left { 
-                        justify-content: flex-start; /* 🌟 픽스: space-between 제거하고 왼쪽 정렬 */
-                        width: 100%; 
-                        gap: 10px;
-                    }
+                    
+                    .header-left { width: 100%; gap: 10px; padding-right: 40px; box-sizing: border-box; }
                     .sales-title { font-size: 1.5rem; }
                     .btn-back { padding: 8px 12px; font-size: 0.85rem; }
                     
-                    .header-right { 
-                        width: 100%; 
-                        justify-content: flex-start; /* 버튼들도 컨테이너 안에서 정렬 맞춤 */
-                        gap: 10px;
+                    /* 🌟 2. 테마 버튼을 흐름에서 빼내어 우측 상단(제목 옆)에 고정 */
+                    .theme-wrapper {
+                        position: absolute;
+                        top: 0;
+                        right: 0;
+                        height: 36px; /* 뒤로가기 버튼과 세로 중앙을 맞추기 위한 높이 설정 */
+                        display: flex;
+                        align-items: center;
                     }
+                    
+                    /* 🌟 3. 액션 버튼 영역: 테마 버튼이 빠졌으니 두 버튼이 예쁘게 50:50으로 꽉 참 */
+                    .header-right { width: 100%; gap: 10px; margin-top: 5px; }
                     .btn-advanced { padding: 8px 12px; font-size: 0.85rem; flex: 1; justify-content: center; }
                     .btn-excel { padding: 8px 12px; font-size: 0.85rem; flex: 1; justify-content: center; }
-
 
                     .stats-grid { grid-template-columns: 1fr; gap: 12px; } 
                     .stat-card { padding: 20px 15px; }
                     .table-card { padding: 15px; background-color: transparent; box-shadow: none; border: none; flex: none; display: block; } 
                     .table-responsive { display: none; } 
                     .sales-card-view { display: flex; flex-direction: column; gap: 12px; } 
-                    
                     .filter-area { flex-direction: column; align-items: stretch; gap: 12px; }
                     .filter-title { margin-bottom: 0; }
                     .filter-group { width: 100%; flex-direction: column; gap: 8px; }
-                    
                     .filter-row { display: grid; width: 100%; gap: 8px; }
                     .filter-row.top-row { grid-template-columns: 1fr 2fr; } 
                     .filter-row.bottom-row { grid-template-columns: repeat(4, 1fr); } 
-                    
                     .filter-select { padding: 0 4px; font-size: 0.85rem; text-align: center; }
                     .btn-filter { padding: 0; font-size: 0.9rem; }
-                    
-                    .mobile-card {
-                        background-color: var(--card-bg, white);
-                        border-radius: 15px; padding: 15px;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-                        border: 1px solid var(--border-color, #eee);
-                        display: flex; flex-direction: column; gap: 10px;
-                    }
+                    .mobile-card { background-color: var(--card-bg, white); border-radius: 15px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid var(--border-color, #eee); display: flex; flex-direction: column; gap: 10px; }
                     .mc-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-color, #ddd); padding-bottom: 8px; }
                     .mc-date { font-size: 0.85rem; color: var(--text-secondary, #666); }
                     .mc-id { font-size: 0.85rem; color: var(--text-secondary, #999); font-family: monospace; }
-                    
                     .mc-body { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
                     .mc-menu { font-size: 1.1rem; font-weight: bold; color: var(--text-primary, #333); display: flex; align-items: center; gap: 8px; }
                     .mc-qty { font-size: 0.9rem; color: var(--text-secondary, #888); font-weight: normal; background-color: var(--bg-color, #f4f6f8); padding: 2px 6px; border-radius: 5px; }
-                    .mc-price { font-size: 1.1rem; font-weight: bold; color: #d32f2f; }
-                    
+                    .mc-price { font-size: 1.1rem; font-weight: bold; color: #d32f2f; } 
                     .mc-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 5px; }
-                    .mc-staff { font-size: 0.85rem; color: #1565c0; font-weight: bold; background-color: rgba(21,101,192,0.1); padding: 4px 8px; border-radius: 6px; }
                 }
                 `}
             </style>
@@ -339,7 +344,13 @@ function SalesDashboard({ onBack }) {
                     <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
                     <h2 className="sales-title">💰 매출 통계</h2>
                 </div>
+
                 <div className="header-right">
+                    {/* 🌟 4. 테마 스위치를 래퍼(wrapper)로 감싸서 모바일 뷰 분리 대비 */}
+                    <div className="theme-wrapper">
+                        <ThemeToggle />
+                    </div>
+
                     <button onClick={() => setShowAdvanced(true)} className="btn-advanced">
                         📊 고급 통계
                     </button>
@@ -447,15 +458,15 @@ function SalesDashboard({ onBack }) {
                                         })}
                                     </td>
                                     <td style={{fontSize:'0.85rem', color:'var(--text-secondary)'}}>{item.display_id}</td>
-                                    <td style={{fontWeight:'bold'}}>{item.menu_name}</td>
+                                    <td className="font-bold">{item.menu_name}</td>
                                     <td>{item.quantity}</td>
-                                    <td style={{color:'#d32f2f', fontWeight:'bold'}}>{item.total_price.toLocaleString()}원</td>
+                                    <td className="text-red font-bold">{item.total_price.toLocaleString()}원</td>
                                     <td>
                                         <span className={`pay-badge ${item.payment_method === 'bank' ? 'pay-bank' : 'pay-cash'}`}>
                                             {item.payment_method === 'bank' ? '🏦 계좌' : '💵 현금'}
                                         </span>
                                     </td>
-                                    <td style={{color: '#1565c0', fontWeight: 'bold'}}>{item.staff_name || '-'}</td>
+                                    <td className="text-blue font-bold">{item.staff_name || '-'}</td>
                                     <td>
                                         <button onClick={() => handleDelete(item.id)} className="btn-del">삭제</button>
                                     </td>

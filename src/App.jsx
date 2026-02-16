@@ -1,5 +1,3 @@
-// TODO: 다크 / 라이트 / 시스템 테마 제작 및 적용
-
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { socket } from './utils/socket';
@@ -15,6 +13,8 @@ import ProfileAuth from './pages/auth/ProfileAuth.jsx';
 import EditProfile from './pages/auth/EditProfile.jsx';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
+
+import ThemeToggle from './components/ThemeToggle';
 
 function App() {
     const [auth, setAuth] = useState({
@@ -278,6 +278,9 @@ function App() {
             {/* 상단 헤더 영역 */}
             {auth.isLoggedIn && (
                 <div className="global-top-header">
+
+                    <ThemeToggle />
+
                     {(myRole === 'cashier' || userCount <= 1) && (
                         <button onClick={() => setShowSettlement(true)} className="btn-global-action btn-settle">
                             💰 시재 점검
