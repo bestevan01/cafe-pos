@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useState, useEffect } from 'react';
-import ThemeToggle from '../../components/ThemeToggle'; // 🌟 테마 스위치 추가
+import ThemeToggle from '../../components/ThemeToggle';
 
 function MenuDashboard({ onBack }) {
     const [menuList, setMenuList] = useState([]);
@@ -90,86 +90,80 @@ function MenuDashboard({ onBack }) {
                     transition: background-color 0.3s ease;
                 }
                 
-                /* 🌟 헤더를 Flex로 감싸서 테마 스위치 공간 확보 */
                 .menu-header {
                     display: flex; justify-content: space-between; align-items: center; 
                     margin-bottom: 20px; flex-wrap: nowrap; gap: 15px;
                 }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .menu-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+                
+                /* 🌟 공통 뒤로가기 버튼 md 둥글기 적용 */
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
                 
                 .theme-wrapper { display: flex; align-items: center; }
 
-                /* 레이아웃 분할 (PC는 양옆, 모바일은 위아래) */
-                .menu-content {
-                    display: flex; gap: 20px; align-items: flex-start;
-                }
+                .menu-content { display: flex; gap: 20px; align-items: flex-start; }
                 
-                /* 왼쪽 폼 영역 */
+                /* 🌟 폼 영역 배경 카드에 lg 둥글기 적용 */
                 .form-section {
                     width: 320px; flex-shrink: 0;
                     background-color: var(--card-bg, white);
-                    padding: 20px; border-radius: 20px;
+                    padding: 20px; border-radius: var(--radius-lg);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
                     box-sizing: border-box;
                     border: 1px solid var(--border-color, transparent);
-                    position: sticky; top: 20px; /* PC에서는 스크롤 따라오게 */
+                    position: sticky; top: 20px; 
                 }
                 .form-title { margin-top: 0; margin-bottom: 15px; color: var(--text-primary, #333); }
+                
+                /* 🌟 입력창과 폼 버튼들에 md 둥글기 적용 */
                 .menu-input {
-                    padding: 12px; border-radius: 10px; border: 1px solid var(--border-color, #ddd); font-size: 1rem;
+                    padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color, #ddd); font-size: 1rem;
                     background-color: var(--bg-color, #f4f6f8); color: var(--text-primary, #333); width: 100%; box-sizing: border-box; margin-bottom: 10px;
                     -webkit-appearance: none;
                 }
                 .menu-input:focus { outline: none; border-color: #007bff; }
                 
-                .btn-submit { padding: 12px; border-radius: 10px; border: none; font-weight: bold; width: 100%; cursor: pointer; color: white; font-size: 1rem; transition: transform 0.1s;}
+                .btn-submit { padding: 12px; border-radius: var(--radius-md); border: none; font-weight: bold; width: 100%; cursor: pointer; color: white; font-size: 1rem; transition: transform 0.1s;}
                 .btn-submit:active { transform: scale(0.97); }
                 .btn-add { background-color: #007bff; }
                 .btn-update { background-color: #ff9800; }
-                .btn-cancel { padding: 12px; border-radius: 10px; border: none; font-weight: bold; width: 100%; cursor: pointer; background-color: #6c757d; color: white; margin-top: 8px; font-size: 1rem;}
+                .btn-cancel { padding: 12px; border-radius: var(--radius-md); border: none; font-weight: bold; width: 100%; cursor: pointer; background-color: #6c757d; color: white; margin-top: 8px; font-size: 1rem;}
 
-                /* 오른쪽 리스트 영역 */
+                /* 🌟 리스트 영역 배경 카드에 lg 둥글기 적용 */
                 .list-section {
-                    flex: 1; background-color: var(--card-bg, white); padding: 20px; border-radius: 20px;
+                    flex: 1; background-color: var(--card-bg, white); padding: 20px; border-radius: var(--radius-lg);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; width: 100%; box-sizing: border-box;
                     border: 1px solid var(--border-color, transparent);
                 }
                 
-                /* PC 테이블 뷰 */
                 .menu-table-view { width: 100%; border-collapse: collapse; }
                 .menu-table-view th { padding: 15px 10px; color: var(--text-secondary, #666); text-align: left; border-bottom: 2px solid var(--border-color, #ddd); white-space: nowrap; }
                 .menu-table-view td { padding: 15px 10px; color: var(--text-primary, #333); border-bottom: 1px solid var(--border-color, #eee); }
                 
                 .menu-card-view { display: none; }
 
-                /* 🌟 뱃지 및 버튼 공통 (다크모드 오버라이드 대비) */
-                .badge-type { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .btn-sale { padding: 6px 12px; background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;}
-                .btn-soldout { padding: 6px 12px; background-color: #ffebee; color: #c62828; border: 1px solid #c62828; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;}
+                /* 🌟 뱃지 및 작은 버튼들에 sm 둥글기 적용 */
+                .badge-type { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .btn-sale { padding: 6px 12px; background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;}
+                .btn-soldout { padding: 6px 12px; background-color: #ffebee; color: #c62828; border: 1px solid #c62828; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s;}
                 
-                .btn-action { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: background-color 0.2s; }
+                .btn-action { padding: 6px 12px; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: background-color 0.2s; }
                 .btn-edit { background-color: #ff9800; color: white; margin-right: 5px; }
                 .btn-del { background-color: #dc3545; color: white; }
 
-                /* 🌙 다크모드 전용 컬러 오버라이드 */
                 [data-theme='dark'] .badge-type { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
-                
                 [data-theme='dark'] .btn-sale { background-color: rgba(46, 125, 50, 0.1); border-color: #4caf50; color: #81c784; }
                 [data-theme='dark'] .btn-soldout { background-color: rgba(220, 53, 69, 0.1); border-color: #ff5252; color: #ff8a80; }
-                
                 [data-theme='dark'] .btn-edit { background-color: rgba(255, 152, 0, 0.2); color: #ffb74d; }
                 [data-theme='dark'] .btn-edit:active { background-color: rgba(255, 152, 0, 0.3); }
                 [data-theme='dark'] .btn-del { background-color: rgba(220, 53, 69, 0.2); color: #ff8a80; }
                 [data-theme='dark'] .btn-del:active { background-color: rgba(220, 53, 69, 0.3); }
 
 
-                /* 📱 모바일 화면 (768px 이하) */
                 @media (max-width: 768px) {
                     .menu-container { padding: 15px; }
                     
-                    /* 🌟 헤더를 2줄로 분리하고 우측 상단에 스위치 배치 */
                     .menu-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
                     .header-left { gap: 10px; padding-right: 40px; box-sizing: border-box; width: 100%; }
                     .menu-title { font-size: 1.5rem; }
@@ -183,9 +177,10 @@ function MenuDashboard({ onBack }) {
                     .menu-table-view { display: none; } 
                     .menu-card-view { display: flex; flex-direction: column; gap: 15px; } 
                     
+                    /* 🌟 모바일 카드들도 모두 lg 둥글기로 통일 */
                     .menu-card {
                         background-color: var(--card-bg, white);
-                        border-radius: 15px; padding: 15px;
+                        border-radius: var(--radius-lg); padding: 15px;
                         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
                         display: flex; flex-direction: column; gap: 12px;
                         border: 1px solid var(--border-color, #eee);

@@ -37,7 +37,7 @@ function RoleSelection({ onSelectRole, isCashierTaken }) {
                     padding: 20px; 
                     height: 280px; 
                     border: 1px solid var(--border-color, transparent); 
-                    border-radius: 24px;
+                    border-radius: var(--radius-lg); /* 🌟 핵심: 24px 하드코딩을 lg 둥글기로 통일! */
                     background-color: var(--card-bg, white);
                     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
                     cursor: pointer; 
@@ -92,7 +92,6 @@ function RoleSelection({ onSelectRole, isCashierTaken }) {
                     <div className="role-content-wrapper">
                         <div className="role-icon">🛒</div>
                         <h2 className="role-name">캐셔 (주문)</h2>
-                        {/* 🌟 수정된 부분: 투명도를 빼고 status-green 적용! */}
                         {isCashierTaken
                             ? <p className="role-status status-red">사용 중...</p>
                             : <p className="role-status status-green">선택 가능</p>

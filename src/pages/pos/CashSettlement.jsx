@@ -154,10 +154,12 @@ function CashSettlement({ onClose }) {
                     z-index: 10000;
                     backdrop-filter: blur(3px);
                 }
+                
+                /* 🌟 모달 전체 배경 lg 둥글기 적용 */
                 .cs-modal {
                     background-color: var(--card-bg, #fff);
                     padding: 20px;
-                    border-radius: 20px;
+                    border-radius: var(--radius-lg);
                     width: 90%; max-width: 380px;
                     text-align: center;
                     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
@@ -174,19 +176,21 @@ function CashSettlement({ onClose }) {
                 .cs-title { margin: 0; font-size: 1.4rem; color: var(--text-primary, #333); }
                 .cs-desc { margin: 0; color: var(--text-secondary, #666); font-size: 0.9rem; }
                 
+                /* 🌟 요약 정보 박스 md 둥글기 적용 */
                 .cs-info-box {
                     background-color: var(--bg-color, #f8f9fa);
-                    padding: 12px; border-radius: 12px;
+                    padding: 12px; border-radius: var(--radius-md);
                     text-align: left; font-size: 0.9rem;
                     border: 1px solid var(--border-color, #ddd);
                 }
                 .cs-row { display: flex; justify-content: space-between; margin-bottom: 6px; color: var(--text-primary, #333); }
                 .cs-row:last-child { margin-bottom: 0; }
                 
+                /* 🌟 계산기 그리드 박스 md 둥글기 적용 */
                 .cs-grid {
                     background-color: var(--bg-color, #f1f3f5);
                     padding: 12px 15px;
-                    border-radius: 12px;
+                    border-radius: var(--radius-md);
                     border: 1px solid var(--border-color, #ddd);
                 }
                 .cs-input-row {
@@ -198,8 +202,9 @@ function CashSettlement({ onClose }) {
                 
                 .cs-label { width: 70px; text-align: right; font-weight: bold; color: var(--text-primary, #495057); }
                 
+                /* 🌟 숫자 입력칸 sm 둥글기 적용 */
                 .cs-mini-input {
-                    width: 60px; padding: 4px; border-radius: 8px;
+                    width: 60px; padding: 4px; border-radius: var(--radius-sm);
                     border: 1px solid var(--border-color, #ced4da);
                     text-align: center; font-size: 1rem;
                     background-color: var(--card-bg, #fff);
@@ -216,27 +221,31 @@ function CashSettlement({ onClose }) {
                 }
                 .cs-total-val { color: #007bff; font-size: 1.3rem; }
 
+                /* 🌟 버튼들 md 둥글기 적용 */
                 .btn-base {
-                    width: 100%; padding: 14px; border: none; border-radius: 12px;
+                    width: 100%; padding: 14px; border: none; border-radius: var(--radius-md);
                     font-size: 1.05rem; cursor: pointer; font-weight: bold;
                     transition: transform 0.1s; color: white;
                 }
                 .btn-base:active { transform: scale(0.97); }
                 
                 .btn-open { background-color: #007bff; }
-                
-                /* 🌟 해결: btn-close를 btn-finish로 변경하여 이름 충돌 방지 */
                 .btn-finish { background-color: #28a745; }
                 
                 .btn-cancel {
                     width: 100%; padding: 14px; 
                     background-color: #dc3545; 
                     color: white; border: none; 
-                    border-radius: 12px;
+                    border-radius: var(--radius-md);
                     font-size: 1.05rem; font-weight: bold;
                     cursor: pointer; transition: transform 0.1s;
                 }
                 .btn-cancel:active { transform: scale(0.97); }
+
+                /* 🌙 다크모드 대응 추가 (정보 박스 배경 대비 개선) */
+                [data-theme='dark'] .cs-info-box, [data-theme='dark'] .cs-grid {
+                    background-color: rgba(255, 255, 255, 0.05);
+                }
                 `}
             </style>
 
@@ -248,7 +257,14 @@ function CashSettlement({ onClose }) {
                     <>
                         <p className="cs-desc">오픈 준비금을 권종별로 입력해주세요.</p>
                         {prevClosing !== null && (
-                            <div style={{fontSize:'0.9rem', color:'#dc3545', fontWeight:'bold', backgroundColor: 'rgba(220,53,69,0.1)', padding:'8px', borderRadius:'8px'}}>
+                            <div style={{
+                                fontSize: '0.9rem',
+                                color: '#dc3545',
+                                fontWeight: 'bold',
+                                backgroundColor: 'rgba(220,53,69,0.1)',
+                                padding: '8px',
+                                borderRadius: 'var(--radius-sm)'
+                            }}>
                                 ※ 전날 마감 금액: {prevClosing.toLocaleString()}원
                             </div>
                         )}
@@ -277,7 +293,8 @@ function CashSettlement({ onClose }) {
 
                         {/* 차액 표시 */}
                         <div style={{
-                            padding:'10px', borderRadius:'10px',
+                            padding: '10px',
+                            borderRadius: 'var(--radius-md)',
                             backgroundColor: (totalAmount - calcData.expected) === 0 ? 'rgba(40,167,69,0.1)' : 'rgba(220,53,69,0.1)',
                             fontWeight:'bold',
                             color: (totalAmount - calcData.expected) === 0 ? '#28a745' : '#dc3545'
@@ -286,7 +303,6 @@ function CashSettlement({ onClose }) {
                             {(totalAmount - calcData.expected) === 0 ? " (정상 ✅)" : " (불일치 ⚠️)"}
                         </div>
 
-                        {/* 🌟 수정된 클래스명 적용 */}
                         <button onClick={handleClose} className="btn-base btn-finish">마감 확정 (퇴근)</button>
                         <button onClick={onClose} className="btn-cancel">취소 / 닫기</button>
                     </>

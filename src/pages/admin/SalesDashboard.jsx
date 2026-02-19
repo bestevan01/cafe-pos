@@ -218,22 +218,21 @@ function SalesDashboard({ onBack }) {
                 
                 .header-right { display: flex; gap: 10px; align-items: center; }
 
-                /* 🌟 테마 래퍼 (PC에서는 버튼들 옆에 자연스럽게 배치) */
                 .theme-wrapper { display: flex; align-items: center; }
 
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
-                .btn-advanced { padding: 10px 15px; background-color: #673ab7; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
-                .btn-excel { padding: 10px 15px; background-color: #217346; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
+                .btn-advanced { padding: 10px 15px; background-color: #673ab7; color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
+                .btn-excel { padding: 10px 15px; background-color: #217346; color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; }
                 
                 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; flex-shrink: 0; }
-                .stat-card { background-color: var(--card-bg, white); padding: 25px 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; border: 1px solid var(--border-color, transparent); transition: background-color 0.3s ease; }
+                .stat-card { background-color: var(--card-bg, white); padding: 25px 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; border: 1px solid var(--border-color, transparent); transition: background-color 0.3s ease; }
                 .stat-title { margin: 0 0 10px 0; font-size: 1rem; color: var(--text-secondary, #666); font-weight: bold; }
                 .stat-val { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #333); }
                 .stat-val.green { color: #2e7d32; }
                 .stat-val.blue { color: #1565c0; }
 
                 .table-card { 
-                    background-color: var(--card-bg, white); padding: 25px; border-radius: 20px; 
+                    background-color: var(--card-bg, white); padding: 25px; border-radius: var(--radius-lg); 
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border-color, transparent); 
                     flex: 1; display: flex; flex-direction: column; min-height: 0; 
                 }
@@ -244,8 +243,8 @@ function SalesDashboard({ onBack }) {
                 .filter-group { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
                 .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
                 
-                .filter-select { height: 36px; padding: 0 12px; font-size: 0.95rem; border-radius: 8px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, white); color: var(--text-primary, #333); outline: none; cursor: pointer; box-sizing: border-box; }
-                .btn-filter { height: 36px; padding: 0 15px; border-radius: 8px; border: none; color: white; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+                .filter-select { height: 36px; padding: 0 12px; font-size: 0.95rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, white); color: var(--text-primary, #333); outline: none; cursor: pointer; box-sizing: border-box; }
+                .btn-filter { height: 36px; padding: 0 15px; border-radius: var(--radius-sm); border: none; color: white; cursor: pointer; font-weight: bold; font-size: 0.9rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
 
                 .table-responsive { flex: 1; overflow-y: auto; overflow-x: auto; min-height: 0; }
                 
@@ -253,10 +252,10 @@ function SalesDashboard({ onBack }) {
                 .sales-table th { padding: 15px; border-bottom: 2px solid var(--border-color, #ddd); font-weight: bold; color: var(--text-secondary, #666); position: sticky; top: 0; background-color: var(--card-bg, white); cursor: pointer; user-select: none; white-space: nowrap; z-index: 10; }
                 .sales-table td { padding: 12px; border-bottom: 1px solid var(--border-color, #eee); color: var(--text-primary, #333); font-size: 0.95rem; white-space: nowrap; }
                 
-                .btn-del { padding: 6px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s; }
+                .btn-del { padding: 6px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s; }
                 .btn-del:active { background-color: #f8d7da; }
 
-                .pay-badge { padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; display: inline-block; min-width: 60px; text-align: center; }
+                .pay-badge { padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; min-width: 60px; text-align: center; }
                 .pay-cash { background-color: rgba(46, 125, 50, 0.1); color: #2e7d32; }
                 .pay-bank { background-color: rgba(237, 108, 2, 0.1); color: #ed6c02; }
 
@@ -265,7 +264,7 @@ function SalesDashboard({ onBack }) {
                 .text-red { color: #d32f2f; }
                 .text-blue { color: #1565c0; }
                 .font-bold { font-weight: bold; }
-                .mc-staff { font-size: 0.85rem; color: #1565c0; font-weight: bold; background-color: rgba(21,101,192,0.1); padding: 4px 8px; border-radius: 6px; }
+                .mc-staff { font-size: 0.85rem; color: #1565c0; font-weight: bold; background-color: rgba(21,101,192,0.1); padding: 4px 8px; border-radius: var(--radius-sm); }
 
                 /* 🌙 다크모드 오버라이드 */
                 [data-theme='dark'] .stat-val.green { color: #4caf50; }
@@ -282,11 +281,10 @@ function SalesDashboard({ onBack }) {
                 
                 [data-theme='dark'] .mc-staff { background-color: rgba(79, 172, 254, 0.15); color: #4facfe; }
 
-                /* 📱 모바일 화면 최적화 (768px 이하) */
+                /* 📱 모바일 화면 최적화 */
                 @media (max-width: 768px) {
                     .sales-container { height: auto; min-height: 100vh; padding: 15px; overflow: visible; }
                     
-                    /* 🌟 1. 헤더 영역을 relative로 설정하여 플로팅 버튼의 기준점을 만듬 */
                     .sales-header { 
                         position: relative;
                         flex-direction: column; 
@@ -298,24 +296,20 @@ function SalesDashboard({ onBack }) {
                     .sales-title { font-size: 1.5rem; }
                     .btn-back { padding: 8px 12px; font-size: 0.85rem; }
                     
-                    /* 🌟 2. 테마 버튼을 흐름에서 빼내어 우측 상단(제목 옆)에 고정 */
                     .theme-wrapper {
-                        position: absolute;
-                        top: 0;
-                        right: 0;
-                        height: 36px; /* 뒤로가기 버튼과 세로 중앙을 맞추기 위한 높이 설정 */
-                        display: flex;
-                        align-items: center;
+                        position: absolute; top: 0; right: 0; height: 36px; display: flex; align-items: center;
                     }
                     
-                    /* 🌟 3. 액션 버튼 영역: 테마 버튼이 빠졌으니 두 버튼이 예쁘게 50:50으로 꽉 참 */
                     .header-right { width: 100%; gap: 10px; margin-top: 5px; }
                     .btn-advanced { padding: 8px 12px; font-size: 0.85rem; flex: 1; justify-content: center; }
                     .btn-excel { padding: 8px 12px; font-size: 0.85rem; flex: 1; justify-content: center; }
 
                     .stats-grid { grid-template-columns: 1fr; gap: 12px; } 
                     .stat-card { padding: 20px 15px; }
-                    .table-card { padding: 15px; background-color: transparent; box-shadow: none; border: none; flex: none; display: block; } 
+                    
+                    /* 🌟 핵심 픽스: 모바일 뷰에서 불필요한 이중 패딩 제거 (15px -> 0) */
+                    .table-card { padding: 0; background-color: transparent; box-shadow: none; border: none; flex: none; display: block; } 
+                    
                     .table-responsive { display: none; } 
                     .sales-card-view { display: flex; flex-direction: column; gap: 12px; } 
                     .filter-area { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -326,7 +320,8 @@ function SalesDashboard({ onBack }) {
                     .filter-row.bottom-row { grid-template-columns: repeat(4, 1fr); } 
                     .filter-select { padding: 0 4px; font-size: 0.85rem; text-align: center; }
                     .btn-filter { padding: 0; font-size: 0.9rem; }
-                    .mobile-card { background-color: var(--card-bg, white); border-radius: 15px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid var(--border-color, #eee); display: flex; flex-direction: column; gap: 10px; }
+                    
+                    .mobile-card { background-color: var(--card-bg, white); border-radius: var(--radius-lg); padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid var(--border-color, #eee); display: flex; flex-direction: column; gap: 10px; }
                     .mc-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-color, #ddd); padding-bottom: 8px; }
                     .mc-date { font-size: 0.85rem; color: var(--text-secondary, #666); }
                     .mc-id { font-size: 0.85rem; color: var(--text-secondary, #999); font-family: monospace; }
@@ -346,7 +341,6 @@ function SalesDashboard({ onBack }) {
                 </div>
 
                 <div className="header-right">
-                    {/* 🌟 4. 테마 스위치를 래퍼(wrapper)로 감싸서 모바일 뷰 분리 대비 */}
                     <div className="theme-wrapper">
                         <ThemeToggle />
                     </div>

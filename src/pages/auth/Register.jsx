@@ -68,7 +68,7 @@ function Register({ onSwitchToLogin }) {
                     background-color: var(--card-bg, white);
                     width: 100%; max-width: 380px;
                     padding: 40px 30px;
-                    border-radius: 25px;
+                    border-radius: var(--radius-lg); /* 🌟 회원가입 카드 lg 둥글기 */
                     box-shadow: 0 10px 30px rgba(0,0,0,0.08);
                     display: flex; flex-direction: column; align-items: center;
                     box-sizing: border-box;
@@ -79,7 +79,8 @@ function Register({ onSwitchToLogin }) {
                 
                 .register-form { width: 100%; display: flex; flex-direction: column; gap: 15px; }
                 .register-input {
-                    padding: 14px; border-radius: 12px; border: 1px solid var(--border-color, #ddd);
+                    padding: 14px; border-radius: var(--radius-md); /* 🌟 입력창 md 둥글기 */
+                    border: 1px solid var(--border-color, #ddd);
                     font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333);
                     outline: none; box-sizing: border-box; width: 100%;
                     -webkit-appearance: none;
@@ -89,7 +90,8 @@ function Register({ onSwitchToLogin }) {
                 .register-input::placeholder { color: var(--text-secondary, #aaa); }
                 
                 .btn-submit {
-                    padding: 14px; border-radius: 12px; border: none; 
+                    padding: 14px; border-radius: var(--radius-md); /* 🌟 가입 버튼 md 둥글기 */
+                    border: none; 
                     background-color: var(--text-primary, #333); 
                     color: var(--bg-color, white);
                     font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px;

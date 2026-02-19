@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import ThemeToggle from '../../components/ThemeToggle'; // 🌟 테마 스위치 추가
+import ThemeToggle from '../../components/ThemeToggle';
 
 function SettlementDashboard({ onBack }) {
     const [settlements, setSettlements] = useState([]);
@@ -34,27 +34,28 @@ function SettlementDashboard({ onBack }) {
                     transition: background-color 0.3s ease;
                 }
                 
-                /* 🌟 헤더를 Flex로 감싸 스위치와 양쪽 정렬 */
                 .settle-header {
                     display: flex; justify-content: space-between; align-items: center; 
                     margin-bottom: 20px; flex-wrap: nowrap; gap: 15px;
                 }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .settle-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+                
+                /* 🌟 공통 뒤로가기 버튼 md 둥글기 적용 */
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
 
                 .theme-wrapper { display: flex; align-items: center; }
 
+                /* 🌟 PC 화면 큰 카드 영역 lg 둥글기 적용 */
                 .settle-content {
                     background-color: var(--card-bg, white);
-                    padding: 20px; border-radius: 20px;
+                    padding: 20px; border-radius: var(--radius-lg);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
                     box-sizing: border-box;
                     width: 100%;
                     border: 1px solid var(--border-color, transparent);
                 }
 
-                /* 💻 PC 테이블 뷰 */
                 .settle-table-view { width: 100%; border-collapse: collapse; }
                 .settle-table-view th { 
                     padding: 15px 10px; color: var(--text-secondary, #666); text-align: left; 
@@ -67,25 +68,22 @@ function SettlementDashboard({ onBack }) {
 
                 .settle-card-view { display: none; }
 
-                /* 🌟 뱃지 및 차액 클래스화 (인라인 스타일 대체) */
-                .badge-open { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .badge-closed { background-color: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .diff-good { color: #28a745; font-weight: bold; background-color: #e8f5e9; padding: 5px 10px; border-radius: 15px; display: inline-block; }
-                .diff-bad { color: #dc3545; font-weight: bold; background-color: #ffebee; padding: 5px 10px; border-radius: 15px; display: inline-block; }
+                /* 🌟 작은 뱃지류는 모두 sm 둥글기 적용 */
+                .badge-open { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .badge-closed { background-color: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .diff-good { color: #28a745; font-weight: bold; background-color: #e8f5e9; padding: 5px 10px; border-radius: var(--radius-sm); display: inline-block; }
+                .diff-bad { color: #dc3545; font-weight: bold; background-color: #ffebee; padding: 5px 10px; border-radius: var(--radius-sm); display: inline-block; }
                 .text-blue { color: #007bff; font-weight: bold; }
 
-                /* 🌙 다크모드 전용 컬러 오버라이드 */
                 [data-theme='dark'] .badge-open { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
                 [data-theme='dark'] .badge-closed { background-color: rgba(46, 125, 50, 0.2); color: #81c784; }
                 [data-theme='dark'] .diff-good { background-color: rgba(40, 167, 69, 0.15); color: #81c784; }
                 [data-theme='dark'] .diff-bad { background-color: rgba(220, 53, 69, 0.15); color: #ff8a80; }
                 [data-theme='dark'] .text-blue { color: #4facfe; }
 
-                /* 📱 모바일 화면 최적화 (768px 이하) */
                 @media (max-width: 768px) {
                     .settle-container { padding: 15px; }
                     
-                    /* 🌟 헤더 밸런스 조정: 제목 옆에 스위치 달기 */
                     .settle-header { position: relative; flex-direction: column; align-items: flex-start; gap: 12px; }
                     .header-left { width: 100%; gap: 10px; padding-right: 40px; box-sizing: border-box; }
                     .settle-title { font-size: 1.5rem; }
@@ -96,9 +94,10 @@ function SettlementDashboard({ onBack }) {
                     .settle-table-view { display: none; } 
                     .settle-card-view { display: flex; flex-direction: column; gap: 15px; } 
                     
+                    /* 🌟 모바일 영수증 카드에도 lg 둥글기 적용 */
                     .settle-card {
                         background-color: var(--card-bg, white);
-                        border-radius: 15px; padding: 20px;
+                        border-radius: var(--radius-lg); padding: 20px;
                         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
                         border: 1px solid var(--border-color, #eee);
                     }
@@ -155,7 +154,6 @@ function SettlementDashboard({ onBack }) {
                                         </td>
                                         <td>{item.opening_amount.toLocaleString()}원</td>
                                         <td>{item.sales_cash.toLocaleString()}원</td>
-                                        {/* 🌟 다크모드 대응을 위해 클래스로 분리 */}
                                         <td className="text-blue">
                                             {expected.toLocaleString()}원
                                         </td>

@@ -311,7 +311,8 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                 
                 .btn-sidebar-toggle {
                     padding: 10px 15px; background-color: #007bff; color: white;
-                    border: none; border-radius: 10px; font-weight: bold; cursor: pointer;
+                    border: none; border-radius: var(--radius-md); /* 🌟 변수 적용 */
+                    font-weight: bold; cursor: pointer;
                     font-size: 1rem; box-shadow: 0 4px 10px rgba(0,123,255,0.3);
                     transition: transform 0.1s, background-color 0.2s;
                 }
@@ -319,7 +320,8 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                 
                 .btn-back {
                     margin-bottom: 15px; padding: 10px 15px; background-color: #6c757d; color: white;
-                    border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
+                    border: none; border-radius: var(--radius-md); /* 🌟 변수 적용 */
+                    font-weight: bold; cursor: pointer;
                     align-self: flex-start; font-size: 0.9rem; transition: transform 0.1s;
                 }
                 .btn-back:active { transform: scale(0.95); }
@@ -331,7 +333,7 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                 }
                 .menu-card {
                     display: flex; flex-direction: column; justify-content: flex-start;
-                    border: 1px solid var(--border-color, #eee); border-radius: 12px; 
+                    border: 1px solid var(--border-color, #eee); border-radius: var(--radius-lg); /* 🌟 변수 적용 */
                     padding: 18px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); 
                     transition: all 0.2s; background-color: var(--card-bg, #fff);
                     cursor: pointer; box-sizing: border-box; height: fit-content;
@@ -351,7 +353,8 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                 
                 .shot-box {
                     margin-top: 15px; padding: 10px; background-color: rgba(0, 123, 255, 0.05);
-                    border-radius: 8px; border: 1px dashed rgba(0, 123, 255, 0.3);
+                    border-radius: var(--radius-sm); /* 🌟 변수 적용 */
+                    border: 1px dashed rgba(0, 123, 255, 0.3);
                     animation: slideDown 0.2s ease-out forwards; transform-origin: top center;
                 }
                 @keyframes slideDown { from { opacity: 0; transform: scaleY(0.8); } to { opacity: 1; transform: scaleY(1); } }
@@ -366,7 +369,7 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                     border-top: 2px solid var(--border-color, #ddd);
                 }
                 .total-info {
-                    padding: 15px; background-color: var(--card-bg, #fff); border-radius: 10px;
+                    padding: 15px; background-color: var(--card-bg, #fff); border-radius: var(--radius-md); /* 🌟 변수 적용 */
                     border: 2px solid var(--text-primary, #333); display: flex; justify-content: space-between;
                     align-items: center; font-size: 1.4rem; font-weight: bold; margin-bottom: 10px;
                     color: var(--text-primary, #333);
@@ -374,7 +377,8 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                 .btn-submit {
                     width: 100%; padding: 15px; font-size: 1.5rem; font-weight: bold;
                     background-color: var(--text-primary, #222); color: var(--bg-color, white);
-                    border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                    border: none; border-radius: var(--radius-md); /* 🌟 변수 적용 */
+                    cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
                     transition: transform 0.1s;
                 }
                 .btn-submit:active { transform: scale(0.98); }
@@ -401,18 +405,19 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                 }
                 .receipt-card {
                     background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd);
-                    border-top: 5px solid #d32f2f; border-radius: 12px; padding: 20px;
+                    border-top: 5px solid #d32f2f; border-radius: var(--radius-lg); /* 🌟 변수 적용 */
+                    padding: 20px;
                     box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; flex-shrink: 0;
                 }
                 .receipt-header { border-bottom: 2px dashed var(--border-color, #ddd); padding-bottom: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
                 .receipt-num { margin: 0; color: #d32f2f; font-size: 1.8rem; font-weight: bold; }
                 
-                .badge { padding: 5px 10px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .badge { padding: 5px 10px; border-radius: var(--radius-sm); /* 🌟 변수 적용 */ font-size: 0.85rem; font-weight: bold; display: inline-block; }
                 .badge-cooking { border: 1px solid #ff9800; color: #ff9800; background-color: rgba(255,152,0,0.1); }
                 .badge-done { border: 1px solid #007bff; color: #007bff; background-color: rgba(0,123,255,0.1); }
                 .badge-paid { color: #28a745; border: 2px solid #28a745; background-color: rgba(40,167,69,0.1); }
                 
-                .btn-action { padding: 8px 12px; font-size: 0.9rem; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+                .btn-action { padding: 8px 12px; font-size: 0.9rem; border: none; border-radius: var(--radius-sm); /* 🌟 변수 적용 */ cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
                 .btn-action:active { opacity: 0.8; }
                 .btn-cancel { background-color: #dc3545; color: white; }
                 .btn-pay { background-color: #28a745; color: white; }
@@ -423,8 +428,8 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
 
                 /* 결제 모달 */
                 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-                .modal-content { background-color: var(--card-bg, white); padding: 30px; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 90%; max-width: 400px; box-sizing: border-box; }
-                .btn-modal-opt { flex: 1; padding: 20px; border: none; border-radius: 15px; color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+                .modal-content { background-color: var(--card-bg, white); padding: 30px; border-radius: var(--radius-lg); /* 🌟 변수 적용 */ text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 90%; max-width: 400px; box-sizing: border-box; }
+                .btn-modal-opt { flex: 1; padding: 20px; border: none; border-radius: var(--radius-md); /* 🌟 변수 적용 */ color: white; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
                 /* 📱 모바일 화면 최적화 (768px 이하) */
                 @media (max-width: 768px) {
@@ -565,7 +570,17 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                                 <div style={{fontSize: '2rem', marginBottom: '10px'}}>🏦</div>계좌
                             </button>
                         </div>
-                        <button onClick={() => setPaymentCheckId(null)} style={{padding: '12px 30px', backgroundColor: 'var(--border-color, #eee)', color: 'var(--text-primary, #333)', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', width: '100%'}}>
+                        <button onClick={() => setPaymentCheckId(null)} style={{
+                            padding: '12px 30px',
+                            backgroundColor: 'var(--border-color, #eee)',
+                            color: 'var(--text-primary, #333)',
+                            border: 'none',
+                            borderRadius: 'var(--radius-md)',
+                            fontWeight: 'bold',
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                            width: '100%'
+                        }}>
                             닫기
                         </button>
                     </div>

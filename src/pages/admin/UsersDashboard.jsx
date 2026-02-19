@@ -80,13 +80,16 @@ function UsersDashboard({ onBack }) {
                 }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .users-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+                
+                /* 🌟 공통 뒤로가기 버튼 md 둥글기 적용 */
+                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
                 
                 .theme-wrapper { display: flex; align-items: center; }
 
+                /* 🌟 PC 테이블 래퍼 (배경 카드) lg 둥글기 적용 */
                 .users-container {
                     background-color: var(--card-bg, white);
-                    border-radius: 15px;
+                    border-radius: var(--radius-lg);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
                     overflow: hidden; 
                     border: 1px solid var(--border-color, transparent);
@@ -105,7 +108,8 @@ function UsersDashboard({ onBack }) {
 
                 .users-card-view { display: none; } 
 
-                .role-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; display: inline-block; }
+                /* 🌟 작은 뱃지류는 sm 둥글기 적용 */
+                .role-badge { padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: bold; display: inline-block; }
                 .role-admin { background-color: #e3f2fd; color: #1565c0; }
                 .role-staff { background-color: #e8f5e9; color: #2e7d32; }
                 .role-pending { background-color: #fff3e0; color: #ef6c00; }
@@ -114,7 +118,8 @@ function UsersDashboard({ onBack }) {
                 [data-theme='dark'] .role-staff { background-color: rgba(46, 125, 50, 0.2); color: #81c784; }
                 [data-theme='dark'] .role-pending { background-color: rgba(239, 108, 0, 0.2); color: #ffb74d; }
 
-                .btn-action-base { padding: 6px 10px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; border: none; cursor: pointer; color: white; transition: transform 0.1s; }
+                /* 🌟 테이블 안의 액션 버튼들도 sm 둥글기 적용 */
+                .btn-action-base { padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: bold; border: none; cursor: pointer; color: white; transition: transform 0.1s; }
                 .btn-action-base:active { transform: scale(0.95); }
                 .btn-approve { background-color: #4caf50; }
                 .btn-demote { background-color: #9e9e9e; }
@@ -125,7 +130,7 @@ function UsersDashboard({ onBack }) {
                 .my-account-label { color: var(--text-blue, #007bff); font-weight: bold; font-size: 0.9rem; padding: 8px; }
                 [data-theme='dark'] .my-account-label { color: #4facfe; }
 
-                /* 📱 모바일 화면 최적화 (768px 이하) */
+                /* 📱 모바일 화면 최적화 */
                 @media (max-width: 768px) {
                     .users-dashboard-wrapper { padding: 15px; }
                     
@@ -139,9 +144,10 @@ function UsersDashboard({ onBack }) {
                     .users-table-view { display: none; } 
                     .users-card-view { display: flex; flex-direction: column; gap: 15px; } 
                     
+                    /* 🌟 모바일 개별 카드들도 lg 둥글기 적용 */
                     .user-card {
                         background-color: var(--card-bg, white);
-                        border-radius: 15px; padding: 20px;
+                        border-radius: var(--radius-lg); padding: 20px;
                         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
                         display: flex; flex-direction: column; gap: 10px;
                         border: 1px solid var(--border-color, transparent);
@@ -151,22 +157,22 @@ function UsersDashboard({ onBack }) {
                     .user-id { font-size: 0.85rem; color: var(--text-secondary, #888); }
                     .user-card-body { display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; color: var(--text-secondary, #555); }
                     
-                    /* 🌟 픽스: 모바일 액션 버튼 자동 줄바꿈 방지 */
                     .user-card-actions { 
                         display: flex; 
-                        gap: 6px; /* 버튼 사이 간격을 살짝 줄임 */
+                        gap: 6px; 
                         margin-top: 10px; 
-                        flex-wrap: nowrap; /* 공간이 부족해도 다음 줄로 내리지 않음 */
-                        overflow-x: auto; /* 만약 화면보다 넘치면 스크롤 가능하게 처리 */
+                        flex-wrap: nowrap; 
+                        overflow-x: auto; 
                     }
                     
+                    /* 🌟 모바일 액션 버튼은 살짝 크니까 sm(또는 md) 적용. 여기선 sm으로 일관성 유지 */
                     .btn-action-base { 
                         flex: 1; 
-                        padding: 10px 2px; /* 좌우 패딩을 확 줄여서 공간 확보 */
+                        padding: 10px 2px; 
                         text-align: center; 
-                        border-radius: 8px; 
-                        font-size: 0.8rem; /* 폰트 사이즈를 조금 줄임 */
-                        white-space: nowrap; /* 🌟 핵심: 텍스트가 두 줄로 꺾이는 것을 완벽 차단! */
+                        border-radius: var(--radius-sm); 
+                        font-size: 0.8rem; 
+                        white-space: nowrap; 
                     }
                     
                     .my-account-label { width: 100%; text-align: right; }

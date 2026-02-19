@@ -7,11 +7,9 @@ import UsersDashboard from './UsersDashboard';
 import ThemeToggle from '../../components/ThemeToggle'; // 🌟 테마 스위치 컴포넌트 불러오기
 
 function AdminDashboard({ onLogout, onEditProfile }) {
-    // 1. 초기 화면을 'home'으로 설정 (목록이 아닌 선택 화면)
-    const [view, setView] = useState('home'); // 'home' | 'users' | 'menu' | 'sales'
+    const [view, setView] = useState('home');
     const [users, setUsers] = useState([]);
 
-    // --- [직원 관리 로직] ---
     useEffect(() => {
         if (view === 'users') {
             fetchUsers();
@@ -38,43 +36,80 @@ function AdminDashboard({ onLogout, onEditProfile }) {
         }
     };
 
-    // --- [화면 전환 로직] ---
-    if (view === 'menu') {
-        return <MenuDashboard onBack={() => setView('home')} />;
-    }
-    if (view === 'sales') {
-        return <SalesDashboard onBack={() => setView('home')} />;
-    }
-    if (view === 'settlement') {
-        return <SettlementDashboard onBack={() => setView('home')} />;
-    }
-    if (view === 'users'){
-        return <UsersDashboard onBack={() => setView('home')} />;
-    }
+    if (view === 'menu') return <MenuDashboard onBack={() => setView('home')}/>;
+    if (view === 'sales') return <SalesDashboard onBack={() => setView('home')}/>;
+    if (view === 'settlement') return <SettlementDashboard onBack={() => setView('home')}/>;
+    if (view === 'users') return <UsersDashboard onBack={() => setView('home')}/>;
 
-    // ✅ 2. 메인 선택 화면 (Home)
     if (view === 'home') {
         return (
-            <div style={containerStyle}>
+            <div className="admin-container">
 
-                <div style={topRightHeaderStyle}>
+                <div className="top-right-header">
                     <ThemeToggle />
-                    <button onClick={onEditProfile} style={profileBtnStyle}>
+                    <button onClick={onEditProfile} className="btn-global btn-profile">
                         ⚙️ 내 정보
                     </button>
-                    <button onClick={onLogout} style={logoutBtnStyle}>
+                    <button onClick={onLogout} className="btn-global btn-logout">
                         로그아웃
                     </button>
                 </div>
 
                 <style>
                     {`
+                    /* 🌟 전체 컨테이너 (인라인 스타일 제거) */
+                    .admin-container {
+                        padding: 20px;
+                        background-color: var(--bg-color, #f4f6f8);
+                        min-height: 100vh;
+                        display: flex;
+                        flex-direction: column;
+                        transition: background-color 0.3s ease;
+                        box-sizing: border-box;
+                        position: relative; 
+                    }
+
+                    /* 🌟 메인 컨텐츠 영역 */
+                    .home-content { 
+                        flex: 1; display: flex; flex-direction: column; 
+                        align-items: center; justify-content: center; 
+                    }
+
+                    /* 🌟 우측 상단 글로벌 버튼 영역 */
+                    .top-right-header {
+                        position: absolute;
+                        top: 15px;
+                        right: 20px;
+                        display: flex;
+                        gap: 10px;
+                        align-items: center;
+                        z-index: 100;
+                    }
+
+                    /* 🌟 상단 공통 버튼 스타일 (둥글기 통일 핵심!) */
+                    .btn-global {
+                        padding: 8px 12px;
+                        color: white;
+                        border: none;
+                        border-radius: var(--radius-md); /* ✅ 기존 20px, 8px 혼용을 12px 변수로 완벽 통일! */
+                        font-weight: bold;
+                        cursor: pointer;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        transition: transform 0.1s;
+                        white-space: nowrap; /* 글자 줄바꿈 방지 */
+                    }
+                    .btn-global:active { transform: scale(0.95); }
+                    .btn-profile { background-color: #495057; }
+                    .btn-logout { background-color: #dc3545; }
+
                     .admin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; width: 100%; max-width: 1000px; margin-bottom: 50px; }
                     
+                    /* 🌟 카드 스타일 */
                     .admin-card { 
                         background-color: var(--card-bg, white); 
                         border: 1px solid var(--border-color, transparent);
-                        border-radius: 20px; padding: 35px 20px; 
+                        border-radius: var(--radius-lg); /* ✅ 기존 20px 하드코딩을 변수로 교체 */
+                        padding: 35px 20px; 
                         box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
                         cursor: pointer; display: flex; flex-direction: column; align-items: center; 
                         text-align: center; transition: transform 0.1s, box-shadow 0.1s, background-color 0.3s; 
@@ -84,10 +119,17 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                     .card-title { font-size: 1.3rem; font-weight: bold; color: var(--text-primary, #333); margin-bottom: 8px; }
                     .card-desc { font-size: 0.95rem; color: var(--text-secondary, #888); word-break: keep-all; }
 
+                    /* 📱 모바일 화면 최적화 */
                     @media (max-width: 768px) {
-                        /* 🌟 모바일 하단 여백을 줄여서 스크롤 발생 확률 추가 차단 */
+                        /* 모바일 상단 버튼들 크기와 간격 다이어트 */
+                        .top-right-header { top: 10px; right: 10px; gap: 8px; }
+                        .btn-global { padding: 6px 10px; font-size: 0.85rem; }
+
                         .admin-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
-                        .admin-card { aspect-ratio: 1 / 1; justify-content: center; padding: 10px; border-radius: 18px; }
+                        .admin-card { 
+                            aspect-ratio: 1 / 1; justify-content: center; padding: 10px; 
+                            border-radius: var(--radius-lg); /* ✅ 기존 18px 하드코딩을 변수로 교체 */
+                        }
                         .card-icon { font-size: 2.5rem; margin-bottom: 8px; }
                         .card-title { font-size: 1.05rem; margin-bottom: 5px; word-break: keep-all; }
                         .card-desc { font-size: 0.75rem; margin: 0; }
@@ -95,8 +137,13 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                     `}
                 </style>
 
-                <div style={homeContentStyle}>
-                    <h1 style={{fontSize: '2.2rem', marginBottom: '30px', color: 'var(--text-primary, #333)'}}>
+                <div className="home-content">
+                    <h1 style={{
+                        fontSize: '2.2rem',
+                        marginBottom: '30px',
+                        color: 'var(--text-primary, #333)',
+                        textAlign: 'center'
+                    }}>
                         🛡️ 관리자 대시보드
                     </h1>
 
@@ -126,61 +173,6 @@ function AdminDashboard({ onLogout, onEditProfile }) {
             </div>
         );
     }
-}
-
-// --- 스타일 ---
-const containerStyle = {
-    padding: '20px',
-    backgroundColor: 'var(--bg-color, #f4f6f8)',
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    transition: 'background-color 0.3s ease',
-    boxSizing: 'border-box', // 🌟 해결 1: padding 때문에 전체 높이가 100vh를 초과하지 않게 강제 맞춤
-    position: 'relative'     // 🌟 해결 2: 우측 상단 absolute 위치의 팝업과 버튼들이 정확한 위치를 잡도록 기준점 마련
-};
-const homeContentStyle = { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' };
-
-const logoutLinkStyle = {
-    marginTop: '20px',
-    background: 'none',
-    border: 'none',
-    color: '#888',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontSize: '1rem'
-};
-
-const topRightHeaderStyle = {
-    position: 'absolute',
-    top: '15px',
-    right: '20px',
-    display: 'flex',
-    gap: '10px',
-    alignItems: 'center',
-    zIndex: 100
-};
-
-const profileBtnStyle = {
-    padding: '8px 12px',
-    backgroundColor: '#495057',
-    color: 'white',
-    border: 'none',
-    borderRadius: '20px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-};
-
-const logoutBtnStyle = {
-    padding: '8px 12px',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
 }
 
 export default AdminDashboard;

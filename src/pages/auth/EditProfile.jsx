@@ -125,10 +125,12 @@ function EditProfile({ onBack }) {
                     background-color: var(--bg-color, #f4f6f8);
                     transition: background-color 0.3s ease;
                 }
+                
+                /* 🌟 메인 카드 배경 둥글기 lg 적용 */
                 .ep-card {
                     background-color: var(--card-bg, white);
                     padding: 30px 25px;
-                    border-radius: 25px;
+                    border-radius: var(--radius-lg);
                     box-shadow: 0 10px 30px rgba(0,0,0,0.08);
                     width: 100%; max-width: 420px;
                     display: flex; flex-direction: column; gap: 20px;
@@ -140,8 +142,10 @@ function EditProfile({ onBack }) {
                 
                 .ep-row { display: flex; flex-direction: column; gap: 8px; width: 100%; }
                 .ep-label { font-size: 0.9rem; color: var(--text-secondary, #666); font-weight: bold; }
+                
+                /* 🌟 입력창 둥글기 md 적용 */
                 .ep-input { 
-                    padding: 14px; border-radius: 12px; border: 1px solid var(--border-color, #ddd); 
+                    padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color, #ddd); 
                     font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333); 
                     outline: none; box-sizing: border-box; width: 100%; 
                     -webkit-appearance: none;
@@ -149,9 +153,10 @@ function EditProfile({ onBack }) {
                 .ep-input:focus { border-color: #007bff; }
                 .ep-input:disabled { opacity: 0.7; }
                 
+                /* 🌟 텍스트 링크 버튼 둥글기 md 적용 */
                 .btn-link { 
                     padding: 14px; background-color: transparent; color: #007bff; 
-                    border: 1px solid #007bff; border-radius: 12px; cursor: pointer; 
+                    border: 1px solid #007bff; border-radius: var(--radius-md); cursor: pointer; 
                     font-weight: bold; font-size: 1rem; text-align: center; transition: background-color 0.2s; 
                     width: 100%; box-sizing: border-box;
                 }
@@ -161,25 +166,30 @@ function EditProfile({ onBack }) {
                 
                 .passkey-header { display: flex; justify-content: space-between; align-items: center; }
                 .passkey-title { margin: 0; font-size: 1.1rem; color: var(--text-primary, #333); font-weight: bold; }
-                .btn-add { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
                 
+                /* 🌟 작은 추가/삭제 버튼 둥글기 sm 적용 */
+                .btn-add { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+                
+                /* 🌟 패스키 목록 배경 및 아이템 둥글기 md 적용 */
                 .passkey-list { 
-                    background-color: var(--bg-color, #f8f9fa); border-radius: 15px; padding: 15px; 
+                    background-color: var(--bg-color, #f8f9fa); border-radius: var(--radius-md); padding: 15px; 
                     border: 1px solid var(--border-color, #eee); max-height: 250px; overflow-y: auto; 
                     display: flex; flex-direction: column; gap: 10px; 
                 }
                 .passkey-item { 
                     display: flex; justify-content: space-between; align-items: center; padding: 12px; 
-                    background-color: var(--card-bg, white); border-radius: 10px; 
+                    background-color: var(--card-bg, white); border-radius: var(--radius-md); 
                     border: 1px solid var(--border-color, #eee); 
                 }
                 .pk-name { font-weight: bold; color: var(--text-primary, #333); font-size: 1rem; margin-bottom: 4px; }
                 .pk-date { font-size: 0.8rem; color: var(--text-secondary, #888); }
-                .btn-del { padding: 8px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
                 
+                .btn-del { padding: 8px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s;}
+                
+                /* 🌟 하단 메인 액션 버튼들 둥글기 md 적용 */
                 .footer-btns { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; }
                 .btn-base { 
-                    flex: 1; padding: 14px; border: none; border-radius: 12px; 
+                    flex: 1; padding: 14px; border: none; border-radius: var(--radius-md); 
                     cursor: pointer; font-weight: bold; font-size: 1rem; text-align: center; 
                     color: white; transition: transform 0.1s; 
                 }
@@ -187,6 +197,13 @@ function EditProfile({ onBack }) {
                 .btn-back { background-color: #6c757d; }
                 .btn-logout { background-color: #dc3545; }
                 .btn-save { background-color: #007bff; }
+
+                /* 🌙 다크모드 오버라이드 (가독성 향상) */
+                [data-theme='dark'] .btn-link { color: #4facfe; border-color: #4facfe; }
+                [data-theme='dark'] .btn-link:active { background-color: rgba(79, 172, 254, 0.1); }
+                
+                [data-theme='dark'] .btn-del { background-color: rgba(220, 53, 69, 0.2); color: #ff8a80; }
+                [data-theme='dark'] .btn-del:active { background-color: rgba(220, 53, 69, 0.3); }
                 `}
             </style>
 

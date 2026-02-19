@@ -107,7 +107,7 @@ export default function ThemeToggle() {
                     top: calc(100% + 10px);
                     background-color: var(--card-bg, #fff);
                     border: 1px solid var(--border-color, #ddd);
-                    border-radius: 12px;
+                    border-radius: var(--radius-md);
                     box-shadow: 0 5px 15px rgba(0,0,0,0.15);
                     padding: 8px;
                     min-width: 150px;
@@ -125,7 +125,9 @@ export default function ThemeToggle() {
 
                 .theme-menu-item {
                     background: none; border: none; width: 100%; text-align: left;
-                    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+                    padding: 10px 12px; 
+                    border-radius: var(--radius-sm);
+                    cursor: pointer;
                     font-size: 0.95rem; color: var(--text-primary, #333);
                     display: flex; align-items: center; gap: 12px;
                     transition: background-color 0.2s;

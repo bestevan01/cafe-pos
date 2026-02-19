@@ -89,16 +89,16 @@ function Kitchen({ onBack }) {
             <style>
                 {`
                 .kitchen-container {
-                    position: relative; /* 🌟 핵심 1: 절대 위치의 기준점 */
+                    position: relative;
                     display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh;
                     background-color: var(--bg-color, #f4f6f8); 
                     padding: 20px; 
-                    padding-top: 65px; /* PC/모바일 모두 상단에 버튼이 뜰 공간을 비워둠 */
+                    padding-top: 65px; 
                     box-sizing: border-box;
                     transition: background-color 0.3s ease;
                 }
                 
-                /* 🌟 핵심 2: 나가기 버튼을 문서 흐름에서 빼내어 우측 버튼들과 똑같은 높이에 고정 */
+                /* 🌟 공통 뒤로가기 버튼 md 둥글기 적용 */
                 .btn-back-floating {
                     position: absolute;
                     top: 15px;
@@ -110,7 +110,7 @@ function Kitchen({ onBack }) {
                     background-color: #6c757d; 
                     color: white;
                     border: none;
-                    border-radius: 8px; /* App.jsx 우측 버튼들과 통일감 부여 */
+                    border-radius: var(--radius-md); 
                     cursor: pointer;
                     box-shadow: 0 2px 5px rgba(0,0,0,0.15);
                     transition: transform 0.1s;
@@ -130,9 +130,10 @@ function Kitchen({ onBack }) {
                     padding-right: 5px; scrollbar-width: thin; align-content: start;
                 }
                 
+                /* 🌟 영수증 카드 배경 lg 둥글기 적용 */
                 .receipt-card {
                     background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd);
-                    border-top: 6px solid #d32f2f; border-radius: 12px; padding: 20px;
+                    border-top: 6px solid #d32f2f; border-radius: var(--radius-lg); padding: 20px;
                     box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: flex; flex-direction: column;
                 }
                 
@@ -143,26 +144,26 @@ function Kitchen({ onBack }) {
                 
                 .receipt-num { margin: 0; color: #d32f2f; font-size: 2.5rem; font-weight: bold; }
                 
-                .badge-paid { color: #28a745; border: 2px solid #28a745; padding: 6px 12px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; background-color: rgba(40,167,69,0.1); }
-                .badge-unpaid { color: #ff9800; border: 2px solid #ff9800; padding: 6px 12px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; background-color: rgba(255,152,0,0.1); }
+                /* 🌟 작은 뱃지들 sm 둥글기 적용 */
+                .badge-paid { color: #28a745; border: 2px solid #28a745; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: rgba(40,167,69,0.1); }
+                .badge-unpaid { color: #ff9800; border: 2px solid #ff9800; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: rgba(255,152,0,0.1); }
                 
                 .receipt-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; margin-bottom: 8px; border-bottom: 1px solid var(--border-color, #f0f0f0); padding-bottom: 5px; color: var(--text-primary, #333); }
                 .item-qty { font-weight: bold; color: var(--text-primary, #111); font-size: 1.3rem; }
                 
+                /* 🌟 하단 액션 버튼들 md 둥글기 적용 */
                 .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-                .btn-cancel { flex: 1; padding: 15px; font-size: 1.1rem; background-color: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+                .btn-cancel { flex: 1; padding: 15px; font-size: 1.1rem; background-color: #dc3545; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
                 .btn-cancel:active { opacity: 0.8; }
-                .btn-complete { flex: 2; padding: 15px; font-size: 1.2rem; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+                .btn-complete { flex: 2; padding: 15px; font-size: 1.2rem; background-color: #28a745; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
                 .btn-complete:active { opacity: 0.8; }
 
-                /* 📱 모바일 화면 최적화 (768px 이하) */
                 @media (max-width: 768px) {
                     .kitchen-container { 
                         padding: 15px; 
                         padding-top: 55px; 
                     } 
                     
-                    /* 🌟 핵심 3: 모바일에서 우측 글로벌 버튼(App.jsx)의 top: 10px, 좌우 여백 10px과 완벽하게 일치시킴 */
                     .btn-back-floating {
                         top: 10px;
                         left: 10px;
@@ -177,7 +178,6 @@ function Kitchen({ onBack }) {
                 `}
             </style>
 
-            {/* 🌟 기존 흐름에서 빼내어 플로팅된 버튼 */}
             <button onClick={onBack} className="btn-back-floating">⬅ 나가기</button>
 
             <div className="kitchen-header-bar">

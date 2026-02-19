@@ -67,9 +67,9 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                     padding: 20px;
                 }
                 .auth-modal {
-                    background-color: var(--card-bg); /* ✅ 다크모드 변수 적용 */
+                    background-color: var(--card-bg); 
                     padding: 30px 25px;
-                    border-radius: 20px;
+                    border-radius: var(--radius-lg); /* 🌟 모달 둥글기 lg 적용 */
                     width: 100%;
                     max-width: 340px;
                     text-align: center;
@@ -84,11 +84,11 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                 
                 .auth-input {
                     padding: 14px;
-                    border-radius: 12px;
+                    border-radius: var(--radius-md); /* 🌟 입력창 둥글기 md 적용 */
                     border: 1px solid var(--border-color);
                     font-size: 1rem;
-                    background-color: var(--bg-color); /* ✅ 다크모드 변수 적용 (입력칸 배경) */
-                    color: var(--text-primary); /* ✅ 다크모드 변수 적용 (입력칸 글씨) */
+                    background-color: var(--bg-color); 
+                    color: var(--text-primary); 
                     -webkit-appearance: none;
                     width: 100%;
                     box-sizing: border-box;
@@ -98,13 +98,13 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                 
                 .auth-btn {
                     padding: 14px;
-                    border-radius: 12px;
+                    border-radius: var(--radius-md); /* 🌟 버튼 둥글기 md 적용 */
                     border: none;
                     font-weight: bold;
                     cursor: pointer;
                     font-size: 1rem;
-                    width: 100%; /* ✅ 버튼을 가로 꽉 차게 변경 */
-                    transition: transform 0.1s;
+                    width: 100%; 
+                    transition: transform 0.1s, background-color 0.2s;
                 }
                 .auth-btn:active { transform: scale(0.97); }
                 
@@ -117,6 +117,9 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                     color: var(--text-secondary); 
                     border: 1px solid var(--border-color); 
                 }
+                
+                /* 🌙 다크모드 대응: 취소 버튼 눌렀을 때 살짝 배경색 보이게 (선택 사항) */
+                [data-theme='dark'] .btn-cancel:active { background-color: rgba(255,255,255,0.05); }
                 `}
             </style>
 

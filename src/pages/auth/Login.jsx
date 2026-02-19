@@ -102,7 +102,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                     background-color: var(--card-bg, white);
                     width: 100%; max-width: 380px;
                     padding: 40px 30px;
-                    border-radius: 25px;
+                    border-radius: var(--radius-lg); /* 🌟 로그인 카드 lg 둥글기 */
                     box-shadow: 0 10px 30px rgba(0,0,0,0.08);
                     display: flex; flex-direction: column; align-items: center;
                     box-sizing: border-box;
@@ -114,7 +114,8 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 
                 .login-form { width: 100%; display: flex; flex-direction: column; gap: 15px; }
                 .login-input {
-                    padding: 14px; border-radius: 12px; border: 1px solid var(--border-color, #ddd);
+                    padding: 14px; border-radius: var(--radius-md); /* 🌟 입력창 md 둥글기 */
+                    border: 1px solid var(--border-color, #ddd);
                     font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333);
                     outline: none; box-sizing: border-box; width: 100%;
                     -webkit-appearance: none;
@@ -124,7 +125,8 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 .login-input::placeholder { color: var(--text-secondary, #aaa); }
                 
                 .btn-submit {
-                    padding: 14px; border-radius: 12px; border: none; background-color: #007bff; color: white;
+                    padding: 14px; border-radius: var(--radius-md); /* 🌟 제출 버튼 md 둥글기 */
+                    border: none; background-color: #007bff; color: white;
                     font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;
                     transition: transform 0.1s, background-color 0.2s;
                 }
@@ -135,7 +137,8 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 .divider-text { padding: 0 15px; color: var(--text-secondary, #999); font-size: 0.85rem; }
                 
                 .btn-passkey {
-                    padding: 14px; border-radius: 12px; border: 1px solid var(--border-color, #ccc);
+                    padding: 14px; border-radius: var(--radius-md); /* 🌟 패스키 버튼 md 둥글기 */
+                    border: 1px solid var(--border-color, #ccc);
                     background-color: var(--card-bg, white); color: var(--text-primary, #333);
                     font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;
                     display: flex; align-items: center; justify-content: center; gap: 8px;
