@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     allowedHosts: [
-        "miranda-unurging-creatively.ngrok-free.dev"
+      "miranda-unurging-creatively.ngrok-free.dev"
     ],
     proxy: {
       '/api': {
@@ -17,6 +17,19 @@ export default defineConfig({
         target: 'ws://localhost:8080',
         ws: true,
         changeOrigin: true,
+      }
+    }
+  },
+
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
       }
     }
   }
