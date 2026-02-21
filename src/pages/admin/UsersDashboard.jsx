@@ -9,7 +9,7 @@ function UsersDashboard({ onBack }) {
     useEffect(() => {
         const userStr = localStorage.getItem('user');
         if (userStr) setCurrentUserId(JSON.parse(userStr).id);
-        fetchUsers();
+        void fetchUsers();
     }, []);
 
     const fetchUsers = async () => {
@@ -26,7 +26,7 @@ function UsersDashboard({ onBack }) {
         try {
             await axios.patch(`/api/admin/users/${id}/role`, { role: newRole });
             alert('변경되었습니다.');
-            fetchUsers();
+            await fetchUsers();
         } catch (err) {
             alert('변경 실패');
         }
@@ -47,7 +47,7 @@ function UsersDashboard({ onBack }) {
         try {
             await axios.delete(`/api/admin/users/${targetUser.id}`);
             alert('✅ 계정이 완전히 삭제되었습니다.');
-            fetchUsers();
+            await fetchUsers();
         } catch (err) {
             alert('계정 삭제에 실패했습니다.');
         }

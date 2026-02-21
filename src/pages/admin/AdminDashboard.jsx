@@ -1,40 +1,15 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import {useState} from 'react'; // 🌟 사용하지 않는 useEffect 제거
+// 🌟 사용하지 않는 axios 제거
 import MenuDashboard from './MenuDashboard';
 import SalesDashboard from './SalesDashboard';
 import SettlementDashboard from './SettlementDashboard';
 import UsersDashboard from './UsersDashboard';
-import ThemeToggle from '../../components/ThemeToggle'; // 🌟 테마 스위치 컴포넌트 불러오기
+import ThemeToggle from '../../components/ThemeToggle';
 
 function AdminDashboard({ onLogout, onEditProfile }) {
     const [view, setView] = useState('home');
-    const [users, setUsers] = useState([]);
 
-    useEffect(() => {
-        if (view === 'users') {
-            fetchUsers();
-        }
-    }, [view]);
-
-    const fetchUsers = async () => {
-        try {
-            const res = await axios.get('/api/admin/users');
-            setUsers(res.data);
-        } catch (err) {
-            console.error('회원 목록 로딩 실패');
-        }
-    };
-
-    const handleRoleChange = async (id, newRole) => {
-        if (!window.confirm(`정말 권한을 ${newRole}(으)로 변경하시겠습니까?`)) return;
-        try {
-            await axios.patch(`/api/admin/users/${id}/role`, { role: newRole });
-            alert('변경되었습니다.');
-            fetchUsers();
-        } catch (err) {
-            alert('변경 실패');
-        }
-    };
+    // 🌟 불필요했던 users 상태, fetchUsers, handleRoleChange 함수 모두 삭제 완료!
 
     if (view === 'menu') return <MenuDashboard onBack={() => setView('home')}/>;
     if (view === 'sales') return <SalesDashboard onBack={() => setView('home')}/>;
@@ -91,7 +66,7 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                         padding: 8px 12px;
                         color: white;
                         border: none;
-                        border-radius: var(--radius-md); /* ✅ 기존 20px, 8px 혼용을 12px 변수로 완벽 통일! */
+                        border-radius: var(--radius-md); 
                         font-weight: bold;
                         cursor: pointer;
                         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
@@ -108,7 +83,7 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                     .admin-card { 
                         background-color: var(--card-bg, white); 
                         border: 1px solid var(--border-color, transparent);
-                        border-radius: var(--radius-lg); /* ✅ 기존 20px 하드코딩을 변수로 교체 */
+                        border-radius: var(--radius-lg); 
                         padding: 35px 20px; 
                         box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
                         cursor: pointer; display: flex; flex-direction: column; align-items: center; 
@@ -128,7 +103,7 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                         .admin-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
                         .admin-card { 
                             aspect-ratio: 1 / 1; justify-content: center; padding: 10px; 
-                            border-radius: var(--radius-lg); /* ✅ 기존 18px 하드코딩을 변수로 교체 */
+                            border-radius: var(--radius-lg); 
                         }
                         .card-icon { font-size: 2.5rem; margin-bottom: 8px; }
                         .card-title { font-size: 1.05rem; margin-bottom: 5px; word-break: keep-all; }

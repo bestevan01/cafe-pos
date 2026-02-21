@@ -1,32 +1,12 @@
-import { useState, useEffect } from 'react'; // 🌟 useEffect 추가
+import {useState} from 'react'; // 🌟 useEffect 추가
 import axios from 'axios';
+import {useSystemTheme} from "../../hooks/useSystemTheme.js";
 
 function Register({ onSwitchToLogin }) {
     const [formData, setFormData] = useState({ username: '', password: '', confirmPassword: '', name: '' });
 
     // 🌟 핵심: 회원가입 화면에서도 항상 시스템 테마(OS 설정)를 따라가도록 강제
-    useEffect(() => {
-        const root = document.documentElement;
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-        const applySystemTheme = (e) => {
-            if (e.matches) {
-                root.setAttribute('data-theme', 'dark');
-            } else {
-                root.setAttribute('data-theme', 'light');
-            }
-        };
-
-        // 컴포넌트가 켜질 때 즉시 시스템 테마 적용
-        applySystemTheme(mediaQuery);
-
-        // 운영체제 테마가 실시간으로 바뀔 때 감지
-        mediaQuery.addEventListener('change', applySystemTheme);
-
-        return () => {
-            mediaQuery.removeEventListener('change', applySystemTheme);
-        };
-    }, []);
+    useSystemTheme();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });

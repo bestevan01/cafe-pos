@@ -18,7 +18,7 @@ function SalesDashboard({ onBack }) {
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     useEffect(() => {
-        fetchSales();
+        void fetchSales();
     }, []);
 
     const fetchSales = async () => {
@@ -115,7 +115,7 @@ function SalesDashboard({ onBack }) {
         if (!window.confirm('정말 삭제(환불) 처리하시겠습니까?')) return;
         try {
             await axios.delete(`/api/admin/sales/${id}`);
-            fetchSales();
+            await fetchSales();
         } catch (err) {
             alert('삭제 실패');
         }
@@ -178,7 +178,7 @@ function SalesDashboard({ onBack }) {
     };
 
     const periodLabel = useMemo(() => {
-        let label = '';
+        let label;
         if (selectedYear === 'all') label = '전체 기간';
         else if (selectedMonth === 'all') label = `${selectedYear}년`;
         else if (selectedDay === 'all') label = `${selectedYear}년 ${selectedMonth}월`;
@@ -411,15 +411,18 @@ function SalesDashboard({ onBack }) {
                             </select>
                             <select value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setSelectedDay('all'); setSelectedHour('all'); }} className="filter-select" disabled={selectedYear === 'all'}>
                                 <option value="all">월 선택</option>
-                                {getAvailableMonths().map(month => (<option key={month} value={month}>{month}월</option>))}
+                                {getAvailableMonths().map(month => (
+                                    <option key={String(month)} value={String(month)}>{month}월</option>))}
                             </select>
                             <select value={selectedDay} onChange={(e) => { setSelectedDay(e.target.value); setSelectedHour('all'); }} className="filter-select" disabled={selectedMonth === 'all'}>
                                 <option value="all">일 선택</option>
-                                {getAvailableDays().map(day => (<option key={day} value={day}>{day}일</option>))}
+                                {getAvailableDays().map(day => (
+                                    <option key={String(day)} value={String(day)}>{day}일</option>))}
                             </select>
                             <select value={selectedHour} onChange={(e) => setSelectedHour(e.target.value)} className="filter-select" disabled={selectedDay === 'all'}>
                                 <option value="all">시간 선택</option>
-                                {getAvailableHours().map(hour => (<option key={hour} value={hour}>{hour}시</option>))}
+                                {getAvailableHours().map(hour => (
+                                    <option key={String(hour)} value={String(hour)}>{hour}시</option>))}
                             </select>
                         </div>
                     </div>

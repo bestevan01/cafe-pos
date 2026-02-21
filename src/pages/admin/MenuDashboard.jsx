@@ -9,7 +9,7 @@ function MenuDashboard({ onBack }) {
     const [formData, setFormData] = useState({ name: '', price: '', type: 'coffee' });
 
     useEffect(() => {
-        fetchMenu();
+        void fetchMenu();
     }, []);
 
     const fetchMenu = async () => {
@@ -31,7 +31,7 @@ function MenuDashboard({ onBack }) {
             await axios.post('/api/menu', formData);
             alert("메뉴가 추가되었습니다.");
             setFormData({ name: '', price: '', type: 'coffee' });
-            fetchMenu();
+            await fetchMenu();
         } catch (err) {
             alert("추가 실패");
         }
@@ -41,7 +41,7 @@ function MenuDashboard({ onBack }) {
         if (!window.confirm("정말 이 메뉴를 삭제하시겠습니까?")) return;
         try {
             await axios.delete(`/api/menu/${id}`);
-            fetchMenu();
+            await fetchMenu();
         } catch (err) {
             alert("삭제 실패");
         }
@@ -60,7 +60,7 @@ function MenuDashboard({ onBack }) {
             alert("수정되었습니다.");
             setEditingId(null);
             setFormData({ name: '', price: '', type: 'coffee' });
-            fetchMenu();
+            await fetchMenu();
         } catch (err) {
             alert("수정 실패");
         }
@@ -70,7 +70,7 @@ function MenuDashboard({ onBack }) {
         try {
             const newVal = menu.is_soldout ? 0 : 1;
             await axios.patch(`/api/menu/${menu.id}`, { is_soldout: newVal });
-            fetchMenu();
+            await fetchMenu();
         } catch (err) {
             alert("상태 변경 실패");
         }
@@ -208,7 +208,10 @@ function MenuDashboard({ onBack }) {
                 {/* 1. 왼쪽/상단: 메뉴 추가 및 수정 폼 */}
                 <div className="form-section">
                     <h3 className="form-title">{editingId ? "✏️ 메뉴 수정" : "➕ 메뉴 추가"}</h3>
-                    <form onSubmit={editingId ? (e) => {e.preventDefault(); handleUpdate();} : handleAdd}>
+                    <form onSubmit={editingId ? (e) => {
+                        e.preventDefault();
+                        void handleUpdate();
+                    } : handleAdd}>
                         <input
                             name="name"
                             placeholder="메뉴 이름 (예: 카페라떼)"

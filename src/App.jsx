@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { socket } from './utils/socket';
 
 import RoleSelection from './pages/pos/RoleSelection';
@@ -23,7 +22,7 @@ function App() {
         view: 'login'
     });
 
-    const SESSION_TIMEOUT = 1 * 60 * 60 * 1000;
+    const SESSION_TIMEOUT = 60 * 60 * 1000;
 
     const handleAutoLogout = useCallback(() => {
         alert("보안을 위해 1시간 동안 활동이 없어 자동 로그아웃되었습니다.");
@@ -99,7 +98,8 @@ function App() {
         const registerMyUser = () => {
             if (auth.user && auth.user.username) {
                 console.log(`🙋‍♂️ 서버에 출석 체크: ${auth.user.username}`);
-                socket.emit('register_user', {
+
+                socket.emit('register_user', /** @type {any} */{
                     username: auth.user.username,
                     role: auth.user.role
                 });
