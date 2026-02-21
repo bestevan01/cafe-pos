@@ -1,33 +1,13 @@
-import { useState, useEffect } from 'react';
+import {useState} from 'react';
 import { startAuthentication } from "@simplewebauthn/browser";
+import {useSystemTheme} from '../../hooks/useSystemTheme';
 import axios from 'axios';
 
 function Login({ onLoginSuccess, onSwitchToRegister }) {
     const [formData, setFormData] = useState({ username: '', password: '' });
 
     // 🌟 핵심: 로그인 화면에서는 항상 시스템 테마(OS 설정)를 따라가도록 강제
-    useEffect(() => {
-        const root = document.documentElement;
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-        const applySystemTheme = (e) => {
-            if (e.matches) {
-                root.setAttribute('data-theme', 'dark');
-            } else {
-                root.setAttribute('data-theme', 'light');
-            }
-        };
-
-        // 컴포넌트가 마운트될 때 즉시 시스템 테마 적용
-        applySystemTheme(mediaQuery);
-
-        // 시스템 테마 변경 실시간 감지
-        mediaQuery.addEventListener('change', applySystemTheme);
-
-        return () => {
-            mediaQuery.removeEventListener('change', applySystemTheme);
-        };
-    }, []);
+    useSystemTheme();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -63,7 +43,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 asseResp = await startAuthentication(resp.data);
             } catch (error) {
                 if (error.name === 'NotAllowedError') return;
-                throw error;
+                return;
             }
 
             const verificationResp = await axios.post('/api/passkey/login-verify', {

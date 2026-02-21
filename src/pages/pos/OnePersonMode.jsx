@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import {useState, useEffect} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
@@ -13,15 +13,15 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
 
-    const cartEndRef = useRef(null);
+    // const cartEndRef = useRef(null);
 
     useEffect(() => {
         // 화면 크기가 변할 때마다 모바일/PC 상태 업데이트
         const handleResize = () => setIsMobile(window.innerWidth <= 768);
         window.addEventListener('resize', handleResize);
 
-        fetchOrders();
-        fetchMenu();
+        void fetchOrders();
+        void fetchMenu();
 
         socket.on('new_order', (newOrderGroup) => {
             setOrderGroups(prev => [newOrderGroup, ...prev]);
@@ -185,7 +185,7 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                 setCart([]);
             } else if (res.data.isDuplicate) {
                 if (window.confirm("⚠️ 중복 주문 감지! 그래도 등록하시겠습니까?")) {
-                    submitOrder(true);
+                    await submitOrder(true);
                 }
             }
         } catch (err) {
@@ -223,7 +223,8 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
     const OrderGridContent = (
         <div className="order-grid">
             <AnimatePresence>
-                {orderGroups.map((group) => {
+                <>
+                    {orderGroups.map((group) => {
                     const groupTotal = group.items.reduce((acc, item) => acc + item.price, 0);
                     return (
                         <motion.div
@@ -270,7 +271,8 @@ function OnePersonMode({ onlyOrder = false, isCashier = false, onBack }) {
                             </div>
                         </motion.div>
                     );
-                })}
+                    })}
+                </>
             </AnimatePresence>
             {orderGroups.length === 0 && (
                 <p style={{textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px'}}>진행 중인 주문이 없습니다.</p>

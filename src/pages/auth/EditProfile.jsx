@@ -20,7 +20,7 @@ function EditProfile({ onBack }) {
             const parsedUser = JSON.parse(userStr);
             setUser(parsedUser);
             if (parsedUser.id) {
-                fetchPasskeys(parsedUser.id);
+                void fetchPasskeys(parsedUser.id);
             } else {
                 console.warn("사용자 ID가 없습니다. 다시 로그인해주세요.");
             }
@@ -73,7 +73,7 @@ function EditProfile({ onBack }) {
         try {
             await axios.delete(`/api/passkeys/${credentialId}`);
             alert("삭제되었습니다.");
-            fetchPasskeys(user.id);
+            await fetchPasskeys(user.id);
         } catch (err) {
             alert("삭제 실패: " + err.message);
         }
@@ -89,14 +89,14 @@ function EditProfile({ onBack }) {
             } catch (error) {
                 if (error.name === 'InvalidStateError') alert('이미 등록된 기기입니다!');
                 else if (error.name !== 'NotAllowedError') alert('등록 오류: ' + error.message);
-                throw error;
+                return;
             }
             const verificationResp = await axios.post('/api/passkey/register-verify', {
                 userId: user.id, body: attResp,
             });
             if (verificationResp.data.success) {
                 // alert('🎉 등록 성공!');
-                fetchPasskeys(user.id);
+                await fetchPasskeys(user.id);
             }
         } catch (error) { console.error(error); }
     };
@@ -280,7 +280,7 @@ function EditProfile({ onBack }) {
                                 passkeys.map((key) => (
                                     <div key={key.id} className="passkey-item">
                                         <div>
-                                            <div className="pk-name">{key.device_name}</div>
+                                            <div className="pk-name">{key['device_name']}</div>
                                             <div className="pk-date">{new Date(key.created_at).toLocaleDateString()}</div>
                                         </div>
                                         <button onClick={() => handleDeletePasskey(key.id)} className="btn-del">삭제</button>

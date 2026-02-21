@@ -30,7 +30,7 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                 asseResp = await startAuthentication(resp.data);
             } catch (error) {
                 if (error.name === 'NotAllowedError') return;
-                throw error;
+                return;
             }
 
             const verificationResp = await axios.post('/api/passkey/login-verify', {

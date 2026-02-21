@@ -7,7 +7,7 @@ function Kitchen({ onBack }) {
     const [orderGroups, setOrderGroups] = useState([]);
 
     useEffect(() => {
-        fetchOrders();
+        void fetchOrders();
 
         socket.on('new_order', (newOrderGroup) => {
             setOrderGroups(prev => [newOrderGroup, ...prev]);
@@ -186,44 +186,47 @@ function Kitchen({ onBack }) {
 
             <div className="order-grid">
                 <AnimatePresence>
-                    {orderGroups.map((group) => (
-                        <motion.div
-                            key={group.daily_number}
-                            className="receipt-card"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-                            layout
-                        >
-                            <div className="receipt-header">
-                                <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
-                                <div>
-                                    {group.is_paid === 1
-                                        ? <span className="badge-paid">입금 완료 💰</span>
-                                        : <span className="badge-unpaid">미입금 ⚠️</span>
-                                    }
-                                </div>
-                            </div>
-
-                            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '5px' }}>
-                                {group.items.map((item, idx) => (
-                                    <div key={idx} className="receipt-item">
-                                        <span style={{color: item.menu_name.includes('샷추가') ? '#007bff' : 'inherit'}}>{item.menu_name}</span>
-                                        <span className="item-qty">{item.quantity}</span>
+                    <>
+                        {orderGroups.map((group) => (
+                            <motion.div
+                                key={group.daily_number}
+                                className="receipt-card"
+                                initial={{opacity: 0, scale: 0.9}}
+                                animate={{opacity: 1, scale: 1}}
+                                exit={{opacity: 0, scale: 0.5, transition: {duration: 0.2}}}
+                                layout
+                            >
+                                <div className="receipt-header">
+                                    <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
+                                    <div>
+                                        {group.is_paid === 1
+                                            ? <span className="badge-paid">입금 완료 💰</span>
+                                            : <span className="badge-unpaid">미입금 ⚠️</span>
+                                        }
                                     </div>
-                                ))}
-                            </div>
+                                </div>
 
-                            <div className="btn-group">
-                                <button onClick={() => handleDelete(group.display_id)} className="btn-cancel">
-                                    취소
-                                </button>
-                                <button onClick={() => handleComplete(group.display_id)} className="btn-complete">
-                                    조리 완료 ✅
-                                </button>
-                            </div>
-                        </motion.div>
-                    ))}
+                                <div style={{flex: 1, overflowY: 'auto', marginBottom: '5px'}}>
+                                    {group.items.map((item, idx) => (
+                                        <div key={idx} className="receipt-item">
+                                            <span
+                                                style={{color: item.menu_name.includes('샷추가') ? '#007bff' : 'inherit'}}>{item.menu_name}</span>
+                                            <span className="item-qty">{item.quantity}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="btn-group">
+                                    <button onClick={() => handleDelete(group.display_id)} className="btn-cancel">
+                                        취소
+                                    </button>
+                                    <button onClick={() => handleComplete(group.display_id)} className="btn-complete">
+                                        조리 완료 ✅
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </>
                 </AnimatePresence>
                 {orderGroups.length === 0 && (
                     <p style={{textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px', fontSize: '1.2rem', gridColumn: '1 / -1'}}>

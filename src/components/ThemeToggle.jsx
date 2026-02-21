@@ -31,11 +31,11 @@ export default function ThemeToggle() {
 
             // 1. 오른쪽으로 화면을 뚫고 나갈 것 같다면? -> 버튼 오른쪽 끝에 맞춤
             if (buttonCenter + (menuWidth / 2) > window.innerWidth - margin) {
-                setMenuStyle({ right: 0, left: 'auto', transform: 'none' });
+                setMenuStyle({right: '0', left: 'auto', transform: 'none'});
             }
             // 2. 왼쪽으로 화면을 뚫고 나갈 것 같다면? -> 버튼 왼쪽 끝에 맞춤
             else if (buttonCenter - (menuWidth / 2) < margin) {
-                setMenuStyle({ left: 0, right: 'auto', transform: 'none' });
+                setMenuStyle({left: '0', right: 'auto', transform: 'none'});
             }
             // 3. 공간이 넉넉하다면? -> 원래대로 버튼 정중앙에 예쁘게 배치
             else {
@@ -64,7 +64,7 @@ export default function ThemeToggle() {
         };
 
         applyTheme(theme);
-        localStorage.setItem('theme', theme);
+        localStorage.setItem('theme', String(theme));
 
         const handleChange = () => {
             if (theme === 'system') applyTheme('system');

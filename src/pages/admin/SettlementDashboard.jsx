@@ -7,7 +7,7 @@ function SettlementDashboard({ onBack }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchSettlements();
+        void fetchSettlements();
     }, []);
 
     const fetchSettlements = async () => {
@@ -143,25 +143,26 @@ function SettlementDashboard({ onBack }) {
                             </thead>
                             <tbody>
                             {settlements.map(item => {
-                                const expected = item.opening_amount + item.sales_cash;
+                                const expected = item['opening_amount'] + item['sales_cash'];
                                 const isDiff = item.difference !== 0;
 
                                 return (
                                     <tr key={item.id}>
                                         <td>{new Date(item.date).toLocaleDateString()}</td>
                                         <td>
-                                            {item.is_closed ? <span className="badge-closed">마감완료</span> : <span className="badge-open">영업중</span>}
+                                            {item['is_closed'] ? <span className="badge-closed">마감완료</span> :
+                                                <span className="badge-open">영업중</span>}
                                         </td>
-                                        <td>{item.opening_amount.toLocaleString()}원</td>
-                                        <td>{item.sales_cash.toLocaleString()}원</td>
+                                        <td>{item['opening_amount'].toLocaleString()}원</td>
+                                        <td>{item['sales_cash'].toLocaleString()}원</td>
                                         <td className="text-blue">
                                             {expected.toLocaleString()}원
                                         </td>
                                         <td>
-                                            {item.is_closed ? item.closing_amount.toLocaleString() + '원' : '-'}
+                                            {item['is_closed'] ? item['closing_amount'].toLocaleString() + '원' : '-'}
                                         </td>
                                         <td>
-                                            {item.is_closed ? (
+                                            {item['is_closed'] ? (
                                                 <span className={isDiff ? "diff-bad" : "diff-good"}>
                                                         {item.difference > 0 ? '+' : ''}{item.difference.toLocaleString()}원
                                                     </span>
@@ -178,34 +179,37 @@ function SettlementDashboard({ onBack }) {
 
                         <div className="settle-card-view">
                             {settlements.map(item => {
-                                const expected = item.opening_amount + item.sales_cash;
+                                const expected = item['opening_amount'] + item['sales_cash'];
                                 const isDiff = item.difference !== 0;
 
                                 return (
                                     <div key={item.id} className="settle-card">
                                         <div className="card-header">
                                             <div className="card-date">{new Date(item.date).toLocaleDateString()}</div>
-                                            {item.is_closed ? <span className="badge-closed">마감완료</span> : <span className="badge-open">영업중</span>}
+                                            {item['is_closed'] ? <span className="badge-closed">마감완료</span> :
+                                                <span className="badge-open">영업중</span>}
                                         </div>
 
                                         <div className="card-row">
                                             <span>오픈 시재</span>
-                                            <span className="card-val">{item.opening_amount.toLocaleString()}원</span>
+                                            <span className="card-val">{item['opening_amount'].toLocaleString()}원</span>
                                         </div>
                                         <div className="card-row">
                                             <span>+ 현금 매출</span>
-                                            <span className="card-val">{item.sales_cash.toLocaleString()}원</span>
+                                            <span className="card-val">{item['sales_cash'].toLocaleString()}원</span>
                                         </div>
                                         <div className="card-total-row text-blue">
                                             <span>= 전산 합계</span>
                                             <span>{expected.toLocaleString()}원</span>
                                         </div>
 
-                                        {item.is_closed ? (
+                                        {item['is_closed'] ? (
                                             <div className="card-closing-section">
                                                 <div>
                                                     <div className="closing-label">실제 마감액</div>
-                                                    <div className="closing-val">{item.closing_amount.toLocaleString()}원</div>
+                                                    <div
+                                                        className="closing-val">{item['closing_amount'].toLocaleString()}원
+                                                    </div>
                                                 </div>
                                                 <div style={{textAlign: 'right'}}>
                                                     <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '3px'}}>차액 (오차)</div>

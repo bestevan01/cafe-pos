@@ -12,11 +12,14 @@ function AdvancedStats({ onBack }) {
                 setStats(res.data);
                 setLoading(false);
             })
-            .catch(err => alert("통계 로딩 실패"));
+            .catch(err => {
+                console.error(err);
+                alert("통계 로딩 실패")
+            });
     }, []);
 
-    const maxItemSales = Math.max(...stats.itemStats.map(i => i.total_sales), 1);
-    const maxTimeSales = Math.max(...stats.timeStats.map(t => t.total_sales), 1);
+    const maxItemSales = Math.max(...stats.itemStats.map(i => i['total_sales']), 1);
+    const maxTimeSales = Math.max(...stats.timeStats.map(t => t['total_sales']), 1);
 
     if (loading) return <div style={{padding:'50px', textAlign:'center', color:'var(--text-secondary)'}}>데이터 분석 중... 📊</div>;
 
@@ -134,12 +137,12 @@ function AdvancedStats({ onBack }) {
                                 <div className="item-info">
                                     <span className="item-name">{idx+1}. {item.menu_name}</span>
                                     <span className="item-sales">
-                                        {Number(item.total_qty).toLocaleString()}잔 / {Number(item.total_sales).toLocaleString()}원
+                                        {Number(item['total_qty']).toLocaleString()}잔 / {Number(item['total_sales']).toLocaleString()}원
                                     </span>
                                 </div>
                                 <div className="bar-bg">
                                     <div className="bar-fill" style={{
-                                        width: `${(item.total_sales / maxItemSales) * 100}%`,
+                                        width: `${(item['total_sales'] / maxItemSales) * 100}%`,
                                         backgroundColor: idx < 3 ? '#ff7043' : '#42a5f5'
                                     }} />
                                 </div>
@@ -158,10 +161,10 @@ function AdvancedStats({ onBack }) {
                         {stats.timeStats.map((time, idx) => (
                             <div key={idx} className="time-col">
                                 <div className="time-val">
-                                    {Number(time.total_sales).toLocaleString()}
+                                    {Number(time['total_sales']).toLocaleString()}
                                 </div>
                                 <div className="time-bar-vertical" style={{
-                                    height: `${(time.total_sales / maxTimeSales) * 200}px` // 최대 200px
+                                    height: `${(time['total_sales'] / maxTimeSales) * 200}px` // 최대 200px
                                 }} />
                                 <div className="time-label">
                                     {time.hour}시
@@ -178,13 +181,13 @@ function AdvancedStats({ onBack }) {
                                 <div className="item-info">
                                     <span className="item-name">{time.hour}시</span>
                                     <span className="item-sales time-val">
-                                        {Number(time.total_sales).toLocaleString()}원
+                                        {Number(time['total_sales']).toLocaleString()}원
                                     </span>
                                 </div>
                                 <div className="bar-bg">
                                     {/* 🌟 모바일의 가로 차트는 양쪽이 모두 둥글어야 하므로 인라인 강제 지정 추가 */}
                                     <div className="bar-fill time-bar-vertical" style={{
-                                        width: `${(time.total_sales / maxTimeSales) * 100}%`,
+                                        width: `${(time['total_sales'] / maxTimeSales) * 100}%`,
                                         height: '100%',
                                         borderRadius: 'var(--radius-sm)'
                                     }} />

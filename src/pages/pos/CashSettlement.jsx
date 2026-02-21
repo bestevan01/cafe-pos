@@ -36,7 +36,7 @@ function CashSettlement({ onClose }) {
                 setPrevClosing(safeAmount);
 
             } else if (res.data.status === 'opened') {
-                fetchCalcData();
+                void fetchCalcData();
             } else {
                 setStep('done');
             }
