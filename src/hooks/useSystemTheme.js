@@ -10,21 +10,13 @@ export const useSystemTheme = () => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
         const applySystemTheme = (e) => {
-            if (e.matches) {
-                root.setAttribute('data-theme', 'dark');
-            } else {
-                root.setAttribute('data-theme', 'light');
-            }
+            root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
         };
 
-        // 1. 컴포넌트가 켜질 때 즉시 시스템 테마 적용
+        // 초기 실행 및 시스템 설정 변경 감지
         applySystemTheme(mediaQuery);
-
-        // 2. 시스템 테마가 실시간으로 바뀔 때 감지
         mediaQuery.addEventListener('change', applySystemTheme);
 
-        return () => {
-            mediaQuery.removeEventListener('change', applySystemTheme);
-        };
+        return () => mediaQuery.removeEventListener('change', applySystemTheme);
     }, []);
 };

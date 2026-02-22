@@ -1,16 +1,28 @@
 import {useState} from 'react';
+import axios from 'axios';
 import { startAuthentication } from "@simplewebauthn/browser";
 import {useSystemTheme} from '../../hooks/useSystemTheme';
-import axios from 'axios';
 
 function Login({ onLoginSuccess, onSwitchToRegister }) {
     const [formData, setFormData] = useState({ username: '', password: '' });
 
-    // 🌟 핵심: 로그인 화면에서는 항상 시스템 테마(OS 설정)를 따라가도록 강제
+    // 로그인 화면은 시스템(OS) 테마 설정을 따름
     useSystemTheme();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // 로그인 성공 시 공통 처리
+    const handleSuccess = (data) => {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify({
+            name: data.name,
+            role: data.role,
+            username: data.username,
+            id: data.id
+        }));
+        onLoginSuccess(data);
     };
 
     const handleSubmit = async (e) => {
@@ -18,17 +30,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         try {
             const res = await axios.post('/api/login', formData);
             if (res.data.success) {
-                // 1. 토큰과 유저 정보 저장
-                localStorage.setItem('token', res.data.token);
-                localStorage.setItem('user', JSON.stringify({
-                    name: res.data.name,
-                    role: res.data.role,
-                    username: res.data.username,
-                    id: res.data.id
-                }));
-
-                // 2. 부모 컴포넌트(App)에 알림
-                onLoginSuccess(res.data);
+                handleSuccess(res.data);
             }
         } catch (err) {
             alert(err.response?.data?.message || "로그인 실패");
@@ -37,32 +39,26 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
 
     const handlePasskeyLogin = async () => {
         try {
+            // 1. 인증 옵션 요청
             const resp = await axios.get('/api/passkey/login-options');
-            let asseResp;
-            try {
-                asseResp = await startAuthentication(resp.data);
-            } catch (error) {
-                if (error.name === 'NotAllowedError') return;
-                return;
-            }
 
+            // 2. 브라우저 인증 시작 (여기서 에러 나면 바로 아래 catch로 점프)
+            const asseResp = await startAuthentication({optionsJSON: resp.data});
+
+            // 3. 서버 검증 요청
             const verificationResp = await axios.post('/api/passkey/login-verify', {
                 body: asseResp,
             });
 
             if (verificationResp.data.success) {
-                const data = verificationResp.data;
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify({
-                    name: data.name,
-                    role: data.role,
-                    username: data.username,
-                    id: data.id
-                }));
-                onLoginSuccess(data);
+                handleSuccess(verificationResp.data);
             }
-        } catch (err) {
-            console.error(err);
+        } catch (error) {
+            if (error.name === 'NotAllowedError') {
+                console.log("패스키 인증 취소됨");
+                return;
+            }
+            console.error(error);
             alert("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.");
         }
     };
@@ -82,7 +78,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                     background-color: var(--card-bg, white);
                     width: 100%; max-width: 380px;
                     padding: 40px 30px;
-                    border-radius: var(--radius-lg); /* 🌟 로그인 카드 lg 둥글기 */
+                    border-radius: var(--radius-lg);
                     box-shadow: 0 10px 30px rgba(0,0,0,0.08);
                     display: flex; flex-direction: column; align-items: center;
                     box-sizing: border-box;
@@ -94,7 +90,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 
                 .login-form { width: 100%; display: flex; flex-direction: column; gap: 15px; }
                 .login-input {
-                    padding: 14px; border-radius: var(--radius-md); /* 🌟 입력창 md 둥글기 */
+                    padding: 14px; border-radius: var(--radius-md);
                     border: 1px solid var(--border-color, #ddd);
                     font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333);
                     outline: none; box-sizing: border-box; width: 100%;
@@ -105,7 +101,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 .login-input::placeholder { color: var(--text-secondary, #aaa); }
                 
                 .btn-submit {
-                    padding: 14px; border-radius: var(--radius-md); /* 🌟 제출 버튼 md 둥글기 */
+                    padding: 14px; border-radius: var(--radius-md);
                     border: none; background-color: #007bff; color: white;
                     font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;
                     transition: transform 0.1s, background-color 0.2s;
@@ -117,7 +113,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 .divider-text { padding: 0 15px; color: var(--text-secondary, #999); font-size: 0.85rem; }
                 
                 .btn-passkey {
-                    padding: 14px; border-radius: var(--radius-md); /* 🌟 패스키 버튼 md 둥글기 */
+                    padding: 14px; border-radius: var(--radius-md);
                     border: 1px solid var(--border-color, #ccc);
                     background-color: var(--card-bg, white); color: var(--text-primary, #333);
                     font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;

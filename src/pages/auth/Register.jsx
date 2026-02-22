@@ -1,11 +1,16 @@
-import {useState} from 'react'; // 🌟 useEffect 추가
+import {useState} from 'react';
 import axios from 'axios';
 import {useSystemTheme} from "../../hooks/useSystemTheme.js";
 
 function Register({ onSwitchToLogin }) {
-    const [formData, setFormData] = useState({ username: '', password: '', confirmPassword: '', name: '' });
+    const [formData, setFormData] = useState({
+        username: '',
+        password: '',
+        confirmPassword: '',
+        name: ''
+    });
 
-    // 🌟 핵심: 회원가입 화면에서도 항상 시스템 테마(OS 설정)를 따라가도록 강제
+    // 시스템 테마(OS 설정) 강제 적용
     useSystemTheme();
 
     const handleChange = (e) => {
@@ -21,6 +26,7 @@ function Register({ onSwitchToLogin }) {
         }
 
         try {
+            // API 전송 시 비밀번호 확인 필드는 제외
             const { confirmPassword, ...submitData } = formData;
 
             const res = await axios.post('/api/register', submitData);
@@ -48,7 +54,7 @@ function Register({ onSwitchToLogin }) {
                     background-color: var(--card-bg, white);
                     width: 100%; max-width: 380px;
                     padding: 40px 30px;
-                    border-radius: var(--radius-lg); /* 🌟 회원가입 카드 lg 둥글기 */
+                    border-radius: var(--radius-lg);
                     box-shadow: 0 10px 30px rgba(0,0,0,0.08);
                     display: flex; flex-direction: column; align-items: center;
                     box-sizing: border-box;
@@ -59,7 +65,7 @@ function Register({ onSwitchToLogin }) {
                 
                 .register-form { width: 100%; display: flex; flex-direction: column; gap: 15px; }
                 .register-input {
-                    padding: 14px; border-radius: var(--radius-md); /* 🌟 입력창 md 둥글기 */
+                    padding: 14px; border-radius: var(--radius-md);
                     border: 1px solid var(--border-color, #ddd);
                     font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333);
                     outline: none; box-sizing: border-box; width: 100%;
@@ -70,7 +76,7 @@ function Register({ onSwitchToLogin }) {
                 .register-input::placeholder { color: var(--text-secondary, #aaa); }
                 
                 .btn-submit {
-                    padding: 14px; border-radius: var(--radius-md); /* 🌟 가입 버튼 md 둥글기 */
+                    padding: 14px; border-radius: var(--radius-md);
                     border: none; 
                     background-color: var(--text-primary, #333); 
                     color: var(--bg-color, white);
