@@ -3,48 +3,44 @@ import { useState, useEffect, useRef } from 'react';
 export default function ThemeToggle() {
     const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'system');
     const [isOpen, setIsOpen] = useState(false);
-
-    // 🌟 추가: 팝업의 위치를 동적으로 관리할 상태
     const [menuStyle, setMenuStyle] = useState({ left: '50%', transform: 'translateX(-50%)' });
     const dropdownRef = useRef(null);
 
-    // 드롭다운 바깥 영역 클릭 시 닫기
+    // 1. 드롭다운 외부 클릭 감지 (닫기)
     useEffect(() => {
         function handleClickOutside(event) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsOpen(false);
             }
         }
-        // 모바일 터치 호환성을 위해 mousedown 대신 pointerdown 사용
         document.addEventListener("pointerdown", handleClickOutside);
         return () => document.removeEventListener("pointerdown", handleClickOutside);
     }, []);
 
-    // 🌟 핵심: 메뉴가 열릴 때 화면 바깥으로 튀어나가는지 검사해서 위치 조정
+    // 2. 드롭다운 위치 자동 보정 (화면 이탈 방지)
     useEffect(() => {
         if (isOpen && dropdownRef.current) {
-            const rect = dropdownRef.current.getBoundingClientRect(); // 버튼의 현재 위치
-            const menuWidth = 160; // 팝업 메뉴의 대략적인 넓이
-            const margin = 15; // 화면 끝에서 최소한 띄울 여백
-
+            const rect = dropdownRef.current.getBoundingClientRect();
+            const menuWidth = 160;
+            const margin = 15;
             const buttonCenter = rect.left + (rect.width / 2);
 
-            // 1. 오른쪽으로 화면을 뚫고 나갈 것 같다면? -> 버튼 오른쪽 끝에 맞춤
+            // 화면 오른쪽을 벗어나는 경우
             if (buttonCenter + (menuWidth / 2) > window.innerWidth - margin) {
                 setMenuStyle({right: '0', left: 'auto', transform: 'none'});
             }
-            // 2. 왼쪽으로 화면을 뚫고 나갈 것 같다면? -> 버튼 왼쪽 끝에 맞춤
+            // 화면 왼쪽을 벗어나는 경우
             else if (buttonCenter - (menuWidth / 2) < margin) {
                 setMenuStyle({left: '0', right: 'auto', transform: 'none'});
             }
-            // 3. 공간이 넉넉하다면? -> 원래대로 버튼 정중앙에 예쁘게 배치
+            // 공간이 충분하면 중앙 정렬
             else {
                 setMenuStyle({ left: '50%', transform: 'translateX(-50%)' });
             }
         }
     }, [isOpen]);
 
-    // 테마 적용 및 시스템 설정 감지 로직
+    // 3. 테마 적용 및 시스템 설정 변경 감지
     useEffect(() => {
         const root = document.documentElement;
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -113,8 +109,6 @@ export default function ThemeToggle() {
                     min-width: 150px;
                     z-index: 10000;
                     display: flex; flex-direction: column; gap: 4px;
-                    
-                    /* 🌟 애니메이션에서 transform을 제거하여 동적 포지셔닝과 충돌 방지 */
                     animation: fadeInDrop 0.15s ease-out forwards;
                 }
                 
@@ -141,7 +135,6 @@ export default function ThemeToggle() {
                     color: #007bff; font-weight: bold;
                 }
                 
-                /* 📱 모바일 화면 최적화 */
                 @media (max-width: 768px) {
                     .theme-trigger-btn { width: 32px; height: 32px; font-size: 1rem; }
                     .theme-menu { min-width: 140px; }
@@ -154,7 +147,6 @@ export default function ThemeToggle() {
                 {getCurrentIcon()}
             </button>
 
-            {/* 🌟 계산된 menuStyle을 style 속성으로 직접 주입 */}
             {isOpen && (
                 <div className="theme-menu" style={menuStyle}>
                     <button className={`theme-menu-item ${theme === 'light' ? 'active' : ''}`} onClick={() => setTheme('light')}>

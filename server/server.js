@@ -1,3 +1,6 @@
+// ---------------------------------------------------------
+// [1] 환경 설정 및 모듈 가져오기
+// ---------------------------------------------------------
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config({path: '../.env'});
 }
@@ -17,41 +20,42 @@ const {
     verifyAuthenticationResponse
 } = require('@simplewebauthn/server');
 
-// --- [Configuration] ---
+// 환경 변수 및 상수 설정
 const PORT = process.env.PORT;
-if (!process.env.JWT_SECRET) {
+const FRONTEND_URL = 'bu-cafe-pos.vercel.app';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
     console.error("🚨 FATAL: JWT_SECRET is missing.");
     process.exit(1);
 }
-const JWT_SECRET = process.env.JWT_SECRET;
-const FRONTEND_URL = 'bu-cafe-pos.vercel.app';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// WebAuthn(패스키) 설정
+// WebAuthn 및 CORS 설정
 const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
 const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
+const CORS_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : "http://localhost:5173";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: IS_PRODUCTION ? `https://${FRONTEND_URL}` : "http://localhost:5173",
-        methods: ["GET", "POST"]
-    }
+    cors: {origin: CORS_ORIGIN, methods: ["GET", "POST"]}
 });
 
-// Middleware
+// ---------------------------------------------------------
+// [2] 미들웨어 설정
+// ---------------------------------------------------------
 app.use(cors({
-    origin: IS_PRODUCTION ? `https://${FRONTEND_URL}` : "http://localhost:5173",
+    origin: CORS_ORIGIN,
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"]
 }));
-
 app.use(express.json());
 
+// 인증 미들웨어 (JWT 검증)
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // "Bearer TOKEN"
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) return res.status(401).json({message: '로그인이 필요합니다.'});
 
@@ -62,6 +66,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+// 관리자 권한 미들웨어
 const requireAdmin = (req, res, next) => {
     if (req.user.role !== 'admin') {
         return res.status(403).json({message: '관리자 권한이 필요합니다.'});
@@ -69,7 +74,9 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 
-// --- [Database Connection] ---
+// ---------------------------------------------------------
+// [3] 데이터베이스 연결 (MySQL)
+// ---------------------------------------------------------
 /** @type {any} */
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -88,11 +95,9 @@ pool.getConnection()
     .catch(err => { console.error("❌ Database Connection Failed:", err); });
 
 
-// ==========================================
-// [SECTION 1] Menu API
-// 🌟 최적화: 트랜잭션이 필요 없는 단순 쿼리는 pool.query() 사용 (커넥션 누수 방지)
-// ==========================================
-
+// ---------------------------------------------------------
+// [4] API 라우트: 메뉴 (Menu)
+// ---------------------------------------------------------
 app.get('/api/menu', authenticateToken, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM menu');
@@ -149,10 +154,9 @@ app.delete('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) =>
 });
 
 
-// ==========================================
-// [SECTION 2] Auth & Admin API
-// ==========================================
-
+// ---------------------------------------------------------
+// [5] API 라우트: 인증 및 사용자 관리 (Auth & Users)
+// ---------------------------------------------------------
 app.post('/api/register', async (req, res) => {
     const { username, password, name } = req.body;
     try {
@@ -251,19 +255,18 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
     }
 });
 
-
-// ==========================================
-// [SECTION 3] Order Handling API
-// ==========================================
-
+// ---------------------------------------------------------
+// [6] API 라우트: 주문 관리 (Orders)
+// ---------------------------------------------------------
 app.post('/api/orders', authenticateToken, async (req, res) => {
     const { items, force, paymentMethod, staff_name } = req.body;
-    let conn; // 🌟 트랜잭션이 필요하므로 getConnection() 유지, finally로 안전하게 반환
+    let conn;
 
     try {
         conn = await pool.getConnection();
         await conn.beginTransaction();
 
+        // 중복 주문 방지 (1분 내 동일 메뉴/수량)
         if (!force && items.length > 0) {
             const [rows] = await conn.query(`
                 SELECT * FROM orders WHERE menu_name = ? AND quantity = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
@@ -275,11 +278,10 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
             }
         }
 
+        // 주문 번호 생성
         const [rows] = await conn.query(`SELECT MAX(daily_number) as maxNum FROM orders WHERE DATE(created_at) = CURDATE()`);
         const nextDailyNum = (rows[0]['maxNum'] || 0) + 1;
-
-        const today = new Date();
-        const formattedID = `${today.toISOString().slice(0, 10).replace(/-/g, "")}-${String(nextDailyNum).padStart(3, "0")}`;
+        const formattedID = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(nextDailyNum).padStart(3, "0")}`;
 
         for (const item of items) {
             await conn.query(
@@ -298,7 +300,7 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
             payment_method: paymentMethod || 'cash',
             staff_name: staff_name || '키오스크',
             is_paid: 0,
-            is_completed: 0 // 프론트 오류 방지용 추가
+            is_completed: 0
         });
 
         res.json({ success: true });
@@ -307,7 +309,7 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
         console.error(error);
         res.status(500).json({ success: false, message: '주문 실패' });
     } finally {
-        if (conn) conn.release(); // 🌟 핵심 방어 코드
+        if (conn) conn.release();
     }
 });
 
@@ -385,11 +387,9 @@ app.delete('/api/orders/:display_id', authenticateToken, async (req, res) => {
     }
 });
 
-
-// ==========================================
-// [SECTION 4] Settlement & Stats API
-// ==========================================
-
+// ---------------------------------------------------------
+// [7] API 라우트: 정산 및 통계 (Settlement & Stats)
+// ---------------------------------------------------------
 app.get('/api/admin/sales', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM orders WHERE is_paid = 1 ORDER BY created_at DESC');
@@ -503,12 +503,10 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
     }
 });
 
-
-// ==========================================
-// [SECTION 5] Passkey (WebAuthn) API
-// ==========================================
-
-const currentChallenges = {}; // In-memory storage
+// ---------------------------------------------------------
+// [8] API 라우트: 패스키 (WebAuthn)
+// ---------------------------------------------------------
+const currentChallenges = {}; // 챌린지 임시 저장소
 
 app.get('/api/passkey/register-options', authenticateToken, async (req, res) => {
     const { userId } = req.query;
@@ -530,7 +528,7 @@ app.get('/api/passkey/register-options', authenticateToken, async (req, res) => 
         });
 
         currentChallenges[userId] = options.challenge;
-
+        // 5분 후 챌린지 자동 삭제 (메모리 관리)
         setTimeout(() => {
             if (currentChallenges[userId]) delete currentChallenges[userId];
         }, 5 * 60 * 1000);
@@ -557,10 +555,9 @@ app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => 
 
         if (verification.verified && verification.registrationInfo) {
             const { credential } = verification.registrationInfo;
-
+            // 기기 이름 추정 로직
             const userAgent = req.get('User-Agent') || '';
             let deviceName = '기타 기기';
-
             if (userAgent.includes('Mac')) deviceName = 'Mac';
             else if (userAgent.includes('Windows')) deviceName = 'Windows PC';
             else if (userAgent.includes('iPhone')) deviceName = 'iPhone';
@@ -568,7 +565,7 @@ app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => 
             else if (userAgent.includes('Linux')) deviceName = 'Linux';
 
             if (userAgent.includes('Chrome')) deviceName += ' (Chrome)';
-            else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) deviceName += ' (Safari)';
+            else if (userAgent.includes('Safari')) deviceName += ' (Safari)';
             else if (userAgent.includes('Edg')) deviceName += ' (Edge)';
             else if (userAgent.includes('Firefox')) deviceName += ' (Firefox)';
 
@@ -681,11 +678,9 @@ app.delete('/api/passkeys/:id', authenticateToken, async (req, res) => {
     }
 });
 
-
-// ==========================================
-// [SECTION 6] Socket.IO & Server Start
-// ==========================================
-
+// ---------------------------------------------------------
+// [9] Socket.IO 및 서버 시작
+// ---------------------------------------------------------
 let currentCashierId = null;
 const connectedUsers = new Map();
 
