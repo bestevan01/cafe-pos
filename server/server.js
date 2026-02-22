@@ -1,3 +1,7 @@
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config({path: '../.env'});
+}
+
 const express = require('express');
 const http = require('http');
 const https = require('https');
@@ -14,15 +18,12 @@ const {
 } = require('@simplewebauthn/server');
 
 // --- [Configuration] ---
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
-});
-
-const PORT = process.env.PORT || 8080;
-// 🌟 보안: JWT_SECRET도 환경변수로 관리하는 것을 권장
-const JWT_SECRET = process.env.JWT_SECRET || "REMOVED_SECRET";
+const PORT = process.env.PORT;
+if (!process.env.JWT_SECRET) {
+    console.error("🚨 FATAL: JWT_SECRET is missing.");
+    process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 const FRONTEND_URL = 'bu-cafe-pos.vercel.app';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
@@ -30,18 +31,52 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
 const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
 
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: IS_PRODUCTION ? `https://${FRONTEND_URL}` : "http://localhost:5173",
+        methods: ["GET", "POST"]
+    }
+});
+
 // Middleware
-app.use(cors({ origin: "*", methods: ["GET", "POST", "PATCH", "PUT", "DELETE"] }));
+app.use(cors({
+    origin: IS_PRODUCTION ? `https://${FRONTEND_URL}` : "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE"]
+}));
+
 app.use(express.json());
+
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // "Bearer TOKEN"
+
+    if (!token) return res.status(401).json({message: '로그인이 필요합니다.'});
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({message: '유효하지 않은 토큰입니다.'});
+        req.user = user;
+        next();
+    });
+};
+
+const requireAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({message: '관리자 권한이 필요합니다.'});
+    }
+    next();
+};
 
 // --- [Database Connection] ---
 /** @type {any} */
 const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || "REMOVED_SECRET",
-    database: process.env.DB_NAME || 'cafe_db',
-    port: process.env.DB_PORT || 3306,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -58,7 +93,7 @@ pool.getConnection()
 // 🌟 최적화: 트랜잭션이 필요 없는 단순 쿼리는 pool.query() 사용 (커넥션 누수 방지)
 // ==========================================
 
-app.get('/api/menu', async (req, res) => {
+app.get('/api/menu', authenticateToken, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM menu');
         res.json(rows);
@@ -68,7 +103,7 @@ app.get('/api/menu', async (req, res) => {
     }
 });
 
-app.post('/api/menu', async (req, res) => {
+app.post('/api/menu', authenticateToken, requireAdmin, async (req, res) => {
     const { name, price, type } = req.body;
     try {
         await pool.query('INSERT INTO menu (name, price, type) VALUES (?, ?, ?)', [name, price, type]);
@@ -79,7 +114,7 @@ app.post('/api/menu', async (req, res) => {
     }
 });
 
-app.patch('/api/menu/:id', async (req, res) => {
+app.patch('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { name, price, type, is_soldout } = req.body;
     let fields = [], values = [];
@@ -103,7 +138,7 @@ app.patch('/api/menu/:id', async (req, res) => {
     }
 });
 
-app.delete('/api/menu/:id', async (req, res) => {
+app.delete('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM menu WHERE id = ?', [req.params.id]);
         res.json({ success: true });
@@ -160,7 +195,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.patch('/api/users/:id/password', async (req, res) => {
+app.patch('/api/users/:id/password', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { currentPassword, newPassword } = req.body;
 
@@ -186,7 +221,7 @@ app.patch('/api/users/:id/password', async (req, res) => {
     }
 });
 
-app.get('/api/admin/users', async (req, res) => {
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT id, username, name, role, created_at FROM users');
         res.json(rows);
@@ -196,7 +231,7 @@ app.get('/api/admin/users', async (req, res) => {
     }
 });
 
-app.patch('/api/admin/users/:id/role', async (req, res) => {
+app.patch('/api/admin/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await pool.query('UPDATE users SET role = ? WHERE id = ?', [req.body.role, req.params.id]);
         res.json({ success: true });
@@ -206,7 +241,7 @@ app.patch('/api/admin/users/:id/role', async (req, res) => {
     }
 });
 
-app.delete('/api/admin/users/:id', async (req, res) => {
+app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM users WHERE id = ?', [req.params.id]);
         res.json({ success: true });
@@ -221,7 +256,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 // [SECTION 3] Order Handling API
 // ==========================================
 
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', authenticateToken, async (req, res) => {
     const { items, force, paymentMethod, staff_name } = req.body;
     let conn; // 🌟 트랜잭션이 필요하므로 getConnection() 유지, finally로 안전하게 반환
 
@@ -276,7 +311,7 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-app.get('/api/orders', async (req, res) => {
+app.get('/api/orders', authenticateToken, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM orders WHERE is_delivered = 0 ORDER BY created_at DESC');
         res.json(rows);
@@ -286,7 +321,7 @@ app.get('/api/orders', async (req, res) => {
     }
 });
 
-app.patch('/api/orders/:display_id/deliver', async (req, res) => {
+app.patch('/api/orders/:display_id/deliver', authenticateToken, async (req, res) => {
     const { display_id } = req.params;
     try {
         await pool.query('UPDATE orders SET is_delivered = 1 WHERE display_id = ?', [display_id]);
@@ -300,7 +335,7 @@ app.patch('/api/orders/:display_id/deliver', async (req, res) => {
     }
 });
 
-app.patch('/api/orders/:display_id/complete', async (req, res) => {
+app.patch('/api/orders/:display_id/complete', authenticateToken, async (req, res) => {
     const { display_id } = req.params;
     try {
         await pool.query('UPDATE orders SET is_paid = 1, is_completed = 1, payment_method = ? WHERE display_id = ?', [req.body.paymentMethod || 'cash', display_id]);
@@ -312,7 +347,7 @@ app.patch('/api/orders/:display_id/complete', async (req, res) => {
     }
 });
 
-app.patch('/api/orders/:display_id/pay', async (req, res) => {
+app.patch('/api/orders/:display_id/pay', authenticateToken, async (req, res) => {
     const { display_id } = req.params;
     try {
         await pool.query('UPDATE orders SET is_paid = 1, payment_method = ? WHERE display_id = ?', [req.body.paymentMethod || 'cash', display_id]);
@@ -326,7 +361,7 @@ app.patch('/api/orders/:display_id/pay', async (req, res) => {
     }
 });
 
-app.patch('/api/orders/:display_id/complete_kitchen', async (req, res) => {
+app.patch('/api/orders/:display_id/complete_kitchen', authenticateToken, async (req, res) => {
     const { display_id } = req.params;
     try {
         await pool.query('UPDATE orders SET is_completed = 1 WHERE display_id = ?', [display_id]);
@@ -338,7 +373,7 @@ app.patch('/api/orders/:display_id/complete_kitchen', async (req, res) => {
     }
 });
 
-app.delete('/api/orders/:display_id', async (req, res) => {
+app.delete('/api/orders/:display_id', authenticateToken, async (req, res) => {
     const { display_id } = req.params;
     try {
         await pool.query('DELETE FROM orders WHERE display_id = ?', [display_id]);
@@ -355,7 +390,7 @@ app.delete('/api/orders/:display_id', async (req, res) => {
 // [SECTION 4] Settlement & Stats API
 // ==========================================
 
-app.get('/api/admin/sales', async (req, res) => {
+app.get('/api/admin/sales', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM orders WHERE is_paid = 1 ORDER BY created_at DESC');
         res.json(rows);
@@ -365,7 +400,7 @@ app.get('/api/admin/sales', async (req, res) => {
     }
 });
 
-app.delete('/api/admin/sales/:id', async (req, res) => {
+app.delete('/api/admin/sales/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM orders WHERE id = ?', [req.params.id]);
         res.json({success: true});
@@ -375,7 +410,7 @@ app.delete('/api/admin/sales/:id', async (req, res) => {
     }
 });
 
-app.get('/api/admin/settlements', async (req, res) => {
+app.get('/api/admin/settlements', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM cash_settlements ORDER BY date DESC');
         res.json(rows);
@@ -385,7 +420,7 @@ app.get('/api/admin/settlements', async (req, res) => {
     }
 });
 
-app.get('/api/settlement/status', async (req, res) => {
+app.get('/api/settlement/status', authenticateToken, async (req, res) => {
     try {
         const [todayRows] = await pool.query('SELECT * FROM cash_settlements WHERE date = CURDATE()');
         if (todayRows.length === 0) {
@@ -401,7 +436,7 @@ app.get('/api/settlement/status', async (req, res) => {
     }
 });
 
-app.post('/api/settlement/open', async (req, res) => {
+app.post('/api/settlement/open', authenticateToken, async (req, res) => {
     try {
         await pool.query('INSERT INTO cash_settlements (date, opening_amount) VALUES (CURDATE(), ?)', [req.body.amount]);
         res.json({ success: true });
@@ -411,7 +446,7 @@ app.post('/api/settlement/open', async (req, res) => {
     }
 });
 
-app.get('/api/settlement/calc', async (req, res) => {
+app.get('/api/settlement/calc', authenticateToken, async (req, res) => {
     try {
         const [settlement] = await pool.query('SELECT opening_amount FROM cash_settlements WHERE date = CURDATE()');
         if (settlement.length === 0) return res.status(400).json({ message: "미오픈 상태" });
@@ -431,7 +466,7 @@ app.get('/api/settlement/calc', async (req, res) => {
     }
 });
 
-app.post('/api/settlement/close', async (req, res) => {
+app.post('/api/settlement/close', authenticateToken, async (req, res) => {
     const { closingAmount, salesCash, diff } = req.body;
     try {
         await pool.query(
@@ -445,7 +480,7 @@ app.post('/api/settlement/close', async (req, res) => {
     }
 });
 
-app.get('/api/admin/stats', async (req, res) => {
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [itemRows] = await pool.query(`SELECT menu_name,
                                                     SUM(quantity)    as total_qty,
@@ -475,7 +510,7 @@ app.get('/api/admin/stats', async (req, res) => {
 
 const currentChallenges = {}; // In-memory storage
 
-app.get('/api/passkey/register-options', async (req, res) => {
+app.get('/api/passkey/register-options', authenticateToken, async (req, res) => {
     const { userId } = req.query;
 
     try {
@@ -495,6 +530,11 @@ app.get('/api/passkey/register-options', async (req, res) => {
         });
 
         currentChallenges[userId] = options.challenge;
+
+        setTimeout(() => {
+            if (currentChallenges[userId]) delete currentChallenges[userId];
+        }, 5 * 60 * 1000);
+
         res.json(options);
     } catch (err) {
         console.error(err);
@@ -502,7 +542,7 @@ app.get('/api/passkey/register-options', async (req, res) => {
     }
 });
 
-app.post('/api/passkey/register-verify', async (req, res) => {
+app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => {
     const { userId, body } = req.body;
     const expectedChallenge = currentChallenges[userId];
     if (!expectedChallenge) return res.status(400).json({ error: 'Challenge not found' });
@@ -584,7 +624,13 @@ app.post('/api/passkey/login-verify', async (req, res) => {
         const user = users[0];
         const verification = await verifyAuthenticationResponse({
             response: body,
-            expectedChallenge: () => true,
+            expectedChallenge: (challenge) => {
+                if (currentChallenges[challenge]) {
+                    delete currentChallenges[challenge];
+                    return true;
+                }
+                return false;
+            },
             expectedOrigin: EXPECTED_ORIGIN,
             expectedRPID: RP_ID,
             credential: {
@@ -610,7 +656,7 @@ app.post('/api/passkey/login-verify', async (req, res) => {
     }
 });
 
-app.get('/api/passkeys', async (req, res) => {
+app.get('/api/passkeys', authenticateToken, async (req, res) => {
     const { userId } = req.query;
     try {
         const [rows] = await pool.query(
@@ -624,7 +670,7 @@ app.get('/api/passkeys', async (req, res) => {
     }
 });
 
-app.delete('/api/passkeys/:id', async (req, res) => {
+app.delete('/api/passkeys/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM passkeys WHERE id = ?', [id]);
