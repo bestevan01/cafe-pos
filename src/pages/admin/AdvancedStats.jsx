@@ -40,24 +40,24 @@ function AdvancedStats({ onBack }) {
     // [3] 렌더링 (Render)
     // ---------------------------------------------------------
     return (
-        <div className="adv-container">
+        <div className="main-container">
             <style>
                 {`
-                .adv-container {
+                .main-container {
                     padding: 20px; background-color: var(--bg-color, #f4f6f8); min-height: 100vh;
                     box-sizing: border-box; transition: background-color 0.3s ease; width: 100%; overflow-x: hidden;
                 }
-                .adv-header {
+                .main-header {
                     display: flex; align-items: center; justify-content: space-between; 
                     margin-bottom: 25px; gap: 15px;
                 }
                 .header-left { display: flex; align-items: center; gap: 15px; }
-                .adv-title { margin: 0; font-size: 1.8rem; color: var(--text-primary, #333); white-space: nowrap; }
+                .main-title { margin: 0; font-size: 1.8rem; color: var(--text-primary, #333); white-space: nowrap; }
                 .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
 
-                .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; width: 100%; }
+                .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; width: 100%; }
                 
-                .adv-card {
+                .main-card {
                     background-color: var(--card-bg, white); padding: 25px; border-radius: var(--radius-lg); 
                     box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border-color, transparent);
                     transition: background-color 0.3s ease; width: 100%; box-sizing: border-box;
@@ -95,31 +95,31 @@ function AdvancedStats({ onBack }) {
                 
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
-                    .adv-container { padding: 15px; }
-                    .adv-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
+                    .main-container { padding: 15px; }
+                    .main-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
                     .header-left { width: 100%; }
                     .theme-wrapper { position: absolute; top: 0; right: 0; }
                     
-                    .adv-grid { grid-template-columns: 1fr; }
+                    .main-grid { grid-template-columns: 1fr; }
                     .desktop-time-chart { display: none; } /* PC 차트 숨김 */
                     .mobile-time-chart { display: flex; flex-direction: column; gap: 20px; width: 100%; } /* 모바일 차트 표시 */
                 }
                 `}
             </style>
 
-            <div className="adv-header">
+            <div className="main-header">
                 <div className="header-left">
                     <button onClick={onBack} className="btn-back">⬅ 뒤로가기</button>
-                    <h1 className="adv-title">📊 고급 매출 분석</h1>
+                    <h1 className="main-title">📊 고급 매출 분석</h1>
                 </div>
                 <div className="theme-wrapper">
                     <ThemeToggle />
                 </div>
             </div>
 
-            <div className="adv-grid">
+            <div className="main-grid">
                 {/* 1. 메뉴별 판매 순위 (가로 막대) */}
-                <div className="adv-card">
+                <div className="main-card">
                     <h2 className="card-title">🍔 메뉴별 인기 순위</h2>
                     <div className="item-list">
                         {stats.itemStats.length === 0 ? <p style={{color: 'var(--text-secondary)'}}>데이터가
@@ -142,7 +142,7 @@ function AdvancedStats({ onBack }) {
                 </div>
 
                 {/* 2. 시간대별 매출 추이 */}
-                <div className="adv-card">
+                <div className="main-card">
                     <h2 className="card-title">⏰ 시간대별 매출 추이</h2>
 
                     {/* PC: 세로 막대 차트 */}
