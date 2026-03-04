@@ -7,7 +7,6 @@ if (process.env.NODE_ENV !== 'production') {
 
 const express = require('express');
 const http = require('http');
-const https = require('https');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -679,7 +678,14 @@ app.delete('/api/passkeys/:id', authenticateToken, async (req, res) => {
 });
 
 // ---------------------------------------------------------
-// [9] Socket.IO 및 서버 시작
+// [9] 단순 응답 확인용
+// ---------------------------------------------------------
+app.get('/ping', (req, res) => {
+    res.status(200).send('pong');
+});
+
+// ---------------------------------------------------------
+// [10] Socket.IO 및 서버 시작
 // ---------------------------------------------------------
 let currentCashierId = null;
 const connectedUsers = new Map();
@@ -733,12 +739,3 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 Server Running: http://localhost:${PORT}`);
 });
-
-// Render Keep-Alive
-setInterval(() => {
-    if (IS_PRODUCTION) {
-        https.get('https://cafe-server-0qur.onrender.com', () => {
-        }).on('error', () => {
-        });
-    }
-}, 600000);
