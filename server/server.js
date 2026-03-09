@@ -833,6 +833,7 @@ app.get('/ping', (req, res) => {
 // ---------------------------------------------------------
 let currentCashierId = null;
 const connectedUsers = new Map();
+const kitchenUsers = new Set();
 
 io.on('connection', (socket) => {
     console.log(`[🟢 Socket 연결됨] ID: ${socket.id} (현재 접속자: ${io.engine.clientsCount}명)`);
@@ -863,6 +864,22 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('request_state', () => {
+        socket.emit('cashier_status', currentCashierId !== null);
+        socket.emit('kitchen_status', kitchenUsers.size > 0); // 주방 상태도 꼭 알려줘야 함!
+    });
+
+    socket.on('join_kitchen', () => {
+        kitchenUsers.add(socket.id);
+        io.emit('kitchen_status', kitchenUsers.size > 0);
+        console.log(`[🍳 주방 입장] ID: ${socket.id} (현재 주방 인원: ${kitchenUsers.size}명)`);
+    });
+
+    socket.on('leave_kitchen', () => {
+        kitchenUsers.delete(socket.id);
+        io.emit('kitchen_status', kitchenUsers.size > 0);
+    });
+
     socket.on('logout', () => {
         const user = connectedUsers.get(socket.id);
         console.log(`[👋 로그아웃] ${user?.username || '알 수 없음'} (ID: ${socket.id})`);
@@ -880,6 +897,12 @@ io.on('connection', (socket) => {
             currentCashierId = null;
             console.log(`[🔓 캐셔 자동 해제] 사유: 캐셔 담당자의 연결 끊김`);
             io.emit('cashier_status', false);
+        }
+
+        if (kitchenUsers.has(socket.id)) {
+            kitchenUsers.delete(socket.id);
+            io.emit('kitchen_status', kitchenUsers.size > 0);
+            console.log(`[🍳 주방 퇴장 (연결 끊김)] 남은 주방 인원: ${kitchenUsers.size}명`);
         }
     });
 

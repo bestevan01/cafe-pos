@@ -23,9 +23,9 @@ function App() {
         view: 'login' // 'login', 'register', 'app'
     });
 
-    const [userCount, setUserCount] = useState(0);
     const [myRole, setMyRole] = useState(null); // 'cashier', 'kitchen', null
     const [isCashierTaken, setIsCashierTaken] = useState(false);
+    const [isKitchenActive, setIsKitchenActive] = useState(false);
 
     // 모달 상태
     const [showSettlement, setShowSettlement] = useState(false);
@@ -124,21 +124,15 @@ function App() {
         if (socket.connected) registerMyUser();
         socket.on('connect', registerMyUser);
 
-        socket.on('user_count', (count) => {
-            setUserCount(count);
-            // 혼자 남으면 역할 초기화 (3초 뒤)
-            if (count <= 1) {
-                setTimeout(() => setMyRole(null), 3000);
-            }
-        });
-
         socket.on('cashier_status', (isTaken) => setIsCashierTaken(isTaken));
+        socket.on('kitchen_status', (isActive) => setIsKitchenActive(isActive));
         socket.emit('request_state'); // 현재 상태 요청
 
         return () => {
             socket.off('connect', registerMyUser);
             socket.off('user_count');
             socket.off('cashier_status');
+            socket.off('kitchen_status');
         };
     }, [auth.isLoggedIn, auth.user]);
 
@@ -185,16 +179,25 @@ function App() {
     // 직원 화면 컨텐츠 분기
     const renderContent = () => {
         if (myRole === 'cashier') {
-            return <OnePersonMode onlyOrder={false} isCashier={true} onBack={() => { socket.emit('release_cashier'); setMyRole(null); }} />;
+            return <OnePersonMode onlyOrder={false} isCashier={isKitchenActive} onBack={() => {
+                socket.emit('release_cashier');
+                setMyRole(null);
+            }}/>;
         }
         if (myRole === 'kitchen') {
-            return <Kitchen onBack={() => setMyRole(null)} />;
+            return <Kitchen onBack={() => {
+                socket.emit('leave_kitchen');
+                setMyRole(null);
+            }}/>;
         }
-        // 접속자가 1명이면 역할 선택 없이 바로 통합 모드
-        if (userCount <= 1) {
-            return <OnePersonMode />;
-        }
-        return <RoleSelection onSelectRole={setMyRole} isCashierTaken={isCashierTaken} />;
+
+        return <RoleSelection
+            onSelectRole={(role) => {
+                if (role === 'kitchen') socket.emit('join_kitchen');
+                setMyRole(role);
+            }}
+            isCashierTaken={isCashierTaken}
+        />;
     };
 
     return (
@@ -230,7 +233,7 @@ function App() {
             {auth.isLoggedIn && (
                 <div className="global-top-header">
                     <ThemeToggle />
-                    {(myRole === 'cashier' || userCount <= 1) && (
+                    {myRole === 'cashier' && (
                         <button onClick={() => setShowSettlement(true)} className="btn-global-action btn-settle">💰 시재
                             점검</button>
                     )}
