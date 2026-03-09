@@ -6,7 +6,6 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const express = require('express');
-const morgan = require('morgan');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
@@ -51,7 +50,6 @@ app.use(cors({
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"]
 }));
 app.use(express.json());
-app.use(morgan('dev'));
 
 // 인증 미들웨어 (JWT 검증)
 const authenticateToken = (req, res, next) => {
@@ -98,13 +96,8 @@ pool.on('connection', (connection) => {
 });
 
 pool.getConnection()
-    .then(conn => {
-        console.log("✅ [DB] 데이터베이스 연결 성공!");
-        conn.release();
-    })
-    .catch(err => {
-        console.error("❌ [DB] 데이터베이스 연결 실패:", err);
-    });
+    .then(conn => { console.log("✅ Database Connected!"); conn.release(); })
+    .catch(err => { console.error("❌ Database Connection Failed:", err); });
 
 
 // ---------------------------------------------------------
@@ -115,12 +108,8 @@ app.get('/api/menu', authenticateToken, async (req, res) => {
         const [rows] = await pool.query('SELECT * FROM menu');
         res.json(rows);
     } catch (err) {
-        console.error('[🔥 GET /api/menu 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '메뉴 목록을 불러오는 중 오류가 발생했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false, message: '메뉴 로드 실패' });
     }
 });
 
@@ -130,12 +119,8 @@ app.post('/api/menu', authenticateToken, requireAdmin, async (req, res) => {
         await pool.query('INSERT INTO menu (name, price, type) VALUES (?, ?, ?)', [name, price, type]);
         res.json({ success: true });
     } catch (err) {
-        console.error('[🔥 POST /api/menu 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '메뉴 추가 중 오류가 발생했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false });
     }
 });
 
@@ -158,27 +143,18 @@ app.patch('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) => 
         }
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 PATCH /api/menu/${id} 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '메뉴 수정 중 오류가 발생했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false });
     }
 });
 
 app.delete('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) => {
-    const {id} = req.params;
     try {
-        await pool.query('DELETE FROM menu WHERE id = ?', [id]);
+        await pool.query('DELETE FROM menu WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 DELETE /api/menu/${id} 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '메뉴 삭제 중 오류가 발생했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false });
     }
 });
 
@@ -194,14 +170,10 @@ app.post('/api/register', async (req, res) => {
             'INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)',
             [username, hashedPassword, name, 'pending']
         );
-        res.json({success: true, message: '가입 신청 완료 (관리자에게 가입 승인을 요청하세요.)'});
+        res.json({ success: true, message: '가입 신청 완료 (승인 대기)' });
     } catch (err) {
-        console.error(`[🔥 POST /api/register 에러] 시도 아이디: ${username}`, err);
-        res.status(500).json({
-            success: false,
-            message: '중복 아이디 또는 오류 발생',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false, message: '중복 아이디 또는 오류 발생' });
     }
 });
 
@@ -227,12 +199,8 @@ app.post('/api/login', async (req, res) => {
 
         res.json({ success: true, token, role: user.role, name: user.name, username: user.username, id: user.id });
     } catch (err) {
-        console.error(`[🔥 POST /api/login 에러] 시도 아이디: ${username}`, err);
-        res.status(500).json({
-            success: false,
-            message: '서버 에러',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false, message: '서버 에러' });
     }
 });
 
@@ -257,12 +225,8 @@ app.patch('/api/users/:id/password', authenticateToken, async (req, res) => {
 
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 PATCH /api/users/${id}/password 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '서버 에러',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false, message: '서버 에러' });
     }
 });
 
@@ -271,43 +235,28 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
         const [rows] = await pool.query('SELECT id, username, name, role, created_at FROM users');
         res.json(rows);
     } catch (err) {
-        console.error('[🔥 GET /api/admin/users 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '유저 목록을 불러오지 못했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
 app.patch('/api/admin/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
-    const {id} = req.params;
-    const {role} = req.params;
     try {
-        await pool.query('UPDATE users SET role = ? WHERE id = ?', [role, id]);
+        await pool.query('UPDATE users SET role = ? WHERE id = ?', [req.body.role, req.params.id]);
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 PATCH /api/admin/users/${id}/role 에러] 변경 시도 역할: ${role}`, err);
-        res.status(500).json({
-            success: false,
-            message: '권한 변경에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false });
     }
 });
 
 app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
-    const {id} = req.params;
     try {
-        await pool.query('DELETE FROM users WHERE id = ?', [id]);
+        await pool.query('DELETE FROM users WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 DELETE /api/admin/users/${id} 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '계정 삭제 실패',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ success: false, message: '계정 삭제 실패' });
     }
 });
 
@@ -362,12 +311,8 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         if (conn) await conn.rollback();
-        console.error(`[🔥 POST /api/orders 에러] 주문자: ${staff_name || '키오스크'}`, error);
-        res.status(500).json({
-            success: false,
-            message: '주문 처리에 실패했습니다.',
-            debug_info: error.message
-        });
+        console.error(error);
+        res.status(500).json({ success: false, message: '주문 실패' });
     } finally {
         if (conn) conn.release();
     }
@@ -378,12 +323,8 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
         const [rows] = await pool.query('SELECT * FROM orders WHERE is_delivered = 0 ORDER BY created_at DESC');
         res.json(rows);
     } catch (error) {
-        console.error('[🔥 GET /api/orders 에러]', error);
-        res.status(500).json({
-            success: false,
-            message: '주문 목록을 불러오지 못했습니다.',
-            debug_info: error.message
-        });
+        console.error(error);
+        res.status(500).json({ success: false });
     }
 });
 
@@ -396,12 +337,8 @@ app.patch('/api/orders/:display_id/deliver', authenticateToken, async (req, res)
         io.emit('order_updated', { display_id, ...rows[0], is_delivered: 1 });
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 PATCH /api/orders/${display_id}/deliver 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '주문 전달 처리에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -412,12 +349,8 @@ app.patch('/api/orders/:display_id/complete', authenticateToken, async (req, res
         io.emit('order_updated', { display_id, is_paid: 1, is_completed: 1 });
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 PATCH /api/orders/${display_id}/complete 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '주문 완료 처리에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -430,12 +363,8 @@ app.patch('/api/orders/:display_id/pay', authenticateToken, async (req, res) => 
         io.emit('order_updated', { display_id, is_paid: 1, is_completed: rows[0]?.is_completed || 0 });
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 PATCH /api/orders/${display_id}/pay 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '결제 처리에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -446,12 +375,8 @@ app.patch('/api/orders/:display_id/complete_kitchen', authenticateToken, async (
         io.emit('order_updated', { display_id, is_completed: 1 });
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 PATCH /api/orders/${display_id}/complete_kitchen 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '주방 조리 완료 처리에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -462,12 +387,8 @@ app.delete('/api/orders/:display_id', authenticateToken, async (req, res) => {
         io.emit('order_deleted', display_id);
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 DELETE /api/orders/${display_id} 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '주문 취소에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -479,27 +400,18 @@ app.get('/api/admin/sales', authenticateToken, requireAdmin, async (req, res) =>
         const [rows] = await pool.query('SELECT * FROM orders WHERE is_paid = 1 ORDER BY created_at DESC');
         res.json(rows);
     } catch (err) {
-        console.error('[🔥 GET /api/admin/sales 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '매출 내역을 불러오지 못했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
 app.delete('/api/admin/sales/:id', authenticateToken, requireAdmin, async (req, res) => {
-    const {id} = req.params;
     try {
-        await pool.query('DELETE FROM orders WHERE id = ?', [id]);
+        await pool.query('DELETE FROM orders WHERE id = ?', [req.params.id]);
         res.json({success: true});
     } catch (err) {
-        console.error(`[🔥 DELETE /api/admin/sales/${id} 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '매출 내역 삭제에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -508,12 +420,8 @@ app.get('/api/admin/settlements', authenticateToken, requireAdmin, async (req, r
         const [rows] = await pool.query('SELECT * FROM cash_settlements ORDER BY date DESC');
         res.json(rows);
     } catch (err) {
-        console.error('[🔥 GET /api/admin/settlements 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '정산 내역을 불러오지 못했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -528,12 +436,8 @@ app.get('/api/settlement/status', authenticateToken, async (req, res) => {
             res.json({status: todayRows[0]['is_closed'] ? 'closed' : 'opened', data: todayRows[0]});
         }
     } catch (err) {
-        console.error('[🔥 GET /api/settlement/status 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '시재 점검 상태를 확인하지 못했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -542,12 +446,8 @@ app.post('/api/settlement/open', authenticateToken, async (req, res) => {
         await pool.query('INSERT INTO cash_settlements (date, opening_amount) VALUES (CURDATE(), ?)', [req.body.amount]);
         res.json({ success: true });
     } catch (err) {
-        console.error('[🔥 POST /api/settlement/open 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '영업 시작(오픈) 처리에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -566,12 +466,8 @@ app.get('/api/settlement/calc', authenticateToken, async (req, res) => {
 
         res.json({ opening, sales: cashSales, expected: opening + cashSales });
     } catch (err) {
-        console.error('[🔥 GET /api/settlement/calc 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '마감 정산 금액을 계산하지 못했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -584,12 +480,8 @@ app.post('/api/settlement/close', authenticateToken, async (req, res) => {
         );
         res.json({ success: true });
     } catch (err) {
-        console.error('[🔥 POST /api/settlement/close 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '영업 종료(마감) 처리에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -611,12 +503,8 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
                                              ORDER BY hour`);
         res.json({ itemStats: itemRows, timeStats: timeRows });
     } catch (err) {
-        console.error('[🔥 GET /api/admin/stats 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '통계 데이터를 집계하는 중 오류가 발생했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({success: false});
     }
 });
 
@@ -652,22 +540,15 @@ app.get('/api/passkey/register-options', authenticateToken, async (req, res) => 
 
         res.json(options);
     } catch (err) {
-        console.error(`[🔥 GET /api/passkey/register-options 에러] 대상 유저 ID: ${userId}`, err);
-        res.status(500).json({
-            success: false,
-            message: '패스키 등록 옵션 생성에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ error: err.message });
     }
 });
 
 app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => {
     const { userId, body } = req.body;
     const expectedChallenge = currentChallenges[userId];
-
-    if (!expectedChallenge) {
-        return res.status(400).json({error: 'Challenge not found'});
-    }
+    if (!expectedChallenge) return res.status(400).json({ error: 'Challenge not found' });
 
     try {
         const verification = await verifyRegistrationResponse({
@@ -708,15 +589,11 @@ app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => 
             delete currentChallenges[userId];
             res.json({ success: true });
         } else {
-            res.status(400).json({success: false, message: '패스키 검증에 실패했습니다.'});
+            res.status(400).json({ success: false, message: 'Verification failed' });
         }
     } catch (error) {
-        console.error(`[🔥 POST /api/passkey/register-verify 에러] 대상 유저 ID: ${userId}`, error);
-        res.status(500).json({
-            success: false,
-            message: '패스키 등록 검증 중 서버 오류가 발생했습니다.',
-            debug_info: error.message
-        });
+        console.error(error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -729,12 +606,8 @@ app.get('/api/passkey/login-options', async (req, res) => {
         currentChallenges[options.challenge] = options.challenge;
         res.json(options);
     } catch (err) {
-        console.error('[🔥 GET /api/passkey/login-options 에러]', err);
-        res.status(500).json({
-            success: false,
-            message: '패스키 로그인 옵션 생성에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({error: "Failed to generate options"});
     }
 });
 
@@ -777,15 +650,11 @@ app.post('/api/passkey/login-verify', async (req, res) => {
             const token = jwt.sign({ id: user.id, username: user.username, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '12h' });
             res.json({ success: true, token, role: user.role, name: user.name, username: user.username, id: user.id });
         } else {
-            res.status(400).json({success: false, message: '패스키 로그인 검증에 실패했습니다.'});
+            res.status(400).json({ success: false, message: 'Verification failed' });
         }
     } catch (error) {
-        console.error('[🔥 POST /api/passkey/login-verify 에러]', error);
-        res.status(400).json({
-            success: false,
-            message: '로그인 검증 중 오류가 발생했습니다.',
-            debug_info: error.message
-        });
+        console.error(error);
+        res.status(400).json({ error: error.message });
     }
 });
 
@@ -798,12 +667,8 @@ app.get('/api/passkeys', authenticateToken, async (req, res) => {
         );
         res.json(rows);
     } catch (err) {
-        console.error(`[🔥 GET /api/passkeys 에러] 대상 유저 ID: ${userId}`, err);
-        res.status(500).json({
-            success: false,
-            message: '패스키 목록 조회에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ error: '목록 조회 실패' });
     }
 });
 
@@ -813,12 +678,8 @@ app.delete('/api/passkeys/:id', authenticateToken, async (req, res) => {
         await pool.query('DELETE FROM passkeys WHERE id = ?', [id]);
         res.json({ success: true });
     } catch (err) {
-        console.error(`[🔥 DELETE /api/passkeys/${id} 에러]`, err);
-        res.status(500).json({
-            success: false,
-            message: '패스키 삭제에 실패했습니다.',
-            debug_info: err.message
-        });
+        console.error(err);
+        res.status(500).json({ error: '삭제 실패' });
     }
 });
 
@@ -836,22 +697,19 @@ let currentCashierId = null;
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
-    console.log(`[🟢 Socket 연결됨] ID: ${socket.id} (현재 접속자: ${io.engine.clientsCount}명)`);
+    console.log(`🔌 Client Connected: ${socket.id}`);
 
     socket.on('register_user', (data) => {
         connectedUsers.set(socket.id, data);
-        console.log(`[👤 유저 등록] ${data.username} (ID: ${socket.id})`);
         broadcastUserCount();
     });
 
     socket.on('claim_cashier', () => {
         if (currentCashierId === null) {
             currentCashierId = socket.id;
-            console.log(`[🛒 캐셔 선점] ID: ${socket.id}`);
             io.emit('cashier_status', true);
             socket.emit('cashier_claimed', true);
         } else {
-            console.log(`[⚠️ 캐셔 선점 실패] ID: ${socket.id} (이미 사용 중)`);
             socket.emit('cashier_claimed', false);
         }
     });
@@ -859,33 +717,22 @@ io.on('connection', (socket) => {
     socket.on('release_cashier', () => {
         if (socket.id === currentCashierId) {
             currentCashierId = null;
-            console.log(`[🔓 캐셔 해제] ID: ${socket.id}가 캐셔 자리를 반납함`);
             io.emit('cashier_status', false);
         }
     });
 
     socket.on('logout', () => {
-        const user = connectedUsers.get(socket.id);
-        console.log(`[👋 로그아웃] ${user?.username || '알 수 없음'} (ID: ${socket.id})`);
         connectedUsers.delete(socket.id);
         broadcastUserCount();
     });
 
-    socket.on('disconnect', (reason) => {
-        console.log(`[🔴 Socket 끊김] ID: ${socket.id}, 사유: ${reason}`);
-
+    socket.on('disconnect', () => {
         connectedUsers.delete(socket.id);
         broadcastUserCount();
-
         if (socket.id === currentCashierId) {
             currentCashierId = null;
-            console.log(`[🔓 캐셔 자동 해제] 사유: 캐셔 담당자의 연결 끊김`);
             io.emit('cashier_status', false);
         }
-    });
-
-    socket.on('error', (err) => {
-        console.error(`[❌ Socket 에러] ID: ${socket.id}, 에러 상세:`, err);
     });
 
     function broadcastUserCount() {
@@ -896,12 +743,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-    const serverUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-
-    const env = process.env.NODE_ENV === 'production' ? '☁️ 운영(Production)' : '💻 개발(Local)';
-
-    console.log(`=================================`);
-    console.log(`🚀 [서버 실행됨] ${env}`);
-    console.log(`🔗 주소: ${serverUrl}`);
-    console.log(`=================================`);
+    console.log(`🚀 Server Running: http://localhost:${PORT}`);
 });
