@@ -88,7 +88,13 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: IS_PRODUCTION }
+    ssl: {minVersion: 'TLSv1.2', rejectUnauthorized: IS_PRODUCTION},
+    timezone: '+09:00',
+    dateStrings: true
+});
+
+pool.on('connection', (connection) => {
+    connection.query("SET time_zone = '+09:00';");
 });
 
 pool.getConnection()
