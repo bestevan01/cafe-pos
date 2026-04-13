@@ -418,8 +418,15 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
 
         res.json({success: true});
     } catch (error) {
-        if (conn) await conn.rollback();
-        console.error(`[🔥 POST /api/orders 에러] 주문자: ${staff_name || '키오스크'}`, error);
+        console.error(`[🔥 POST /api/orders 원본 에러] 주문자: ${staff_name || '키오스크'}`, error);
+
+        if (conn) {
+            try {
+                await conn.rollback();
+            } catch (rollbackError) {
+                console.error(`[⚠️ DB 롤백 실패 (연결 끊김)]`, rollbackError.message);
+            }
+        }
         res.status(500).json({
             success: false,
             message: '주문 처리에 실패했습니다.',
@@ -1023,8 +1030,14 @@ app.delete('/api/passkeys/:id', authenticateToken, async (req, res) => {
 // ---------------------------------------------------------
 // [10] 단순 응답 확인용
 // ---------------------------------------------------------
-app.get('/ping', (req, res) => {
-    res.status(200).send('pong');
+app.get('/ping', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.status(200).send('pong');
+    } catch (error) {
+        console.error('[Ping DB Error]', error);
+        res.status(500).send('error');
+    }
 });
 
 // ---------------------------------------------------------

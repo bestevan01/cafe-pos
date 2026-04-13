@@ -3,7 +3,7 @@ import {motion, AnimatePresence} from 'framer-motion';
 import axios from 'axios';
 import {socket} from '../../utils/socket';
 
-function OnePersonMode({onlyOrder = false, isCashier = false, onBack}) {
+function OnePersonMode({onlyOrder = false, isCashier = false}) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
