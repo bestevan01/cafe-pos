@@ -1,7 +1,8 @@
 import {useState} from 'react';
-import MenuDashboard from './MenuDashboard';
 import SalesDashboard from './SalesDashboard';
 import SettlementDashboard from './SettlementDashboard';
+import MenuDashboard from './MenuDashboard';
+import EventDashboard from './EventDashboard';
 import UsersDashboard from './UsersDashboard';
 import ThemeToggle from '../../components/ThemeToggle';
 
@@ -9,9 +10,10 @@ function AdminDashboard({ onLogout, onEditProfile }) {
     const [view, setView] = useState('home');
 
     // 화면 전환 라우팅
-    if (view === 'menu') return <MenuDashboard onBack={() => setView('home')}/>;
     if (view === 'sales') return <SalesDashboard onBack={() => setView('home')}/>;
     if (view === 'settlement') return <SettlementDashboard onBack={() => setView('home')}/>;
+    if (view === 'menu') return <MenuDashboard onBack={() => setView('home')}/>;
+    if (view === 'event') return <EventDashboard onBack={() => setView('home')}/>;
     if (view === 'users') return <UsersDashboard onBack={() => setView('home')}/>;
 
     // 메인(Home) 화면 렌더링
@@ -116,6 +118,11 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                         <div className="card-icon">📋</div>
                         <div className="card-title">메뉴 관리</div>
                         <div className="card-desc">메뉴 추가/품절 변경</div>
+                    </button>
+                    <button onClick={() => setView('event')} className="admin-card">
+                        <div className="card-icon">🎉</div>
+                        <div className="card-title">이벤트 관리</div>
+                        <div className="card-desc">할인/무료 행사 설정</div>
                     </button>
                     <button onClick={() => setView('users')} className="admin-card">
                         <div className="card-icon">👥</div>

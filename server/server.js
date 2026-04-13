@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
 const express = require('express');
 const morgan = require('morgan');
 const http = require('http');
-const { Server } = require('socket.io');
+const {Server} = require('socket.io');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
@@ -124,10 +124,10 @@ app.get('/api/menu', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/menu', authenticateToken, requireAdmin, async (req, res) => {
-    const { name, price, type } = req.body;
+    const {name, price, type} = req.body;
     try {
         await pool.query('INSERT INTO menu (name, price, type) VALUES (?, ?, ?)', [name, price, type]);
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error('[🔥 POST /api/menu 에러]', err);
         res.status(500).json({
@@ -139,14 +139,26 @@ app.post('/api/menu', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 app.patch('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) => {
-    const { id } = req.params;
-    const { name, price, type, is_soldout } = req.body;
+    const {id} = req.params;
+    const {name, price, type, is_soldout} = req.body;
     let fields = [], values = [];
 
-    if (name) { fields.push('name = ?'); values.push(name); }
-    if (price) { fields.push('price = ?'); values.push(price); }
-    if (type) { fields.push('type = ?'); values.push(type); }
-    if (is_soldout !== undefined) { fields.push('is_soldout = ?'); values.push(is_soldout); }
+    if (name) {
+        fields.push('name = ?');
+        values.push(name);
+    }
+    if (price) {
+        fields.push('price = ?');
+        values.push(price);
+    }
+    if (type) {
+        fields.push('type = ?');
+        values.push(type);
+    }
+    if (is_soldout !== undefined) {
+        fields.push('is_soldout = ?');
+        values.push(is_soldout);
+    }
     values.push(id);
 
     try {
@@ -155,7 +167,7 @@ app.patch('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) => 
                               SET ${fields.join(', ')}
                               WHERE id = ?`, values);
         }
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 PATCH /api/menu/${id} 에러]`, err);
         res.status(500).json({
@@ -170,7 +182,7 @@ app.delete('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) =>
     const {id} = req.params;
     try {
         await pool.query('DELETE FROM menu WHERE id = ?', [id]);
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 DELETE /api/menu/${id} 에러]`, err);
         res.status(500).json({
@@ -186,7 +198,7 @@ app.delete('/api/menu/:id', authenticateToken, requireAdmin, async (req, res) =>
 // [5] API 라우트: 인증 및 사용자 관리 (Auth & Users)
 // ---------------------------------------------------------
 app.post('/api/register', async (req, res) => {
-    const { username, password, name } = req.body;
+    const {username, password, name} = req.body;
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         await pool.query(
@@ -205,26 +217,26 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
+    const {username, password} = req.body;
     try {
         const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
         if (users.length === 0 || !(await bcrypt.compare(password, users[0].password))) {
-            return res.status(401).json({ success: false, message: '아이디/비번 불일치' });
+            return res.status(401).json({success: false, message: '아이디/비번 불일치'});
         }
 
         const user = users[0];
         if (user.role === 'pending') {
-            return res.status(403).json({ success: false, message: '승인 대기 중입니다.' });
+            return res.status(403).json({success: false, message: '승인 대기 중입니다.'});
         }
 
         const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role, name: user.name },
+            {id: user.id, username: user.username, role: user.role, name: user.name},
             JWT_SECRET,
-            { expiresIn: '12h' }
+            {expiresIn: '12h'}
         );
 
-        res.json({ success: true, token, role: user.role, name: user.name, username: user.username, id: user.id });
+        res.json({success: true, token, role: user.role, name: user.name, username: user.username, id: user.id});
     } catch (err) {
         console.error(`[🔥 POST /api/login 에러] 시도 아이디: ${username}`, err);
         res.status(500).json({
@@ -236,25 +248,25 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.patch('/api/users/:id/password', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const { currentPassword, newPassword } = req.body;
+    const {id} = req.params;
+    const {currentPassword, newPassword} = req.body;
 
     try {
         const [users] = await pool.query('SELECT password FROM users WHERE id = ?', [id]);
         if (users.length === 0) {
-            return res.status(404).json({ success: false, message: '유저를 찾을 수 없습니다.' });
+            return res.status(404).json({success: false, message: '유저를 찾을 수 없습니다.'});
         }
 
         const user = users[0];
         const isMatch = await bcrypt.compare(currentPassword, user.password);
         if (!isMatch) {
-            return res.status(401).json({ success: false, message: '현재 비밀번호가 틀렸습니다.' });
+            return res.status(401).json({success: false, message: '현재 비밀번호가 틀렸습니다.'});
         }
 
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);
         await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedNewPassword, id]);
 
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 PATCH /api/users/${id}/password 에러]`, err);
         res.status(500).json({
@@ -284,7 +296,7 @@ app.patch('/api/admin/users/:id/role', authenticateToken, requireAdmin, async (r
     const {role} = req.params;
     try {
         await pool.query('UPDATE users SET role = ? WHERE id = ?', [role, id]);
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 PATCH /api/admin/users/${id}/role 에러] 변경 시도 역할: ${role}`, err);
         res.status(500).json({
@@ -299,7 +311,7 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
     const {id} = req.params;
     try {
         await pool.query('DELETE FROM users WHERE id = ?', [id]);
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 DELETE /api/admin/users/${id} 에러]`, err);
         res.status(500).json({
@@ -314,8 +326,9 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
 // [6] API 라우트: 주문 관리 (Orders)
 // ---------------------------------------------------------
 app.post('/api/orders', authenticateToken, async (req, res) => {
-    const { items, force, paymentMethod, staff_name } = req.body;
+    const {items, force, paymentMethod, staff_name, applied_event_id, applied_event_qty} = req.body;
     let conn;
+    let isEventUpdated = false;
 
     try {
         conn = await pool.getConnection();
@@ -324,33 +337,78 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
         // 중복 주문 방지 (1분 내 동일 메뉴/수량)
         if (!force && items.length > 0) {
             const [rows] = await conn.query(`
-                SELECT * FROM orders WHERE menu_name = ? AND quantity = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+                SELECT *
+                FROM orders
+                WHERE menu_name = ?
+                  AND quantity = ?
+                  AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
             `, [items[0].menu_name, items[0].quantity]);
 
             if (rows.length > 0) {
                 await conn.rollback();
-                return res.json({ success: false, isDuplicate: true });
+                return res.json({success: false, isDuplicate: true});
+            }
+        }
+
+        if (applied_event_id && applied_event_qty > 0) {
+            // FOR UPDATE를 붙여서 다른 캐셔가 동시에 결제하지 못하게 잠깐 줄을 세웁니다.
+            const [eventRows] = await conn.query(`
+                SELECT daily_limit, IF(last_used_date = CURDATE(), used_count, 0) AS current_used_count
+                FROM events
+                WHERE id = ? FOR
+                UPDATE
+            `, [applied_event_id]);
+
+            if (eventRows.length > 0) {
+                const ev = eventRows[0];
+
+                // 한도 초과 검사
+                if (ev.daily_limit !== null && (ev['current_used_count'] + applied_event_qty > ev.daily_limit)) {
+                    await conn.rollback(); // 수량이 초과되면 주문 전체를 취소(롤백)합니다.
+                    return res.json({
+                        success: false,
+                        message: `해당 이벤트 한도를 초과했습니다. (오늘 남은 수량: ${ev.daily_limit - ev['current_used_count']}잔)`
+                    });
+                }
+
+                // 통과했다면 차감 업데이트! (어제면 덮어씌우고, 오늘이면 기존 값에 더합니다. 날짜는 오늘로 갱신)
+                await conn.query(`
+                    UPDATE events
+                    SET used_count     = IF(last_used_date = CURDATE(), used_count + ?, ?),
+                        last_used_date = CURDATE()
+                    WHERE id = ?
+                `, [applied_event_qty, applied_event_qty, applied_event_id]);
+
+                isEventUpdated = true;
             }
         }
 
         // 주문 번호 생성
-        const [rows] = await conn.query(`SELECT MAX(daily_number) as maxNum FROM orders WHERE DATE(created_at) = CURDATE()`);
+        const [rows] = await conn.query(`SELECT MAX(daily_number) as maxNum
+                                         FROM orders
+                                         WHERE DATE(created_at) = CURDATE()`);
         const nextDailyNum = (rows[0]['maxNum'] || 0) + 1;
         const formattedID = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(nextDailyNum).padStart(3, "0")}`;
 
         for (const item of items) {
             await conn.query(
-                `INSERT INTO orders (menu_name, quantity, total_price, daily_number, display_id, payment_method, staff_name) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [item.menu_name, item.quantity, item.price * item.quantity, nextDailyNum, formattedID, paymentMethod || 'cash', staff_name || '키오스크']
+                `INSERT INTO orders (menu_name, quantity, total_price, daily_number, display_id, payment_method,
+                                     staff_name, applied_event_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [item.menu_name, item.quantity, item.price * item.quantity, nextDailyNum, formattedID, paymentMethod || 'cash', staff_name || '키오스크', item.applied_event_id || null]
             );
         }
 
         await conn.commit();
 
+        if (isEventUpdated) {
+            io.emit('events_updated');
+        }
+
         io.emit('new_order', {
             display_id: formattedID,
             daily_number: String(nextDailyNum).padStart(3, "0"),
-            items: items.map(i => ({ menu_name: i.menu_name, quantity: i.quantity, price: i.price * i.quantity })),
+            items: items.map(i => ({menu_name: i.menu_name, quantity: i.quantity, price: i.price * i.quantity})),
             created_at: new Date(),
             payment_method: paymentMethod || 'cash',
             staff_name: staff_name || '키오스크',
@@ -358,7 +416,7 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
             is_completed: 0
         });
 
-        res.json({ success: true });
+        res.json({success: true});
     } catch (error) {
         if (conn) await conn.rollback();
         console.error(`[🔥 POST /api/orders 에러] 주문자: ${staff_name || '키오스크'}`, error);
@@ -387,13 +445,13 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 });
 
 app.patch('/api/orders/:display_id/deliver', authenticateToken, async (req, res) => {
-    const { display_id } = req.params;
+    const {display_id} = req.params;
     try {
         await pool.query('UPDATE orders SET is_delivered = 1 WHERE display_id = ?', [display_id]);
         const [rows] = await pool.query('SELECT is_paid, is_completed FROM orders WHERE display_id = ? LIMIT 1', [display_id]);
 
-        io.emit('order_updated', { display_id, ...rows[0], is_delivered: 1 });
-        res.json({ success: true });
+        io.emit('order_updated', {display_id, ...rows[0], is_delivered: 1});
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/deliver 에러]`, err);
         res.status(500).json({
@@ -405,11 +463,11 @@ app.patch('/api/orders/:display_id/deliver', authenticateToken, async (req, res)
 });
 
 app.patch('/api/orders/:display_id/complete', authenticateToken, async (req, res) => {
-    const { display_id } = req.params;
+    const {display_id} = req.params;
     try {
         await pool.query('UPDATE orders SET is_paid = 1, is_completed = 1, payment_method = ? WHERE display_id = ?', [req.body.paymentMethod || 'cash', display_id]);
-        io.emit('order_updated', { display_id, is_paid: 1, is_completed: 1 });
-        res.json({ success: true });
+        io.emit('order_updated', {display_id, is_paid: 1, is_completed: 1});
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/complete 에러]`, err);
         res.status(500).json({
@@ -421,13 +479,13 @@ app.patch('/api/orders/:display_id/complete', authenticateToken, async (req, res
 });
 
 app.patch('/api/orders/:display_id/pay', authenticateToken, async (req, res) => {
-    const { display_id } = req.params;
+    const {display_id} = req.params;
     try {
         await pool.query('UPDATE orders SET is_paid = 1, payment_method = ? WHERE display_id = ?', [req.body.paymentMethod || 'cash', display_id]);
         const [rows] = await pool.query('SELECT is_completed FROM orders WHERE display_id = ? LIMIT 1', [display_id]);
 
-        io.emit('order_updated', { display_id, is_paid: 1, is_completed: rows[0]?.is_completed || 0 });
-        res.json({ success: true });
+        io.emit('order_updated', {display_id, is_paid: 1, is_completed: rows[0]?.is_completed || 0});
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/pay 에러]`, err);
         res.status(500).json({
@@ -439,11 +497,11 @@ app.patch('/api/orders/:display_id/pay', authenticateToken, async (req, res) => 
 });
 
 app.patch('/api/orders/:display_id/complete_kitchen', authenticateToken, async (req, res) => {
-    const { display_id } = req.params;
+    const {display_id} = req.params;
     try {
         await pool.query('UPDATE orders SET is_completed = 1 WHERE display_id = ?', [display_id]);
-        io.emit('order_updated', { display_id, is_completed: 1 });
-        res.json({ success: true });
+        io.emit('order_updated', {display_id, is_completed: 1});
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/complete_kitchen 에러]`, err);
         res.status(500).json({
@@ -455,11 +513,31 @@ app.patch('/api/orders/:display_id/complete_kitchen', authenticateToken, async (
 });
 
 app.delete('/api/orders/:display_id', authenticateToken, async (req, res) => {
-    const { display_id } = req.params;
+    const {display_id} = req.params;
     try {
+        const [usedEvents] = await pool.query(`
+            SELECT applied_event_id, SUM(quantity) as qty
+            FROM orders
+            WHERE display_id = ?
+              AND applied_event_id IS NOT NULL
+            GROUP BY applied_event_id
+        `, [display_id]);
+
         await pool.query('DELETE FROM orders WHERE display_id = ?', [display_id]);
+
+        if (usedEvents.length > 0) {
+            for (const row of usedEvents) {
+                await pool.query(`
+                    UPDATE events
+                    SET used_count =GREATEST(0, used_count - ?)
+                    WHERE id = ?
+                      AND last_used_date = CURDATE()
+                `, [row.qty, row.applied_event_id]);
+            }
+            io.emit('events_updated');
+        }
         io.emit('order_deleted', display_id);
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 DELETE /api/orders/${display_id} 에러]`, err);
         res.status(500).json({
@@ -471,7 +549,94 @@ app.delete('/api/orders/:display_id', authenticateToken, async (req, res) => {
 });
 
 // ---------------------------------------------------------
-// [7] API 라우트: 정산 및 통계 (Settlement & Stats)
+// [7] API 라우트: 이벤트 관리 (Events)
+// ---------------------------------------------------------
+app.get('/api/events', authenticateToken, async (req, res) => {
+    try {
+        const query = `
+            SELECT id,
+                   name,
+                   type,
+                   discount_amount,
+                   daily_limit,
+                   target_menus,
+                   is_active,
+                   IF(last_used_date = CURDATE(), used_count, 0) AS used_count
+            FROM events
+            ORDER BY id DESC
+        `;
+        const [rows] = await pool.query(query);
+        res.json(rows);
+    } catch (err) {
+        console.error(`[🔥 GET /api/events 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '이벤트 조회에 실패했습니다.',
+            debug_info: err.message
+        });
+    }
+});
+
+app.post('/api/events', authenticateToken, requireAdmin, async (req, res) => {
+    const {name, type, discount_amount, daily_limit, target_menus, is_active} = req.body;
+    try {
+        const [result] = await pool.query(
+            'INSERT INTO events (name, type, discount_amount, daily_limit, target_menus, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+                name,
+                type,
+                discount_amount || 0,
+                daily_limit || null,
+                target_menus || 'all',
+                is_active ? 1 : 0
+            ]
+        );
+        res.json({success: true, id: result.insertId});
+    } catch (err) {
+        console.error(`[🔥 POST /api/events 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '이벤트 등록에 실패했습니다.',
+            debug_info: err.message
+        });
+    }
+});
+
+app.patch('/api/events/:id/toggle', authenticateToken, requireAdmin, async (req, res) => {
+    const {id} = req.params;
+    const {is_active} = req.body;
+    try {
+        await pool.query('UPDATE events SET is_active = ? WHERE id = ?', [is_active ? 1 : 0, id]);
+        io.emit('events_updated');
+        res.json({success: true});
+    } catch (err) {
+        console.error(`[🔥 PATCH /api/events/${id} 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '이벤트 상태 변경에 실패했습니다.',
+            debug_info: err.message
+        });
+    }
+});
+
+app.delete('/api/events/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const {id} = req.params;
+    try {
+        await pool.query('DELETE FROM events WHERE id = ?', [id]);
+        io.emit('events_updated');
+        res.json({success: true});
+    } catch (err) {
+        console.error(`[🔥 DELETE /api/events/${id} 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '이벤트 삭제에 실패했습니다.',
+            debug_info: err.message
+        });
+    }
+});
+
+// ---------------------------------------------------------
+// [8] API 라우트: 정산 및 통계 (Settlement & Stats)
 // ---------------------------------------------------------
 app.get('/api/admin/sales', authenticateToken, requireAdmin, async (req, res) => {
     try {
@@ -490,7 +655,23 @@ app.get('/api/admin/sales', authenticateToken, requireAdmin, async (req, res) =>
 app.delete('/api/admin/sales/:id', authenticateToken, requireAdmin, async (req, res) => {
     const {id} = req.params;
     try {
+        const [orderRows] = await pool.query('SELECT applied_event_id, quantity FROM orders WHERE id = ?', [id]);
         await pool.query('DELETE FROM orders WHERE id = ?', [id]);
+
+        if (orderRows.length > 0) {
+            const order = orderRows[0];
+
+            if (order.applied_event_id) {
+                await pool.query(`
+                    UPDATE events
+                    SET used_count = GREATEST(0, used_count - ?)
+                    WHERE id = ?
+                      AND last_used_date = CURDATE()
+                `, [order.quantity, order.applied_event_id]);
+                io.emit('events_updated');
+            }
+        }
+
         res.json({success: true});
     } catch (err) {
         console.error(`[🔥 DELETE /api/admin/sales/${id} 에러]`, err);
@@ -522,7 +703,7 @@ app.get('/api/settlement/status', authenticateToken, async (req, res) => {
         if (todayRows.length === 0) {
             const [prevRows] = await pool.query('SELECT closing_amount FROM cash_settlements WHERE is_closed = 1 ORDER BY date DESC, created_at DESC LIMIT 1');
             const prevClosing = prevRows.length > 0 ? Number(prevRows[0]['closing_amount']) : 0;
-            res.json({ status: 'not_opened', prevClosing });
+            res.json({status: 'not_opened', prevClosing});
         } else {
             res.json({status: todayRows[0]['is_closed'] ? 'closed' : 'opened', data: todayRows[0]});
         }
@@ -539,7 +720,7 @@ app.get('/api/settlement/status', authenticateToken, async (req, res) => {
 app.post('/api/settlement/open', authenticateToken, async (req, res) => {
     try {
         await pool.query('INSERT INTO cash_settlements (date, opening_amount) VALUES (CURDATE(), ?)', [req.body.amount]);
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error('[🔥 POST /api/settlement/open 에러]', err);
         res.status(500).json({
@@ -553,7 +734,7 @@ app.post('/api/settlement/open', authenticateToken, async (req, res) => {
 app.get('/api/settlement/calc', authenticateToken, async (req, res) => {
     try {
         const [settlement] = await pool.query('SELECT opening_amount FROM cash_settlements WHERE date = CURDATE()');
-        if (settlement.length === 0) return res.status(400).json({ message: "미오픈 상태" });
+        if (settlement.length === 0) return res.status(400).json({message: "미오픈 상태"});
 
         const [orders] = await pool.query(`SELECT IFNULL(SUM(total_price), 0) as cash_sales
                                            FROM orders
@@ -563,7 +744,7 @@ app.get('/api/settlement/calc', authenticateToken, async (req, res) => {
         const opening = settlement[0]['opening_amount'];
         const cashSales = parseInt(orders[0]['cash_sales']);
 
-        res.json({ opening, sales: cashSales, expected: opening + cashSales });
+        res.json({opening, sales: cashSales, expected: opening + cashSales});
     } catch (err) {
         console.error('[🔥 GET /api/settlement/calc 에러]', err);
         res.status(500).json({
@@ -575,13 +756,18 @@ app.get('/api/settlement/calc', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/settlement/close', authenticateToken, async (req, res) => {
-    const { closingAmount, salesCash, diff } = req.body;
+    const {closingAmount, salesCash, diff} = req.body;
     try {
         await pool.query(
-            `UPDATE cash_settlements SET closing_amount = ?, sales_cash = ?, difference = ?, is_closed = 1 WHERE date = CURDATE()`,
+            `UPDATE cash_settlements
+             SET closing_amount = ?,
+                 sales_cash     = ?,
+                 difference     = ?,
+                 is_closed      = 1
+             WHERE date = CURDATE()`,
             [closingAmount, salesCash, diff]
         );
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error('[🔥 POST /api/settlement/close 에러]', err);
         res.status(500).json({
@@ -608,7 +794,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
                                              WHERE is_paid = 1
                                              GROUP BY HOUR(created_at)
                                              ORDER BY hour`);
-        res.json({ itemStats: itemRows, timeStats: timeRows });
+        res.json({itemStats: itemRows, timeStats: timeRows});
     } catch (err) {
         console.error('[🔥 GET /api/admin/stats 에러]', err);
         res.status(500).json({
@@ -620,18 +806,18 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
 });
 
 // ---------------------------------------------------------
-// [8] API 라우트: 패스키 (WebAuthn)
+// [9] API 라우트: 패스키 (WebAuthn)
 // ---------------------------------------------------------
 const currentChallenges = {}; // 챌린지 임시 저장소
 
 app.get('/api/passkey/register-options', authenticateToken, async (req, res) => {
-    const { userId } = req.query;
+    const {userId} = req.query;
 
     try {
         const [users] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
         const [userPasskeys] = await pool.query('SELECT id, transports FROM passkeys WHERE user_id = ?', [userId]);
 
-        if (users.length === 0) return res.status(400).json({ error: 'User not found' });
+        if (users.length === 0) return res.status(400).json({error: 'User not found'});
         const user = users[0];
 
         const options = await generateRegistrationOptions({
@@ -639,8 +825,15 @@ app.get('/api/passkey/register-options', authenticateToken, async (req, res) => 
             rpID: RP_ID,
             userID: new Uint8Array(Buffer.from(String(user.id))),
             userName: user.username,
-            excludeCredentials: userPasskeys.map(key => ({ id: key.id, transports: key.transports ? key.transports.split(',') : [] })),
-            authenticatorSelection: { residentKey: 'preferred', userVerification: 'preferred', authenticatorAttachment: 'platform' },
+            excludeCredentials: userPasskeys.map(key => ({
+                id: key.id,
+                transports: key.transports ? key.transports.split(',') : []
+            })),
+            authenticatorSelection: {
+                residentKey: 'preferred',
+                userVerification: 'preferred',
+                authenticatorAttachment: 'platform'
+            },
         });
 
         currentChallenges[userId] = options.challenge;
@@ -661,7 +854,7 @@ app.get('/api/passkey/register-options', authenticateToken, async (req, res) => 
 });
 
 app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => {
-    const { userId, body } = req.body;
+    const {userId, body} = req.body;
     const expectedChallenge = currentChallenges[userId];
 
     if (!expectedChallenge) {
@@ -677,7 +870,7 @@ app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => 
         });
 
         if (verification.verified && verification.registrationInfo) {
-            const { credential } = verification.registrationInfo;
+            const {credential} = verification.registrationInfo;
             // 기기 이름 추정 로직
             const userAgent = req.get('User-Agent') || '';
             let deviceName = '기타 기기';
@@ -693,7 +886,8 @@ app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => 
             else if (userAgent.includes('Firefox')) deviceName += ' (Firefox)';
 
             await pool.query(
-                `INSERT INTO passkeys (id, public_key, counter, user_id, transports, device_name) VALUES (?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO passkeys (id, public_key, counter, user_id, transports, device_name)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
                 [
                     String(credential.id),
                     Buffer.from(credential.publicKey).toString('base64'),
@@ -705,7 +899,7 @@ app.post('/api/passkey/register-verify', authenticateToken, async (req, res) => 
             );
 
             delete currentChallenges[userId];
-            res.json({ success: true });
+            res.json({success: true});
         } else {
             res.status(400).json({success: false, message: '패스키 검증에 실패했습니다.'});
         }
@@ -738,7 +932,7 @@ app.get('/api/passkey/login-options', async (req, res) => {
 });
 
 app.post('/api/passkey/login-verify', async (req, res) => {
-    const { body } = req.body;
+    const {body} = req.body;
 
     try {
         const [rows] = await pool.query('SELECT * FROM passkeys WHERE id = ?', [body.id]);
@@ -773,8 +967,13 @@ app.post('/api/passkey/login-verify', async (req, res) => {
         if (verification.verified) {
             await pool.query('UPDATE passkeys SET counter = ? WHERE id = ?', [verification.authenticationInfo.newCounter, passkey.id]);
 
-            const token = jwt.sign({ id: user.id, username: user.username, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '12h' });
-            res.json({ success: true, token, role: user.role, name: user.name, username: user.username, id: user.id });
+            const token = jwt.sign({
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                name: user.name
+            }, JWT_SECRET, {expiresIn: '12h'});
+            res.json({success: true, token, role: user.role, name: user.name, username: user.username, id: user.id});
         } else {
             res.status(400).json({success: false, message: '패스키 로그인 검증에 실패했습니다.'});
         }
@@ -789,7 +988,7 @@ app.post('/api/passkey/login-verify', async (req, res) => {
 });
 
 app.get('/api/passkeys', authenticateToken, async (req, res) => {
-    const { userId } = req.query;
+    const {userId} = req.query;
     try {
         const [rows] = await pool.query(
             'SELECT id, device_name, created_at FROM passkeys WHERE user_id = ? ORDER BY created_at DESC',
@@ -807,10 +1006,10 @@ app.get('/api/passkeys', authenticateToken, async (req, res) => {
 });
 
 app.delete('/api/passkeys/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
+    const {id} = req.params;
     try {
         await pool.query('DELETE FROM passkeys WHERE id = ?', [id]);
-        res.json({ success: true });
+        res.json({success: true});
     } catch (err) {
         console.error(`[🔥 DELETE /api/passkeys/${id} 에러]`, err);
         res.status(500).json({
@@ -822,14 +1021,14 @@ app.delete('/api/passkeys/:id', authenticateToken, async (req, res) => {
 });
 
 // ---------------------------------------------------------
-// [9] 단순 응답 확인용
+// [10] 단순 응답 확인용
 // ---------------------------------------------------------
 app.get('/ping', (req, res) => {
     res.status(200).send('pong');
 });
 
 // ---------------------------------------------------------
-// [10] Socket.IO 및 서버 시작
+// [11] Socket.IO 및 서버 시작
 // ---------------------------------------------------------
 let currentCashierId = null;
 const connectedUsers = new Map();

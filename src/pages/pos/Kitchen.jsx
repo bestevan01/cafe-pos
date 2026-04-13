@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {useState, useEffect} from 'react';
+import {motion, AnimatePresence} from 'framer-motion';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import {socket} from '../../utils/socket';
 
-function Kitchen({ onBack }) {
+function Kitchen({onBack}) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -25,7 +25,7 @@ function Kitchen({ onBack }) {
         });
 
         // 주문 상태 업데이트 (결제완료 or 조리완료)
-        socket.on('order_updated', ({ display_id, is_paid, is_completed }) => {
+        socket.on('order_updated', ({display_id, is_paid, is_completed}) => {
             if (is_completed === 1) {
                 // 조리 완료 시 목록에서 제거
                 setOrderGroups(prev => prev.filter(group => group.display_id !== display_id));
@@ -33,7 +33,7 @@ function Kitchen({ onBack }) {
                 // 결제 상태 변경 시 업데이트
                 setOrderGroups(prev => prev.map(group => {
                     if (group.display_id === display_id) {
-                        return { ...group, is_paid: is_paid };
+                        return {...group, is_paid: is_paid};
                     }
                     return group;
                 }));
@@ -153,9 +153,7 @@ function Kitchen({ onBack }) {
                 }
                 `}
             </style>
-
-            <button onClick={onBack} className="btn-back-floating">⬅ 나가기</button>
-
+            
             <div className="kitchen-header-bar">
                 <h1 className="kitchen-title">👨‍🍳 음료 제조 리스트</h1>
             </div>

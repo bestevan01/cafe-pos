@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import {useState, useEffect, useMemo} from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import AdvancedStats from "./AdvancedStats.jsx";
 import ThemeToggle from '../../components/ThemeToggle';
 
-function SalesDashboard({ onBack }) {
+function SalesDashboard({onBack}) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -19,7 +19,7 @@ function SalesDashboard({ onBack }) {
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
 
     // UI 상태 (정렬, 고급 통계 모드)
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'default' });
+    const [sortConfig, setSortConfig] = useState({key: null, direction: 'default'});
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     // API 권한 토큰
@@ -112,7 +112,7 @@ function SalesDashboard({ onBack }) {
         const monthSum = salesData.filter(item => getKSTDateStr(item.created_at).startsWith(monthKST)).reduce((acc, cur) => acc + cur.total_price, 0);
         const filteredTotal = filteredData.reduce((acc, cur) => acc + cur.total_price, 0);
 
-        return { today: todaySum, month: monthSum, count: filteredData.length, filteredTotal: filteredTotal };
+        return {today: todaySum, month: monthSum, count: filteredData.length, filteredTotal: filteredTotal};
     }, [salesData, filteredData]);
 
     // ---------------------------------------------------------
@@ -140,7 +140,7 @@ function SalesDashboard({ onBack }) {
             '메뉴명': item.menu_name,
             '수량': item.quantity,
             '결제금액': item.total_price,
-            '결제수단': item.payment_method === 'bank' ? '계좌이체' : '현금',
+            '결제수단': item.payment_method === 'bank' ? '계좌이체' : (item.payment_method === 'event' ? '이벤트' : '현금'),
             '담당자': item.staff_name
         }));
         const ws = XLSX.utils.json_to_sheet(excelData);
@@ -155,7 +155,7 @@ function SalesDashboard({ onBack }) {
         setSelectedDay('all');
         setSelectedHour('all');
         setSelectedPaymentMethod('all');
-        setSortConfig({ key: null, direction: 'default' });
+        setSortConfig({key: null, direction: 'default'});
     };
 
     // 드롭다운 옵션 동적 생성
@@ -179,7 +179,7 @@ function SalesDashboard({ onBack }) {
     // ---------------------------------------------------------
     if (loading) return <div style={{padding: '50px', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터를 불러오는
         중입니다...</div>;
-    if (showAdvanced) return <AdvancedStats onBack={() => setShowAdvanced(false)} />;
+    if (showAdvanced) return <AdvancedStats onBack={() => setShowAdvanced(false)}/>;
 
     return (
         <div className="sales-container">
@@ -190,10 +190,12 @@ function SalesDashboard({ onBack }) {
                 .header-left, .header-right { display: flex; align-items: center; gap: 10px; }
                 .sales-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
                 
-                .btn-back, .btn-advanced, .btn-excel { padding: 10px 15px; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; color: white; display: flex; align-items: center; gap: 5px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+                .btn-back, .btn-advanced, .btn-excel, .btn-refresh { padding: 10px 15px; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; color: white; display: flex; align-items: center; gap: 5px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+                .btn-back:active, .btn-advanced:active, .btn-excel:active, .btn-refresh:active { opacity: 0.8; }
                 .btn-back { background-color: #6c757d; }
                 .btn-advanced { background-color: #673ab7; }
                 .btn-excel { background-color: #217346; }
+                .btn-refresh { background-color: #0284c7; }
                 
                 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; flex-shrink: 0; }
                 .stat-card { background-color: var(--card-bg, white); padding: 25px 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; transition: background-color 0.3s; }
@@ -216,6 +218,7 @@ function SalesDashboard({ onBack }) {
                 .pay-badge { padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; }
                 .pay-cash { background-color: rgba(46, 125, 50, 0.1); color: #2e7d32; }
                 .pay-bank { background-color: rgba(237, 108, 2, 0.1); color: #ed6c02; }
+                .pay-event { background-color: rgba(0, 123, 255, 0.1); color: #007bff; }
                 .btn-del { padding: 6px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; }
                 
                 .sales-card-view { display: none; }
@@ -225,6 +228,7 @@ function SalesDashboard({ onBack }) {
                 [data-theme='dark'] .stat-val.blue { color: #4facfe; }
                 [data-theme='dark'] .pay-cash { background-color: rgba(76, 175, 80, 0.15); color: #81c784; }
                 [data-theme='dark'] .pay-bank { background-color: rgba(255, 152, 0, 0.15); color: #ffb74d; }
+                [data-theme='dark'] .pay-event { background-color: rgba(0, 123, 255, 0.15); color: #66b2ff; }
                 [data-theme='dark'] .btn-del { background-color: rgba(220, 53, 69, 0.2); color: #ff8a80; }
 
                 /* 모바일 반응형 */
@@ -261,6 +265,7 @@ function SalesDashboard({ onBack }) {
                 </div>
                 <div className="header-right">
                     <div className="theme-wrapper"><ThemeToggle/></div>
+                    <button onClick={fetchSales} className="btn-refresh">🔄 새로고침</button>
                     <button onClick={() => setShowAdvanced(true)} className="btn-advanced">📊 고급 통계</button>
                     <button onClick={exportExcel} className="btn-excel">📗 엑셀 다운로드</button>
                 </div>
@@ -319,21 +324,34 @@ function SalesDashboard({ onBack }) {
                             </select>
                         </div>
                         <div className="filter-row bottom-row">
-                            <select value={selectedYear} onChange={(e) => { setSelectedYear(e.target.value); setSelectedMonth('all'); setSelectedDay('all'); setSelectedHour('all'); }} className="filter-select">
+                            <select value={selectedYear} onChange={(e) => {
+                                setSelectedYear(e.target.value);
+                                setSelectedMonth('all');
+                                setSelectedDay('all');
+                                setSelectedHour('all');
+                            }} className="filter-select">
                                 <option value="all">연도 선택</option>
                                 {getAvailableYears().map(year => (<option key={year} value={year}>{year}년</option>))}
                             </select>
-                            <select value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setSelectedDay('all'); setSelectedHour('all'); }} className="filter-select" disabled={selectedYear === 'all'}>
+                            <select value={selectedMonth} onChange={(e) => {
+                                setSelectedMonth(e.target.value);
+                                setSelectedDay('all');
+                                setSelectedHour('all');
+                            }} className="filter-select" disabled={selectedYear === 'all'}>
                                 <option value="all">월 선택</option>
                                 {getAvailableMonths().map(month => (
                                     <option key={String(month)} value={String(month)}>{month}월</option>))}
                             </select>
-                            <select value={selectedDay} onChange={(e) => { setSelectedDay(e.target.value); setSelectedHour('all'); }} className="filter-select" disabled={selectedMonth === 'all'}>
+                            <select value={selectedDay} onChange={(e) => {
+                                setSelectedDay(e.target.value);
+                                setSelectedHour('all');
+                            }} className="filter-select" disabled={selectedMonth === 'all'}>
                                 <option value="all">일 선택</option>
                                 {getAvailableDays().map(day => (
                                     <option key={String(day)} value={String(day)}>{day}일</option>))}
                             </select>
-                            <select value={selectedHour} onChange={(e) => setSelectedHour(e.target.value)} className="filter-select" disabled={selectedDay === 'all'}>
+                            <select value={selectedHour} onChange={(e) => setSelectedHour(e.target.value)}
+                                    className="filter-select" disabled={selectedDay === 'all'}>
                                 <option value="all">시간 선택</option>
                                 {getAvailableHours().map(hour => (
                                     <option key={String(hour)} value={String(hour)}>{hour}시</option>))}
@@ -385,8 +403,11 @@ function SalesDashboard({ onBack }) {
                                     <td className="text-red"
                                         style={{fontWeight: 'bold'}}>{item.total_price.toLocaleString()}원
                                     </td>
-                                    <td><span
-                                        className={`pay-badge ${item.payment_method === 'bank' ? 'pay-bank' : 'pay-cash'}`}>{item.payment_method === 'bank' ? '🏦 계좌' : '💵 현금'}</span>
+                                    <td>
+                                        <span
+                                            className={`pay-badge ${item.payment_method === 'bank' ? 'pay-bank' : (item.payment_method === 'event' ? 'pay-event' : 'pay-cash')}`}>
+                                            {item.payment_method === 'bank' ? '🏦 계좌' : (item.payment_method === 'event' ? '🎁 이벤트' : '💵 현금')}
+                                        </span>
                                     </td>
                                     <td className="text-blue" style={{fontWeight: 'bold'}}>{item.staff_name || '-'}</td>
                                     <td>
@@ -439,7 +460,9 @@ function SalesDashboard({ onBack }) {
                                     }}>👤 {item.staff_name || '-'}</span>
                                     <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                                         <span
-                                            className={`pay-badge ${item.payment_method === 'bank' ? 'pay-bank' : 'pay-cash'}`}>{item.payment_method === 'bank' ? '🏦 계좌' : '💵 현금'}</span>
+                                            className={`pay-badge ${item.payment_method === 'bank' ? 'pay-bank' : (item.payment_method === 'event' ? 'pay-event' : 'pay-cash')}`}>
+                                            {item.payment_method === 'bank' ? '🏦 계좌' : (item.payment_method === 'event' ? '🎁 이벤트' : '💵 현금')}
+                                        </span>
                                         <button onClick={() => handleDelete(item.id)} className="btn-del">삭제</button>
                                     </div>
                                 </div>
