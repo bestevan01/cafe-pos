@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 
-function SettlementDashboard({ onBack }) {
+function SettlementDashboard({onBack}) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -23,7 +23,7 @@ function SettlementDashboard({ onBack }) {
 
     const fetchSettlements = async () => {
         try {
-            const res = await axios.get('/api/admin/settlements', getAuthHeader());
+            const res = await axios.get('/api/settlements/history', getAuthHeader());
             setSettlements(res.data);
             setLoading(false);
         } catch (err) {
@@ -103,7 +103,7 @@ function SettlementDashboard({ onBack }) {
                     <h1 className="settle-title">💰 시재/정산 관리</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle />
+                    <ThemeToggle/>
                 </div>
             </div>
 
