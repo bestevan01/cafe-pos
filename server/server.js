@@ -24,6 +24,7 @@ const statsRoutes = require('./routes/stats.routes');
 const passkeyRoutes = require('./routes/passkey.routes');
 const healthRoutes = require('./routes/health.routes');
 
+const notFound = require('./middlewares/notFound');
 const errorHandler = require('./middlewares/errorHandler');
 
 const setupSocketHandlers = require('./sockets/socketHandlers')
@@ -94,6 +95,9 @@ app.use('/api/settlements', settlementRoutes);
 
 // 상태 확인용 API (Health Check)
 app.use('/ping', healthRoutes);
+
+// 매칭되는 라우트가 없을 때 (404)
+app.use(notFound);
 
 // 전역 에러 처리 미들웨어
 app.use(errorHandler);
