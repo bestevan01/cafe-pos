@@ -9,11 +9,19 @@ const kitchenUsers = new Set();
 module.exports = (io) => {
     // 핸드셰이크 단계에서 JWT를 검증해야만 소켓 연결을 허용합니다.
     io.use((socket, next) => {
+        // 인증 실패 에러에는 type:'auth' 표시를 달아, 클라이언트가
+        // 일시적 네트워크 오류와 구분해 '재로그인'을 유도할 수 있게 한다.
+        const authError = (message) => {
+            const err = new Error(message);
+            err.data = {type: 'auth'};
+            return err;
+        };
+
         const token = socket.handshake.auth && socket.handshake.auth.token;
-        if (!token) return next(new Error('인증 토큰이 없습니다.'));
+        if (!token) return next(authError('인증 토큰이 없습니다.'));
 
         jwt.verify(token, JWT_SECRET, (err, user) => {
-            if (err) return next(new Error('유효하지 않은 토큰입니다.'));
+            if (err) return next(authError('유효하지 않은 토큰입니다.'));
             socket.data.user = user; // 검증된 신원을 소켓에 저장
             next();
         });

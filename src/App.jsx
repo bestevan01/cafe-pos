@@ -123,9 +123,20 @@ function App() {
             });
         };
 
+        // 인증 실패(만료/위조 토큰)로 연결이 거부된 경우에만 재로그인 유도.
+        // 일시적 네트워크 오류는 type 표시가 없으므로 무시 → socket.io가 자동 재시도.
+        const handleAuthError = (err) => {
+            if (err?.data?.type === 'auth') {
+                socket.disconnect(); // 무한 재시도 중단
+                alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+                handleLogout();
+            }
+        };
+
         if (socket.connected) registerMyUser();
         else socket.connect(); // 로그인 상태면 소켓 연결 시작 (핸드셰이크에 토큰 전송)
         socket.on('connect', registerMyUser);
+        socket.on('connect_error', handleAuthError);
 
         socket.on('cashier_status', (isTaken) => setIsCashierTaken(isTaken));
         socket.on('kitchen_status', (isActive) => setIsKitchenActive(isActive));
@@ -133,11 +144,12 @@ function App() {
 
         return () => {
             socket.off('connect', registerMyUser);
+            socket.off('connect_error', handleAuthError);
             socket.off('user_count');
             socket.off('cashier_status');
             socket.off('kitchen_status');
         };
-    }, [auth.isLoggedIn, auth.user]);
+    }, [auth.isLoggedIn, auth.user, handleLogout]);
 
     // ---------------------------------------------------------
     // [4] 렌더링 로직 (Render Logic)
