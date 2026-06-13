@@ -48,6 +48,7 @@ const CORS_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : "http://localhos
 // [3] Express App 및 Socket.IO 초기화 (Init)
 // ---------------------------------------------------------
 const app = express();
+app.set('trust proxy', 1); // Render 등 리버스 프록시 뒤에서 req.ip가 실제 클라이언트 IP가 되도록
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {origin: CORS_ORIGIN, methods: ["GET", "POST"]}
