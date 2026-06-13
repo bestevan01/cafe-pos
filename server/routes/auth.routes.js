@@ -103,7 +103,7 @@ router.get('/admin/users', authenticateToken, requireAdmin, async (req, res) => 
 
 router.patch('/admin/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
     const {id} = req.params;
-    const {role} = req.params;
+    const {role} = req.body;
     try {
         await pool.query('UPDATE users SET role = ? WHERE id = ?', [role, id]);
         res.json({success: true});
