@@ -85,7 +85,7 @@ app.use('/api', authRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/passkeys', passkeyRoutes);
+app.use('/api', passkeyRoutes);
 
 // 관리자, 정산 및 통계 API
 app.use('/api/admin/sales', salesRoutes);

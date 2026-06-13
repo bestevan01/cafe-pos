@@ -17,7 +17,7 @@ const currentChallenges = {}; // 챌린지 임시 저장소
 const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
 const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
 
-router.get('/register-options', authenticateToken, async (req, res) => {
+router.get('/passkey/register-options', authenticateToken, async (req, res) => {
     const {userId} = req.query;
 
     try {
@@ -60,7 +60,7 @@ router.get('/register-options', authenticateToken, async (req, res) => {
     }
 });
 
-router.post('/register-verify', authenticateToken, async (req, res) => {
+router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
     const {userId, body} = req.body;
     const expectedChallenge = currentChallenges[userId];
 
@@ -120,7 +120,7 @@ router.post('/register-verify', authenticateToken, async (req, res) => {
     }
 });
 
-router.get('/login-options', async (req, res) => {
+router.get('/passkey/login-options', async (req, res) => {
     try {
         const options = await generateAuthenticationOptions({
             rpID: RP_ID,
@@ -138,7 +138,7 @@ router.get('/login-options', async (req, res) => {
     }
 });
 
-router.post('/login-verify', async (req, res) => {
+router.post('/passkey/login-verify', async (req, res) => {
     const {body} = req.body;
 
     try {
@@ -194,7 +194,7 @@ router.post('/login-verify', async (req, res) => {
     }
 });
 
-router.get('s', authenticateToken, async (req, res) => {
+router.get('/passkeys', authenticateToken, async (req, res) => {
     const {userId} = req.query;
     try {
         const [rows] = await pool.query(
@@ -212,7 +212,7 @@ router.get('s', authenticateToken, async (req, res) => {
     }
 });
 
-router.delete('s/:id', authenticateToken, async (req, res) => {
+router.delete('/passkeys/:id', authenticateToken, async (req, res) => {
     const {id} = req.params;
     try {
         await pool.query('DELETE FROM passkeys WHERE id = ?', [id]);
