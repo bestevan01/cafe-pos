@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const {authenticateToken, requireAdmin} = require("../middlewares/auth");
+const debugInfo = require("../utils/debugInfo");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -21,7 +22,7 @@ router.post('/register', async (req, res) => {
         res.status(500).json({
             success: false,
             message: '중복 아이디 또는 오류 발생',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -52,7 +53,7 @@ router.post('/login', async (req, res) => {
         res.status(500).json({
             success: false,
             message: '서버 에러',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -82,7 +83,7 @@ router.patch('/users/:id/password', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '서버 에러',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -96,7 +97,7 @@ router.get('/admin/users', authenticateToken, requireAdmin, async (req, res) => 
         res.status(500).json({
             success: false,
             message: '유저 목록을 불러오지 못했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -112,7 +113,7 @@ router.patch('/admin/users/:id/role', authenticateToken, requireAdmin, async (re
         res.status(500).json({
             success: false,
             message: '권한 변경에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -127,7 +128,7 @@ router.delete('/admin/users/:id', authenticateToken, requireAdmin, async (req, r
         res.status(500).json({
             success: false,
             message: '계정 삭제 실패',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });

@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router();
 const pool = require("../config/db");
 const {authenticateToken, requireAdmin} = require("../middlewares/auth");
+const debugInfo = require("../utils/debugInfo");
 
 router.get('', authenticateToken, async (req, res) => {
     try {
@@ -12,7 +13,7 @@ router.get('', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '메뉴 목록을 불러오는 중 오류가 발생했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -27,7 +28,7 @@ router.post('', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '메뉴 추가 중 오류가 발생했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -67,7 +68,7 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '메뉴 수정 중 오류가 발생했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -82,7 +83,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '메뉴 삭제 중 오류가 발생했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });

@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router();
 const pool = require("../config/db");
 const {authenticateToken, requireAdmin} = require("../middlewares/auth");
+const debugInfo = require("../utils/debugInfo");
 
 router.get('/status', authenticateToken, async (req, res) => {
     try {
@@ -18,7 +19,7 @@ router.get('/status', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '시재 점검 상태를 확인하지 못했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -32,7 +33,7 @@ router.post('/open', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '영업 시작(오픈) 처리에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -56,7 +57,7 @@ router.get('/calc', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '마감 정산 금액을 계산하지 못했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -79,7 +80,7 @@ router.post('/close', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '영업 종료(마감) 처리에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -93,7 +94,7 @@ router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '정산 내역을 불러오지 못했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });

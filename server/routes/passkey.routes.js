@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 const {authenticateToken} = require("../middlewares/auth");
+const debugInfo = require("../utils/debugInfo");
 const {
     generateRegistrationOptions,
     verifyRegistrationResponse,
@@ -55,7 +56,7 @@ router.get('/passkey/register-options', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '패스키 등록 옵션 생성에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -115,7 +116,7 @@ router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '패스키 등록 검증 중 서버 오류가 발생했습니다.',
-            debug_info: error.message
+            debug_info: debugInfo(error)
         });
     }
 });
@@ -133,7 +134,7 @@ router.get('/passkey/login-options', async (req, res) => {
         res.status(500).json({
             success: false,
             message: '패스키 로그인 옵션 생성에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -189,7 +190,7 @@ router.post('/passkey/login-verify', async (req, res) => {
         res.status(400).json({
             success: false,
             message: '로그인 검증 중 오류가 발생했습니다.',
-            debug_info: error.message
+            debug_info: debugInfo(error)
         });
     }
 });
@@ -207,7 +208,7 @@ router.get('/passkeys', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '패스키 목록 조회에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -222,7 +223,7 @@ router.delete('/passkeys/:id', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '패스키 삭제에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });

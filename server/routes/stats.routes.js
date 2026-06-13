@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db')
 const {authenticateToken, requireAdmin} = require('../middlewares/auth')
+const debugInfo = require('../utils/debugInfo')
 
 router.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {
@@ -25,7 +26,7 @@ router.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res)
         res.status(500).json({
             success: false,
             message: '통계 데이터를 집계하는 중 오류가 발생했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });

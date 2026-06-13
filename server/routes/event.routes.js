@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router();
 const pool = require('../config/db')
 const {authenticateToken, requireAdmin} = require('../middlewares/auth')
+const debugInfo = require('../utils/debugInfo')
 
 router.get('/', authenticateToken, async (req, res) => {
     try {
@@ -24,7 +25,7 @@ router.get('/', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '이벤트 조회에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -49,7 +50,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '이벤트 등록에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -66,7 +67,7 @@ router.patch('/:id/toggle', authenticateToken, requireAdmin, async (req, res) =>
         res.status(500).json({
             success: false,
             message: '이벤트 상태 변경에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -82,7 +83,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '이벤트 삭제에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });

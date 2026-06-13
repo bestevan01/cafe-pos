@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const {authenticateToken, requireAdmin} = require("../middlewares/auth");
+const debugInfo = require("../utils/debugInfo");
 
 router.get('', authenticateToken, requireAdmin, async (req, res) => {
     try {
@@ -12,7 +13,7 @@ router.get('', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '매출 내역을 불러오지 못했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -45,7 +46,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '매출 내역 삭제에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });

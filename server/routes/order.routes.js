@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router();
 const pool = require("../config/db");
 const {authenticateToken} = require("../middlewares/auth");
+const debugInfo = require("../utils/debugInfo");
 
 router.post('', authenticateToken, async (req, res) => {
     const {items, force, paymentMethod, staff_name, applied_event_id, applied_event_qty} = req.body;
@@ -109,7 +110,7 @@ router.post('', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '주문 처리에 실패했습니다.',
-            debug_info: error.message
+            debug_info: debugInfo(error)
         });
     } finally {
         if (conn) conn.release();
@@ -125,7 +126,7 @@ router.get('', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '주문 목록을 불러오지 못했습니다.',
-            debug_info: error.message
+            debug_info: debugInfo(error)
         });
     }
 });
@@ -145,7 +146,7 @@ router.patch('/:display_id/deliver', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '주문 전달 처리에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -163,7 +164,7 @@ router.patch('/:display_id/complete', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '주문 완료 처리에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -183,7 +184,7 @@ router.patch('/:display_id/pay', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '결제 처리에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -201,7 +202,7 @@ router.patch('/:display_id/complete_kitchen', authenticateToken, async (req, res
         res.status(500).json({
             success: false,
             message: '주방 조리 완료 처리에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
@@ -239,7 +240,7 @@ router.delete('/:display_id', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '주문 취소에 실패했습니다.',
-            debug_info: err.message
+            debug_info: debugInfo(err)
         });
     }
 });
