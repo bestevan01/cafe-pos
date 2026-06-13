@@ -4,7 +4,7 @@ const pool = require('../config/db')
 const {authenticateToken, requireAdmin} = require('../middlewares/auth')
 const debugInfo = require('../utils/debugInfo')
 
-router.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [itemRows] = await pool.query(`SELECT menu_name,
                                                     SUM(quantity)    as total_qty,
