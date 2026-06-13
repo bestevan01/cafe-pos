@@ -2,8 +2,10 @@ import {useState, useEffect} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import axios from 'axios';
 import {socket} from '../../utils/socket';
+import {useNotification} from '../../hooks/useNotification';
 
 function OnePersonMode({onlyOrder = false, isCashier = false}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -226,7 +228,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
     // [5] 주문 및 상태 관리 핸들러
     // ---------------------------------------------------------
     const submitOrder = async (isForced = false) => {
-        if (cart.length === 0) return alert("메뉴를 하나 이상 선택해주세요!");
+        if (cart.length === 0) return notify("메뉴를 하나 이상 선택해주세요!", {icon: '⚠️'});
 
         const itemsToSend = [];
 
@@ -301,13 +303,13 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 setCart([]);
                 setSelectedEventId(null);
             } else if (res.data.message) {
-                alert(res.data.message);
+                notify(res.data.message, {icon: '⚠️'});
                 await fetchActiveEvents();
             } else if (res.data.isDuplicate) {
-                if (window.confirm("⚠️ 중복 주문 감지! 그래도 등록하시겠습니까?")) await submitOrder(true);
+                if (await confirm("그래도 등록하시겠습니까?", {title: "⚠️ 중복 주문 감지", confirmText: "등록"})) await submitOrder(true);
             }
         } catch (err) {
-            alert("주문 전송 실패");
+            notify("주문 전송 실패", {icon: '⚠️'});
         }
     };
 
@@ -319,7 +321,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
             await axios.patch(apiPath, {paymentMethod: method}, getAuthHeader());
             if (!overrideId) setPaymentCheckId(null);
         } catch (err) {
-            alert("처리 실패: " + err.message);
+            notify("처리 실패: " + err.message, {icon: '⚠️'});
         }
     };
 
@@ -330,7 +332,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
         }
     };
     const handleDelete = async (displayId) => {
-        if (!window.confirm("⚠️ 정말 삭제하시겠습니까?")) return;
+        if (!(await confirm("정말 삭제하시겠습니까?", {title: "⚠️ 주문 삭제", confirmText: "삭제", danger: true}))) return;
         try {
             await axios.delete(`/api/orders/${displayId}`, getAuthHeader());
         } catch (err) {

@@ -1,6 +1,8 @@
-import { socket } from '../../utils/socket';
+import {socket} from '../../utils/socket';
+import {useNotification} from '../../hooks/useNotification';
 
-function RoleSelection({ onSelectRole, isCashierTaken }) {
+function RoleSelection({onSelectRole, isCashierTaken}) {
+    const {notify} = useNotification();
 
     // ---------------------------------------------------------
     // [1] 이벤트 핸들러
@@ -10,7 +12,7 @@ function RoleSelection({ onSelectRole, isCashierTaken }) {
         socket.emit('claim_cashier');
         socket.once('cashier_claimed', (success) => {
             if (success) onSelectRole('cashier');
-            else alert("이미 다른 사람이 캐셔를 보고 있습니다!");
+            else notify("이미 다른 사람이 캐셔를 보고 있습니다!", {icon: '⚠️'});
         });
     };
 

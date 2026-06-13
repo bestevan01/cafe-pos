@@ -5,9 +5,27 @@ import MenuDashboard from './MenuDashboard';
 import EventDashboard from './EventDashboard';
 import UsersDashboard from './UsersDashboard';
 import ThemeToggle from '../../components/ThemeToggle';
+import {socket} from '../../utils/socket';
+import {useNotification} from '../../hooks/useNotification';
 
-function AdminDashboard({ onLogout, onEditProfile }) {
+function AdminDashboard({onLogout, onEditProfile}) {
     const [view, setView] = useState('home');
+    const {notify, confirm} = useNotification();
+
+    // 데드 스위치: 캐셔 잠금이 꼬여 아무도 접속하지 못할 때 강제 해제
+    const handleForceReleaseCashier = async () => {
+        const ok = await confirm(
+            "현재 정상적으로 캐셔를 사용 중인 직원이 있다면 충돌할 수 있습니다.\n" +
+            "캐셔 자리가 멈춰서 아무도 접속하지 못할 때만 사용하세요.",
+            {title: "🚨 캐셔 잠금 강제 해제", confirmText: "강제 해제", danger: true}
+        );
+        if (!ok) return;
+
+        socket.emit('force_release_cashier', (res) => {
+            if (res?.success) notify("캐셔 잠금을 해제했습니다. 이제 직원이 캐셔로 접속할 수 있습니다.", {icon: "✅"});
+            else notify("해제 실패: " + (res?.message || "알 수 없는 오류"), {icon: "⚠️"});
+        });
+    };
 
     // 화면 전환 라우팅
     if (view === 'sales') return <SalesDashboard onBack={() => setView('home')}/>;
@@ -81,6 +99,16 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                 .card-title { font-size: 1.3rem; font-weight: bold; color: var(--text-primary, #333); margin-bottom: 8px; }
                 .card-desc { font-size: 0.95rem; color: var(--text-secondary, #888); word-break: keep-all; }
 
+                /* 비상용 캐셔 강제 해제 버튼 */
+                .btn-force-release {
+                    padding: 12px 20px; background-color: transparent;
+                    color: #dc3545; border: 1px solid #dc3545; border-radius: var(--radius-md);
+                    font-weight: bold; font-size: 0.95rem; cursor: pointer;
+                    transition: background-color 0.2s, transform 0.1s;
+                }
+                .btn-force-release:hover { background-color: rgba(220,53,69,0.08); }
+                .btn-force-release:active { transform: scale(0.97); }
+
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
                     .top-right-header { top: 10px; right: 10px; gap: 8px; }
@@ -130,6 +158,11 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                         <div className="card-desc">가입 승인 및 권한 설정</div>
                     </button>
                 </div>
+
+                {/* 운영 도구: 캐셔 잠금이 꼬였을 때 비상 해제 */}
+                <button onClick={handleForceReleaseCashier} className="btn-force-release">
+                    🚨 캐셔 강제 해제 (비상용)
+                </button>
             </div>
         </div>
     );

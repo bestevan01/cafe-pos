@@ -1,8 +1,10 @@
 import {useState} from 'react';
 import axios from 'axios';
 import {useSystemTheme} from "../../hooks/useSystemTheme.js";
+import {useNotification} from '../../hooks/useNotification';
 
-function Register({ onSwitchToLogin }) {
+function Register({onSwitchToLogin}) {
+    const {notify} = useNotification();
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -14,28 +16,28 @@ function Register({ onSwitchToLogin }) {
     useSystemTheme();
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        setFormData({...formData, [e.target.name]: e.target.value});
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (formData.password !== formData.confirmPassword) {
-            alert("비밀번호가 일치하지 않습니다. 다시 확인해주세요.");
+            notify("비밀번호가 일치하지 않습니다. 다시 확인해주세요.", {icon: '⚠️'});
             return;
         }
 
         try {
             // API 전송 시 비밀번호 확인 필드는 제외
-            const { confirmPassword, ...submitData } = formData;
+            const {confirmPassword, ...submitData} = formData;
 
             const res = await axios.post('/api/register', submitData);
             if (res.data.success) {
-                alert(res.data.message);
+                notify(res.data.message, {icon: '✅'});
                 onSwitchToLogin();
             }
         } catch (err) {
-            alert(err.response?.data?.message || "회원가입 실패");
+            notify(err.response?.data?.message || "회원가입 실패", {icon: '⚠️'});
         }
     };
 

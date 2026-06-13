@@ -1,0 +1,181 @@
+import {useState, useCallback, useMemo, useEffect} from 'react';
+import {createPortal} from 'react-dom';
+import {motion, AnimatePresence} from 'framer-motion';
+import {NotificationContext} from '../hooks/useNotification';
+
+/**
+ * 전역 알림 시스템.
+ * - notify(message, options?)  : 오른쪽 상단 토스트 (alert 대체, 논블로킹). 토스트 id 반환.
+ *      options = { icon, title, duration(ms, 0이면 수동 닫기) }
+ * - confirm(message, options?) : 중앙 확인 다이얼로그 (window.confirm 대체). Promise<boolean> 반환.
+ *      options = { title, confirmText, cancelText, danger }
+ *
+ * 호출은 useNotification 훅으로 한다 (src/hooks/useNotification.js).
+ */
+let idCounter = 0;
+
+export function NotificationProvider({children}) {
+    const [toasts, setToasts] = useState([]);
+    const [confirmState, setConfirmState] = useState(null); // { message, title, confirmText, cancelText, danger, resolve }
+
+    const removeToast = useCallback((id) => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+    }, []);
+
+    const notify = useCallback((message, options = {}) => {
+        const id = ++idCounter;
+        const duration = options.duration ?? 3000;
+        setToasts(prev => [...prev, {id, message, icon: options.icon, title: options.title, loading: options.loading}]);
+        if (duration > 0) setTimeout(() => removeToast(id), duration);
+        return id;
+    }, [removeToast]);
+
+    // 이미 떠 있는 토스트 내용 갱신 (예: 로딩 중 메시지 변경)
+    const update = useCallback((id, patch) => {
+        setToasts(prev => prev.map(t => t.id === id ? {...t, ...patch} : t));
+    }, []);
+
+    const confirm = useCallback((message, options = {}) => {
+        return new Promise((resolve) => {
+            setConfirmState({
+                message,
+                title: options.title ?? '확인',
+                confirmText: options.confirmText ?? '확인',
+                cancelText: options.cancelText ?? '취소',
+                danger: options.danger ?? false,
+                resolve,
+            });
+        });
+    }, []);
+
+    const closeConfirm = useCallback((result) => {
+        setConfirmState(prev => {
+            if (prev) prev.resolve(result);
+            return null;
+        });
+    }, []);
+
+    // 다이얼로그 열렸을 때: Enter=확인 / Esc=취소, 배경 스크롤 잠금
+    useEffect(() => {
+        if (!confirmState) return;
+        const onKey = (e) => {
+            if (e.key === 'Enter') closeConfirm(true);
+            else if (e.key === 'Escape') closeConfirm(false);
+        };
+        window.addEventListener('keydown', onKey);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [confirmState, closeConfirm]);
+
+    const value = useMemo(() => ({
+        notify,
+        update,
+        dismiss: removeToast,
+        confirm
+    }), [notify, update, removeToast, confirm]);
+
+    return (
+        <NotificationContext.Provider value={value}>
+            {children}
+            {createPortal(
+                <>
+                    <style>{`
+                        /* ===== 토스트 스택 (오른쪽 상단) ===== */
+                        .ntf-toast-stack { position: fixed; top: 20px; right: 20px; z-index: 12000; display: flex; flex-direction: column; gap: 10px; max-width: calc(100vw - 40px); pointer-events: none; }
+                        .ntf-toast {
+                            pointer-events: auto;
+                            display: flex; align-items: center; gap: 12px;
+                            width: 340px; max-width: 100%;
+                            padding: 14px 16px;
+                            background-color: var(--card-bg, #fff); color: var(--text-primary, #333);
+                            border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+                            border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+                            backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+                            box-sizing: border-box;
+                        }
+                        .ntf-toast-icon { flex-shrink: 0; font-size: 1.6rem; line-height: 1; }
+                        .ntf-toast-spinner { flex-shrink: 0; width: 24px; height: 24px; border: 3px solid var(--border-color, #e0e0e0); border-top-color: #007bff; border-radius: 50%; animation: ntf-spin 0.8s linear infinite; }
+                        @keyframes ntf-spin { to { transform: rotate(360deg); } }
+                        .ntf-toast-text { flex: 1; min-width: 0; text-align: left; }
+                        .ntf-toast-title { margin: 0 0 2px 0; font-size: 0.95rem; font-weight: 700; }
+                        .ntf-toast-msg { margin: 0; font-size: 0.88rem; color: var(--text-secondary, #666); line-height: 1.4; white-space: pre-line; word-break: keep-all; }
+                        .ntf-toast-close { flex-shrink: 0; align-self: flex-start; background: none; border: none; color: var(--text-secondary, #999); font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 2px 4px; }
+
+                        /* ===== 확인 다이얼로그 (중앙) ===== */
+                        .ntf-dialog-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,0.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 12000; padding: 20px; box-sizing: border-box; animation: ntf-fade 0.15s ease; }
+                        @keyframes ntf-fade { from { opacity: 0; } to { opacity: 1; } }
+                        .ntf-dialog { background-color: var(--card-bg, #fff); color: var(--text-primary, #333); border: 1px solid var(--border-color, transparent); border-radius: var(--radius-lg, 16px); box-shadow: 0 10px 30px rgba(0,0,0,0.25); width: 100%; max-width: 360px; padding: 26px 24px; text-align: center; box-sizing: border-box; animation: ntf-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+                        @keyframes ntf-pop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+                        .ntf-dialog-title { margin: 0 0 10px 0; font-size: 1.2rem; font-weight: 700; }
+                        .ntf-dialog-msg { margin: 0 0 22px 0; font-size: 0.95rem; color: var(--text-secondary, #666); line-height: 1.55; white-space: pre-line; word-break: keep-all; }
+                        .ntf-dialog-actions { display: flex; gap: 10px; }
+                        .ntf-btn { flex: 1; padding: 13px; border: none; border-radius: var(--radius-md, 10px); font-size: 1rem; font-weight: bold; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
+                        .ntf-btn:active { transform: scale(0.97); }
+                        .ntf-btn-cancel { background-color: var(--border-color, #e9ecef); color: var(--text-primary, #333); }
+                        .ntf-btn-confirm { background-color: #007bff; color: #fff; }
+                        .ntf-btn-danger { background-color: #dc3545; color: #fff; }
+
+                        @media (max-width: 480px) {
+                            .ntf-toast-stack { top: 12px; right: 12px; left: 12px; }
+                            .ntf-toast { width: 100%; }
+                        }
+                    `}</style>
+
+                    <div className="ntf-toast-stack">
+                        <AnimatePresence initial={true}>
+                            {toasts.map(t => (
+                                <motion.div
+                                    key={t.id}
+                                    className="ntf-toast"
+                                    role="status"
+                                    layout
+                                    initial={{opacity: 0, x: 24, scale: 0.96}}
+                                    animate={{opacity: 1, x: 0, scale: 1}}
+                                    exit={{opacity: 0, x: 24, scale: 0.9}}
+                                    transition={{duration: 0.25, ease: [0.16, 1, 0.3, 1]}}
+                                >
+                                    {t.loading
+                                        ? <span className="ntf-toast-spinner"/>
+                                        : (t.icon && <span className="ntf-toast-icon">{t.icon}</span>)}
+                                    <div className="ntf-toast-text">
+                                        {t.title && <p className="ntf-toast-title">{t.title}</p>}
+                                        <p className="ntf-toast-msg">{t.message}</p>
+                                    </div>
+                                    {!t.loading && <button className="ntf-toast-close" onClick={() => removeToast(t.id)}
+                                                           aria-label="닫기">×</button>}
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </div>
+
+                    {confirmState && (
+                        <div className="ntf-dialog-overlay" onClick={() => closeConfirm(false)}>
+                            <div className="ntf-dialog" role="dialog" aria-modal="true"
+                                 onClick={(e) => e.stopPropagation()}>
+                                <h2 className="ntf-dialog-title">{confirmState.title}</h2>
+                                <p className="ntf-dialog-msg">{confirmState.message}</p>
+                                <div className="ntf-dialog-actions">
+                                    <button className="ntf-btn ntf-btn-cancel" onClick={() => closeConfirm(false)}>
+                                        {confirmState.cancelText}
+                                    </button>
+                                    <button
+                                        className={`ntf-btn ${confirmState.danger ? 'ntf-btn-danger' : 'ntf-btn-confirm'}`}
+                                        onClick={() => closeConfirm(true)}
+                                        autoFocus
+                                    >
+                                        {confirmState.confirmText}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>,
+                document.body
+            )}
+        </NotificationContext.Provider>
+    );
+}

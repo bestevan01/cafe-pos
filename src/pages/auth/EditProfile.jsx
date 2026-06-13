@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
-import { startRegistration } from '@simplewebauthn/browser';
+import {startRegistration} from '@simplewebauthn/browser';
+import {useNotification} from '../../hooks/useNotification';
 
-function EditProfile({ onBack }) {
+function EditProfile({onBack}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
-    const [user, setUser] = useState({ id: null, name: '', username: '' });
+    const [user, setUser] = useState({id: null, name: '', username: ''});
     const [passkeys, setPasskeys] = useState([]);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({currentPassword: '', newPassword: '', confirmPassword: ''});
@@ -38,10 +40,10 @@ function EditProfile({ onBack }) {
     };
 
     const handleChangePassword = async () => {
-        if (!pwForm.currentPassword || !pwForm.newPassword || !pwForm.confirmPassword) return alert("모든 빈칸을 채워주세요.");
-        if (pwForm.newPassword !== pwForm.confirmPassword) return alert("새 비밀번호가 일치하지 않습니다.");
-        if (pwForm.newPassword.length < 4) return alert("비밀번호는 최소 4자리 이상이어야 합니다.");
-        if (!window.confirm("비밀번호를 변경하시겠습니까?")) return;
+        if (!pwForm.currentPassword || !pwForm.newPassword || !pwForm.confirmPassword) return notify("모든 빈칸을 채워주세요.", {icon: '⚠️'});
+        if (pwForm.newPassword !== pwForm.confirmPassword) return notify("새 비밀번호가 일치하지 않습니다.", {icon: '⚠️'});
+        if (pwForm.newPassword.length < 4) return notify("비밀번호는 최소 4자리 이상이어야 합니다.", {icon: '⚠️'});
+        if (!(await confirm("비밀번호를 변경하시겠습니까?", {confirmText: "변경"}))) return;
 
         try {
             const res = await axios.patch(`/api/users/${user.id}/password`, {
@@ -50,12 +52,12 @@ function EditProfile({ onBack }) {
             }, getAuthHeader());
 
             if (res.data.success) {
-                alert("✅ 비밀번호가 성공적으로 변경되었습니다.");
-                setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                notify("비밀번호가 성공적으로 변경되었습니다.", {icon: '✅'});
+                setPwForm({currentPassword: '', newPassword: '', confirmPassword: ''});
                 setIsChangingPassword(false);
             }
         } catch (err) {
-            alert(err.response?.data?.message || "비밀번호 변경 실패");
+            notify(err.response?.data?.message || "비밀번호 변경 실패", {icon: '⚠️'});
         }
     };
 
@@ -69,8 +71,8 @@ function EditProfile({ onBack }) {
             try {
                 attResp = await startRegistration(resp.data);
             } catch (error) {
-                if (error.name === 'InvalidStateError') alert('이미 등록된 기기입니다!');
-                else if (error.name !== 'NotAllowedError') alert('등록 오류: ' + error.message);
+                if (error.name === 'InvalidStateError') notify('이미 등록된 기기입니다!', {icon: '⚠️'});
+                else if (error.name !== 'NotAllowedError') notify('등록 오류: ' + error.message, {icon: '⚠️'});
                 return;
             }
 
@@ -81,17 +83,19 @@ function EditProfile({ onBack }) {
             if (verificationResp.data.success) {
                 await fetchPasskeys(user.id);
             }
-        } catch (error) { console.error(error); }
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     const handleDeletePasskey = async (credentialId) => {
-        if (!window.confirm("정말 이 기기를 삭제하시겠습니까?")) return;
+        if (!(await confirm("정말 이 기기를 삭제하시겠습니까?", {title: "기기 삭제", confirmText: "삭제", danger: true}))) return;
         try {
             await axios.delete(`/api/passkeys/${credentialId}`, getAuthHeader());
-            alert("삭제되었습니다.");
+            notify("삭제되었습니다.", {icon: '✅'});
             await fetchPasskeys(user.id);
         } catch (err) {
-            alert("삭제 실패: " + err.message);
+            notify("삭제 실패: " + err.message, {icon: '⚠️'});
         }
     };
 
@@ -105,9 +109,9 @@ function EditProfile({ onBack }) {
     // [4] 렌더링 (Render)
     // ---------------------------------------------------------
     return (
-        <div className="ep-container" style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
-                <ThemeToggle />
+        <div className="ep-container" style={{position: 'relative'}}>
+            <div style={{position: 'absolute', top: '20px', right: '20px', zIndex: 1000}}>
+                <ThemeToggle/>
             </div>
 
             <style>
@@ -168,7 +172,8 @@ function EditProfile({ onBack }) {
                                    className="ep-input" autoComplete="new-password"/>
                         </div>
                         <div className="footer-btns">
-                            <button onClick={() => setIsChangingPassword(false)} className="btn-base btn-back">취소</button>
+                            <button onClick={() => setIsChangingPassword(false)} className="btn-base btn-back">취소
+                            </button>
                             <button onClick={handleChangePassword} className="btn-base btn-save">변경 저장</button>
                         </div>
                     </>
@@ -178,15 +183,15 @@ function EditProfile({ onBack }) {
                         <h2 className="ep-header">⚙️ 내 정보 수정</h2>
                         <div className="ep-row">
                             <label className="ep-label">아이디</label>
-                            <input type="text" value={user.username} disabled className="ep-input" />
+                            <input type="text" value={user.username} disabled className="ep-input"/>
                         </div>
                         <div className="ep-row">
                             <label className="ep-label">이름</label>
-                            <input type="text" value={user.name} disabled className="ep-input" />
+                            <input type="text" value={user.name} disabled className="ep-input"/>
                         </div>
                         <button onClick={() => setIsChangingPassword(true)} className="btn-link">비밀번호 변경하기 〉</button>
 
-                        <hr className="divider" />
+                        <hr className="divider"/>
 
                         <div className="passkey-header">
                             <h3 className="passkey-title">🔐 패스키 관리</h3>
@@ -205,9 +210,11 @@ function EditProfile({ onBack }) {
                                     <div key={key.id} className="passkey-item">
                                         <div>
                                             <div className="pk-name">{key['device_name']}</div>
-                                            <div className="pk-date">{new Date(key.created_at).toLocaleDateString()}</div>
+                                            <div
+                                                className="pk-date">{new Date(key.created_at).toLocaleDateString()}</div>
                                         </div>
-                                        <button onClick={() => handleDeletePasskey(key.id)} className="btn-del">삭제</button>
+                                        <button onClick={() => handleDeletePasskey(key.id)} className="btn-del">삭제
+                                        </button>
                                     </div>
                                 ))
                             )}

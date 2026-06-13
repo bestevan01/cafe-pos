@@ -58,6 +58,19 @@ module.exports = (io) => {
             }
         });
 
+        // 데드 스위치: 잠금이 꼬여 아무도 캐셔로 접속하지 못할 때 관리자가 강제 해제.
+        // 소켓 ID와 무관하게 currentCashierId를 비운다. (관리자 전용)
+        socket.on('force_release_cashier', (ack) => {
+            if (socket.data.user?.role !== 'admin') {
+                if (typeof ack === 'function') ack({success: false, message: '관리자 권한이 필요합니다.'});
+                return;
+            }
+            currentCashierId = null;
+            console.log(`[🚨 캐셔 강제 해제] 관리자: ${socket.data.user.username}`);
+            io.emit('cashier_status', false);
+            if (typeof ack === 'function') ack({success: true});
+        });
+
         socket.on('request_state', () => {
             socket.emit('cashier_status', currentCashierId !== null);
             socket.emit('kitchen_status', kitchenUsers.size > 0);

@@ -1,14 +1,16 @@
 import axios from 'axios';
-import { useState, useEffect } from 'react';
+import {useState, useEffect} from 'react';
 import ThemeToggle from '../../components/ThemeToggle';
+import {useNotification} from '../../hooks/useNotification';
 
-function MenuDashboard({ onBack }) {
+function MenuDashboard({onBack}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
     const [menuList, setMenuList] = useState([]);
     const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState({ name: '', price: '', type: 'coffee' });
+    const [formData, setFormData] = useState({name: '', price: '', type: 'coffee'});
 
     // API 권한 토큰
     const getAuthHeader = () => ({
@@ -27,7 +29,7 @@ function MenuDashboard({ onBack }) {
             const res = await axios.get('/api/menu', getAuthHeader());
             setMenuList(res.data);
         } catch (err) {
-            alert("메뉴 불러오기 실패");
+            notify("메뉴 불러오기 실패", {icon: '⚠️'});
         }
     };
 
@@ -35,33 +37,33 @@ function MenuDashboard({ onBack }) {
         e.preventDefault();
         try {
             await axios.post('/api/menu', formData, getAuthHeader());
-            alert("메뉴가 추가되었습니다.");
-            setFormData({ name: '', price: '', type: 'coffee' });
+            notify("메뉴가 추가되었습니다.", {icon: '✅'});
+            setFormData({name: '', price: '', type: 'coffee'});
             await fetchMenu();
         } catch (err) {
-            alert("추가 실패");
+            notify("추가 실패", {icon: '⚠️'});
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("정말 이 메뉴를 삭제하시겠습니까?")) return;
+        if (!(await confirm("정말 이 메뉴를 삭제하시겠습니까?", {title: "메뉴 삭제", confirmText: "삭제", danger: true}))) return;
         try {
             await axios.delete(`/api/menu/${id}`, getAuthHeader());
             await fetchMenu();
         } catch (err) {
-            alert("삭제 실패");
+            notify("삭제 실패", {icon: '⚠️'});
         }
     };
 
     const handleUpdate = async () => {
         try {
             await axios.patch(`/api/menu/${editingId}`, formData, getAuthHeader());
-            alert("수정되었습니다.");
+            notify("수정되었습니다.", {icon: '✅'});
             setEditingId(null);
-            setFormData({ name: '', price: '', type: 'coffee' });
+            setFormData({name: '', price: '', type: 'coffee'});
             await fetchMenu();
         } catch (err) {
-            alert("수정 실패");
+            notify("수정 실패", {icon: '⚠️'});
         }
     };
 
@@ -71,7 +73,7 @@ function MenuDashboard({ onBack }) {
             await axios.patch(`/api/menu/${menu.id}`, {is_soldout: newVal}, getAuthHeader());
             await fetchMenu();
         } catch (err) {
-            alert("상태 변경 실패");
+            notify("상태 변경 실패", {icon: '⚠️'});
         }
     };
 
@@ -176,7 +178,7 @@ function MenuDashboard({ onBack }) {
                     <h1 className="menu-title">📋 메뉴 관리</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle />
+                    <ThemeToggle/>
                 </div>
             </div>
 
@@ -230,13 +232,15 @@ function MenuDashboard({ onBack }) {
                                 <td>{menu.price.toLocaleString()}원</td>
                                 <td><span className="badge-type">{menu.type}</span></td>
                                 <td>
-                                    <button onClick={() => toggleSoldOut(menu)} className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
+                                    <button onClick={() => toggleSoldOut(menu)}
+                                            className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
                                         {menu.is_soldout ? "🚫 품절" : "🟢 판매중"}
                                     </button>
                                 </td>
                                 <td>
                                     <button onClick={() => startEdit(menu)} className="btn-action btn-edit">수정</button>
-                                    <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">삭제</button>
+                                    <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">삭제
+                                    </button>
                                 </td>
                             </tr>
                         ))}
@@ -255,12 +259,16 @@ function MenuDashboard({ onBack }) {
                                     <div className="menu-card-price">{menu.price.toLocaleString()}원</div>
                                 </div>
                                 <div className="menu-card-actions">
-                                    <button onClick={() => toggleSoldOut(menu)} className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
+                                    <button onClick={() => toggleSoldOut(menu)}
+                                            className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
                                         {menu.is_soldout ? "🚫 품절중" : "🟢 판매중"}
                                     </button>
                                     <div>
-                                        <button onClick={() => startEdit(menu)} className="btn-action btn-edit">수정</button>
-                                        <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">삭제</button>
+                                        <button onClick={() => startEdit(menu)} className="btn-action btn-edit">수정
+                                        </button>
+                                        <button onClick={() => handleDelete(menu.id)}
+                                                className="btn-action btn-del">삭제
+                                        </button>
                                     </div>
                                 </div>
                             </div>

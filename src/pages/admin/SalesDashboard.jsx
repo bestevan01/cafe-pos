@@ -3,8 +3,10 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import AdvancedStats from "./AdvancedStats.jsx";
 import ThemeToggle from '../../components/ThemeToggle';
+import {useNotification} from '../../hooks/useNotification';
 
 function SalesDashboard({onBack}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -43,22 +45,22 @@ function SalesDashboard({onBack}) {
             setLoading(false);
         } catch (err) {
             if (err.response && err.response.status === 401) {
-                alert("로그인 세션이 만료되었습니다.");
+                notify("로그인 세션이 만료되었습니다.", {icon: '🔒'});
             } else {
-                alert("데이터 로딩 실패");
+                notify("데이터 로딩 실패", {icon: '⚠️'});
             }
             setLoading(false);
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('정말 삭제(환불) 처리하시겠습니까?')) return;
+        if (!(await confirm('정말 삭제(환불) 처리하시겠습니까?', {title: '매출 삭제', confirmText: '삭제', danger: true}))) return;
         try {
             await axios.delete(`/api/admin/sales/${id}`, getAuthHeader());
 
             await fetchSales();
         } catch (err) {
-            alert('삭제 실패: 권한이 없거나 오류가 발생했습니다.');
+            notify('삭제 실패: 권한이 없거나 오류가 발생했습니다.', {icon: '⚠️'});
         }
     };
 

@@ -1,16 +1,39 @@
 import {useState} from 'react';
 import axios from 'axios';
-import { startAuthentication } from "@simplewebauthn/browser";
+import {startAuthentication} from "@simplewebauthn/browser";
 import {useSystemTheme} from '../../hooks/useSystemTheme';
+import {useNotification} from '../../hooks/useNotification';
 
-function Login({ onLoginSuccess, onSwitchToRegister }) {
-    const [formData, setFormData] = useState({ username: '', password: '' });
+function Login({onLoginSuccess, onSwitchToRegister}) {
+    const [formData, setFormData] = useState({username: '', password: ''});
+    const [submitting, setSubmitting] = useState(false);
+    const {notify, update, dismiss} = useNotification();
 
     // 로그인 화면은 시스템(OS) 테마 설정을 따름
     useSystemTheme();
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        setFormData({...formData, [e.target.name]: e.target.value});
+    };
+
+    // 서버 응답을 기다리는 동안 로딩 모달 표시.
+    // 4초 넘게 걸리면(콜드 스타트로 추정) 안내 문구를 바꿔 사용자를 안심시킨다.
+    const runWithStatus = async (task) => {
+        setSubmitting(true);
+        const toastId = notify('잠시만 기다려주세요...', {loading: true, title: '로그인 중', duration: 0});
+        const slowTimer = setTimeout(() => {
+            update(toastId, {message: '서버를 깨우는 중이에요. 최대 1분 정도 걸릴 수 있어요 ☕'});
+        }, 4000);
+        try {
+            // [임시/테스트용] 로컬은 응답이 즉시라 로딩 토스트를 볼 수 없어, 개발 모드에서만 10초 지연.
+            // import.meta.env.DEV는 프로덕션 빌드에서 false라 배포본엔 적용되지 않음. 확인 끝나면 이 줄만 삭제.
+            if (import.meta.env.DEV) await new Promise(resolve => setTimeout(resolve, 10000));
+            return await task();
+        } finally {
+            clearTimeout(slowTimer);
+            dismiss(toastId);
+            setSubmitting(false);
+        }
     };
 
     // 로그인 성공 시 공통 처리
@@ -22,33 +45,36 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             username: data.username,
             id: data.id
         }));
+        notify(`${data.name}님, 환영합니다!`, {icon: '✅'});
         onLoginSuccess(data);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (submitting) return; // 중복 제출 방지
         try {
-            const res = await axios.post('/api/login', formData);
+            const res = await runWithStatus(() => axios.post('/api/login', formData));
             if (res.data.success) {
                 handleSuccess(res.data);
             }
         } catch (err) {
-            alert(err.response?.data?.message || "로그인 실패");
+            if (err.code === 'ECONNABORTED') notify("서버 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.", {icon: '⏳'});
+            else notify(err.response?.data?.message || "로그인 실패", {icon: '⚠️'});
         }
     };
 
     const handlePasskeyLogin = async () => {
         try {
-            // 1. 인증 옵션 요청
-            const resp = await axios.get('/api/passkey/login-options');
+            // 1. 인증 옵션 요청 (서버 통신 — 로딩 표시)
+            const resp = await runWithStatus(() => axios.get('/api/passkey/login-options'));
 
-            // 2. 브라우저 인증 시작 (여기서 에러 나면 바로 아래 catch로 점프)
+            // 2. 브라우저 인증 시작 (OS 생체인증 프롬프트 — 로딩 모달은 띄우지 않음)
             const asseResp = await startAuthentication({optionsJSON: resp.data});
 
-            // 3. 서버 검증 요청
-            const verificationResp = await axios.post('/api/passkey/login-verify', {
+            // 3. 서버 검증 요청 (서버 통신 — 로딩 표시)
+            const verificationResp = await runWithStatus(() => axios.post('/api/passkey/login-verify', {
                 body: asseResp,
-            });
+            }));
 
             if (verificationResp.data.success) {
                 handleSuccess(verificationResp.data);
@@ -59,7 +85,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 return;
             }
             console.error(error);
-            alert("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.");
+            notify("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.", {icon: '⚠️'});
         }
     };
 
@@ -107,6 +133,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                     transition: transform 0.1s, background-color 0.2s;
                 }
                 .btn-submit:active { transform: scale(0.97); background-color: #0056b3; }
+                .btn-submit:disabled, .btn-passkey:disabled { opacity: 0.6; cursor: not-allowed; }
                 
                 .divider-container { width: 100%; display: flex; align-items: center; margin: 25px 0 15px 0; }
                 .divider-line { flex: 1; height: 1px; background-color: var(--border-color, #ddd); transition: background-color 0.3s; }
@@ -154,7 +181,9 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                         autoComplete="current-password"
                         required
                     />
-                    <button type="submit" className="btn-submit">로그인</button>
+                    <button type="submit" className="btn-submit" disabled={submitting}>
+                        {submitting ? '로그인 중...' : '로그인'}
+                    </button>
                 </form>
 
                 <div className="divider-container">
@@ -163,7 +192,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                     <div className="divider-line"></div>
                 </div>
 
-                <button onClick={handlePasskeyLogin} className="btn-passkey">
+                <button onClick={handlePasskeyLogin} className="btn-passkey" disabled={submitting}>
                     🔑 패스키(지문/FaceID)로 로그인
                 </button>
 

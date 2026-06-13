@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
+import {useNotification} from '../../hooks/useNotification';
 
-function UsersDashboard({ onBack }) {
+function UsersDashboard({onBack}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -32,30 +34,42 @@ function UsersDashboard({ onBack }) {
     };
 
     const handleRoleChange = async (id, newRole) => {
-        if (!window.confirm(`정말 권한을 ${newRole}(으)로 변경하시겠습니까?`)) return;
+        if (!(await confirm(`정말 권한을 ${newRole}(으)로 변경하시겠습니까?`, {title: '권한 변경', confirmText: '변경'}))) return;
         try {
             await axios.patch(`/api/admin/users/${id}/role`, {role: newRole}, getAuthHeader());
-            alert('변경되었습니다.');
+            notify('변경되었습니다.', {icon: '✅'});
             await fetchUsers();
         } catch (err) {
-            alert('변경 실패');
+            notify('변경 실패', {icon: '⚠️'});
         }
     };
 
     const handleDeleteUser = async (targetUser) => {
         if (targetUser.role === 'pending') {
-            if (!window.confirm(`'${targetUser.name}' 님의 가입 신청을 거절하고 계정을 삭제하시겠습니까?`)) return;
+            if (!(await confirm(`'${targetUser.name}' 님의 가입 신청을 거절하고 계정을 삭제하시겠습니까?`, {
+                title: '가입 거절',
+                confirmText: '거절·삭제',
+                danger: true
+            }))) return;
         } else if (targetUser.role === 'staff') {
-            if (!window.confirm(`정말 직원 '${targetUser.name}' 님의 계정을 삭제하시겠습니까?`)) return;
-            if (!window.confirm('⚠️ [최종 경고] 직원의 계정 및 관련 데이터가 영구적으로 삭제됩니다.\n그래도 삭제하시겠습니까?')) return;
+            if (!(await confirm(`정말 직원 '${targetUser.name}' 님의 계정을 삭제하시겠습니까?`, {
+                title: '직원 계정 삭제',
+                confirmText: '삭제',
+                danger: true
+            }))) return;
+            if (!(await confirm('직원의 계정 및 관련 데이터가 영구적으로 삭제됩니다.\n그래도 삭제하시겠습니까?', {
+                title: '⚠️ 최종 경고',
+                confirmText: '영구 삭제',
+                danger: true
+            }))) return;
         }
 
         try {
             await axios.delete(`/api/admin/users/${targetUser.id}`, getAuthHeader());
-            alert('✅ 계정이 완전히 삭제되었습니다.');
+            notify('계정이 완전히 삭제되었습니다.', {icon: '✅'});
             await fetchUsers();
         } catch (err) {
-            alert('계정 삭제에 실패했습니다.');
+            notify('계정 삭제에 실패했습니다.', {icon: '⚠️'});
         }
     };
 
@@ -138,7 +152,7 @@ function UsersDashboard({ onBack }) {
                     <h1 className="users-title">👥 직원 관리</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle />
+                    <ThemeToggle/>
                 </div>
             </div>
 

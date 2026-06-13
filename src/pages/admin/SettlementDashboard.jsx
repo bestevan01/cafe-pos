@@ -1,8 +1,10 @@
 import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
+import {useNotification} from '../../hooks/useNotification';
 
 function SettlementDashboard({onBack}) {
+    const {notify} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -27,7 +29,7 @@ function SettlementDashboard({onBack}) {
             setSettlements(res.data);
             setLoading(false);
         } catch (err) {
-            alert("시재 기록 로딩 실패");
+            notify("시재 기록 로딩 실패", {icon: '⚠️'});
             setLoading(false);
         }
     };

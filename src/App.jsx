@@ -12,6 +12,7 @@ import ProfileAuth from './pages/auth/ProfileAuth.jsx';
 import EditProfile from './pages/auth/EditProfile.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ThemeToggle from './components/ThemeToggle';
+import {useNotification} from './hooks/useNotification';
 
 function App() {
     // ---------------------------------------------------------
@@ -34,6 +35,7 @@ function App() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     const SESSION_TIMEOUT = 60 * 60 * 1000; // 1시간
+    const {notify} = useNotification();
 
     // ---------------------------------------------------------
     // [2] 인증 및 세션 관리 (Auth & Session)
@@ -51,10 +53,16 @@ function App() {
         setIsProfileVerified(false);
     }, []);
 
-    const handleAutoLogout = useCallback(() => {
-        alert("보안을 위해 1시간 동안 활동이 없어 자동 로그아웃되었습니다.");
+    // 사용자가 직접 로그아웃 버튼을 눌렀을 때 (자동/세션만료 경로와 구분해 성공 안내)
+    const handleManualLogout = useCallback(() => {
+        notify("로그아웃되었습니다.", {icon: '👋'});
         handleLogout();
-    }, [handleLogout]);
+    }, [handleLogout, notify]);
+
+    const handleAutoLogout = useCallback(() => {
+        notify("보안을 위해 1시간 동안 활동이 없어 자동 로그아웃되었습니다.", {icon: '🔒'});
+        handleLogout();
+    }, [handleLogout, notify]);
 
     // 초기 실행: 로컬 스토리지에서 세션 복구
     useEffect(() => {
@@ -128,7 +136,7 @@ function App() {
         const handleAuthError = (err) => {
             if (err?.data?.type === 'auth') {
                 socket.disconnect(); // 무한 재시도 중단
-                alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+                notify('세션이 만료되었습니다. 다시 로그인해주세요.', {icon: '🔒'});
                 handleLogout();
             }
         };
@@ -149,7 +157,7 @@ function App() {
             socket.off('cashier_status');
             socket.off('kitchen_status');
         };
-    }, [auth.isLoggedIn, auth.user, handleLogout]);
+    }, [auth.isLoggedIn, auth.user, handleLogout, notify]);
 
     // ---------------------------------------------------------
     // [4] 렌더링 로직 (Render Logic)
@@ -178,7 +186,7 @@ function App() {
                 : <ProfileAuth currentUser={auth.user} onSuccess={() => setIsProfileVerified(true)}
                                onCancel={() => setShowProfile(false)}/>;
         }
-        return <AdminDashboard onLogout={handleLogout} onEditProfile={() => setShowProfile(true)}/>;
+        return <AdminDashboard onLogout={handleManualLogout} onEditProfile={() => setShowProfile(true)}/>;
     }
 
     // 직원 화면 (프로필 수정 모달)
@@ -287,7 +295,7 @@ function App() {
                         <button onClick={() => setShowProfile(true)} className="btn-global-action btn-profile">⚙️ 내 정보
                         </button>
                         <span className="global-user-name">{auth.user.name}님</span>
-                        <button onClick={handleLogout} className="btn-global-logout">로그아웃</button>
+                        <button onClick={handleManualLogout} className="btn-global-logout">로그아웃</button>
                     </div>
 
                     {/* 📱 모바일 뷰 (데스크탑에서는 숨김) */}
@@ -308,7 +316,7 @@ function App() {
                                 }} className="dropdown-item">⚙️ 내 정보
                                 </button>
                                 <button onClick={() => {
-                                    handleLogout();
+                                    handleManualLogout();
                                     setIsDropdownOpen(false);
                                 }} className="dropdown-item logout">🚪 로그아웃
                                 </button>

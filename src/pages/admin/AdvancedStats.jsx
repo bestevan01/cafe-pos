@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
+import {useNotification} from '../../hooks/useNotification';
 
-function AdvancedStats({ onBack }) {
-    const [stats, setStats] = useState({ itemStats: [], timeStats: [] });
+function AdvancedStats({onBack}) {
+    const {notify} = useNotification();
+    const [stats, setStats] = useState({itemStats: [], timeStats: []});
     const [loading, setLoading] = useState(true);
 
     // API 권한 토큰
@@ -22,10 +24,10 @@ function AdvancedStats({ onBack }) {
             })
             .catch(err => {
                 console.error(err);
-                alert("통계 로딩 실패");
+                notify("통계 로딩 실패", {icon: '⚠️'});
                 setLoading(false);
             });
-    }, []);
+    }, [notify]);
 
     // ---------------------------------------------------------
     // [2] 차트 스케일 계산 (최대값 기준)
@@ -113,7 +115,7 @@ function AdvancedStats({ onBack }) {
                     <h1 className="main-title">📊 고급 매출 분석</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle />
+                    <ThemeToggle/>
                 </div>
             </div>
 
@@ -150,12 +152,12 @@ function AdvancedStats({ onBack }) {
                         {stats.timeStats.length === 0 ?
                             <p style={{width: '100%', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터가
                                 없습니다.</p> : stats.timeStats.map((time, idx) => (
-                            <div key={idx} className="time-col">
-                                <div className="time-val">{Number(time['total_sales']).toLocaleString()}</div>
-                                <div className="time-bar-vertical"
-                                     style={{height: `${(Number(time['total_sales']) / maxTimeSales) * 200}px`}}/>
-                                <div className="time-label">{time.hour}시</div>
-                            </div>
+                                <div key={idx} className="time-col">
+                                    <div className="time-val">{Number(time['total_sales']).toLocaleString()}</div>
+                                    <div className="time-bar-vertical"
+                                         style={{height: `${(Number(time['total_sales']) / maxTimeSales) * 200}px`}}/>
+                                    <div className="time-label">{time.hour}시</div>
+                                </div>
                             ))}
                     </div>
 

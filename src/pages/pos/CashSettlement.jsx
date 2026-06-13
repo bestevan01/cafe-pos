@@ -1,10 +1,12 @@
 import {useState, useEffect, useMemo} from 'react';
 import axios from 'axios';
+import {useNotification} from '../../hooks/useNotification';
 
 // 💵 화폐 단위 정의 (5만원 ~ 10원)
 const MONEY_TYPES = [50000, 10000, 5000, 1000, 500, 100, 50, 10];
 
 function CashSettlement({onClose}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -45,7 +47,7 @@ function CashSettlement({onClose}) {
             }
         }).catch(err => {
             console.error(err);
-            alert("데이터 로딩 중 오류가 발생했습니다.");
+            notify("데이터 로딩 중 오류가 발생했습니다.", {icon: '⚠️'});
         });
     }, []);
 
@@ -55,7 +57,7 @@ function CashSettlement({onClose}) {
             setCalcData(res.data);
             setStep('close');
         } catch (err) {
-            alert("오픈 기록이 없습니다.");
+            notify("오픈 기록이 없습니다.", {icon: '⚠️'});
             setStep('open');
         }
     };
@@ -70,20 +72,20 @@ function CashSettlement({onClose}) {
     };
 
     const handleOpen = async () => {
-        if (totalAmount === 0 && !window.confirm("시재금이 0원입니다. 이대로 오픈하시겠습니까?")) return;
+        if (totalAmount === 0 && !(await confirm("시재금이 0원입니다. 이대로 오픈하시겠습니까?", {confirmText: "오픈"}))) return;
 
         if (prevClosing !== null && totalAmount !== prevClosing) {
             const diff = totalAmount - prevClosing;
-            const msg = `⚠️ 경고: 전날 마감 시재와 다릅니다!\n\n📆 전날 마감: ${prevClosing.toLocaleString()}원\n💵 현재 입력: ${totalAmount.toLocaleString()}원\n❌ 차액: ${diff.toLocaleString()}원\n\n돈이 맞지 않습니다. 그래도 강제로 오픈하시겠습니까?`;
-            if (!window.confirm(msg)) return;
+            const msg = `전날 마감 시재와 다릅니다!\n\n📆 전날 마감: ${prevClosing.toLocaleString()}원\n💵 현재 입력: ${totalAmount.toLocaleString()}원\n❌ 차액: ${diff.toLocaleString()}원\n\n돈이 맞지 않습니다. 그래도 강제로 오픈하시겠습니까?`;
+            if (!(await confirm(msg, {title: "⚠️ 시재 불일치", confirmText: "강제 오픈", danger: true}))) return;
         }
 
         try {
             await axios.post('/api/settlements/open', {amount: totalAmount}, getAuthHeader());
-            alert(`✅ 오픈 완료! 시작 시재금: ${totalAmount.toLocaleString()}원`);
+            notify(`오픈 완료! 시작 시재금: ${totalAmount.toLocaleString()}원`, {icon: '✅'});
             onClose();
         } catch (err) {
-            alert(err.response?.data?.message || "오픈 처리 실패");
+            notify(err.response?.data?.message || "오픈 처리 실패", {icon: '⚠️'});
         }
     };
 
@@ -92,7 +94,10 @@ function CashSettlement({onClose}) {
         const diff = totalAmount - expected;
 
         if (diff !== 0) {
-            if (!window.confirm(`⚠️ 금액 불일치!\n\n전산: ${expected.toLocaleString()}원\n실제: ${totalAmount.toLocaleString()}원\n차액: ${diff.toLocaleString()}원\n\n마감하시겠습니까?`)) return;
+            if (!(await confirm(`전산: ${expected.toLocaleString()}원\n실제: ${totalAmount.toLocaleString()}원\n차액: ${diff.toLocaleString()}원\n\n마감하시겠습니까?`, {
+                title: "⚠️ 금액 불일치",
+                confirmText: "마감"
+            }))) return;
         }
 
         try {
@@ -101,10 +106,10 @@ function CashSettlement({onClose}) {
                 salesCash: calcData.sales,
                 diff: diff
             }, getAuthHeader());
-            alert("🔒 마감 처리되었습니다. 수고하셨습니다!");
+            notify("마감 처리되었습니다. 수고하셨습니다!", {icon: '🔒'});
             onClose();
         } catch (err) {
-            alert("마감 처리 실패");
+            notify("마감 처리 실패", {icon: '⚠️'});
         }
     };
 

@@ -2,8 +2,10 @@ import {useState, useEffect} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import axios from 'axios';
 import {socket} from '../../utils/socket';
+import {useNotification} from '../../hooks/useNotification';
 
 function Kitchen({onBack}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -90,20 +92,20 @@ function Kitchen({onBack}) {
     // [3] 이벤트 핸들러
     // ---------------------------------------------------------
     const handleComplete = async (displayId) => {
-        if (!window.confirm("조리를 완료 처리하시겠습니까?")) return;
+        if (!(await confirm("조리를 완료 처리하시겠습니까?", {confirmText: "완료"}))) return;
         try {
             await axios.patch(`/api/orders/${displayId}/complete_kitchen`, {}, getAuthHeader());
         } catch (err) {
-            alert("처리 실패");
+            notify("처리 실패", {icon: '⚠️'});
         }
     };
 
     const handleDelete = async (displayId) => {
-        if (!window.confirm("⚠️ 주문을 취소하시겠습니까?")) return;
+        if (!(await confirm("주문을 취소하시겠습니까?", {title: "⚠️ 주문 취소", confirmText: "주문 취소", danger: true}))) return;
         try {
             await axios.delete(`/api/orders/${displayId}`, getAuthHeader());
         } catch (err) {
-            alert("삭제 실패");
+            notify("삭제 실패", {icon: '⚠️'});
         }
     };
 
@@ -153,7 +155,7 @@ function Kitchen({onBack}) {
                 }
                 `}
             </style>
-            
+
             <div className="kitchen-header-bar">
                 <h1 className="kitchen-title">👨‍🍳 음료 제조 리스트</h1>
             </div>

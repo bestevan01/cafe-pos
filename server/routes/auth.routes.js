@@ -35,7 +35,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
         if (users.length === 0 || !(await bcrypt.compare(password, users[0].password))) {
             recordLoginFailure(req.loginKey);
-            return res.status(401).json({success: false, message: '아이디/비번 불일치'});
+            return res.status(401).json({success: false, message: '아이디 혹은 비밀번호가 일치하지 않습니다.'});
         }
 
         recordLoginSuccess(req.loginKey); // 비밀번호 일치 → 실패 카운터 초기화

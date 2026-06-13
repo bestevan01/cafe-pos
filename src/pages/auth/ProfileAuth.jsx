@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import {useState} from 'react';
 import axios from 'axios';
-import { startAuthentication } from "@simplewebauthn/browser";
+import {startAuthentication} from "@simplewebauthn/browser";
 import ThemeToggle from "../../components/ThemeToggle.jsx";
+import {useNotification} from '../../hooks/useNotification';
 
-function ProfileAuth({ currentUser, onSuccess, onCancel }) {
+function ProfileAuth({currentUser, onSuccess, onCancel}) {
+    const {notify} = useNotification();
     const [password, setPassword] = useState('');
 
     // ---------------------------------------------------------
@@ -22,7 +24,7 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                 onSuccess();
             }
         } catch (err) {
-            alert("비밀번호가 일치하지 않습니다.");
+            notify("비밀번호가 일치하지 않습니다.", {icon: '⚠️'});
         }
     };
 
@@ -49,12 +51,12 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                 if (verificationResp.data.username === currentUser.username) {
                     onSuccess();
                 } else {
-                    alert("현재 로그인된 계정의 패스키가 아닙니다.");
+                    notify("현재 로그인된 계정의 패스키가 아닙니다.", {icon: '⚠️'});
                 }
             }
         } catch (err) {
             console.error(err);
-            alert("패스키 인증 실패");
+            notify("패스키 인증 실패", {icon: '⚠️'});
         }
     };
 
@@ -63,8 +65,8 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
     // ---------------------------------------------------------
     return (
         <div className="auth-overlay">
-            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
-                <ThemeToggle />
+            <div style={{position: 'absolute', top: '20px', right: '20px', zIndex: 1000}}>
+                <ThemeToggle/>
             </div>
 
             <style>

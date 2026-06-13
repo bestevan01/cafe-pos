@@ -1,8 +1,10 @@
 import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
+import {useNotification} from '../../hooks/useNotification';
 
 function EventDashboard({onBack}) {
+    const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리
     // ---------------------------------------------------------
@@ -65,15 +67,15 @@ function EventDashboard({onBack}) {
     };
 
     const handleAddEvent = async () => {
-        if (!newEventName.trim()) return alert("이벤트 이름을 입력해주세요!");
+        if (!newEventName.trim()) return notify("이벤트 이름을 입력해주세요!", {icon: '⚠️'});
         if (newEventType === 'discount' && (!newDiscountAmount || newDiscountAmount <= 0)) {
-            return alert("할인 금액을 올바르게 입력해주세요!");
+            return notify("할인 금액을 올바르게 입력해주세요!", {icon: '⚠️'});
         }
         if (hasDailyLimit && (!dailyLimitQty || dailyLimitQty <= 0)) {
-            return alert("제한 수량을 올바르게 입력해주세요!");
+            return notify("제한 수량을 올바르게 입력해주세요!", {icon: '⚠️'});
         }
         if (hasTargetMenu && selectedMenus.length === 0) {
-            return alert("적용할 메뉴를 최소 1개 이상 선택해주세요!");
+            return notify("적용할 메뉴를 최소 1개 이상 선택해주세요!", {icon: '⚠️'});
         }
 
         const newEventData = {
@@ -97,7 +99,7 @@ function EventDashboard({onBack}) {
                 setSelectedMenus([]); // 폼 초기화
             }
         } catch (err) {
-            alert("이벤트 등록에 실패했습니다.");
+            notify("이벤트 등록에 실패했습니다.", {icon: '⚠️'});
         }
     };
 
@@ -108,17 +110,17 @@ function EventDashboard({onBack}) {
             await axios.patch(`/api/events/${id}/toggle`, {is_active: !targetEvent.is_active}, getAuthHeader());
             await fetchEvents();
         } catch (err) {
-            alert("상태 변경에 실패했습니다.");
+            notify("상태 변경에 실패했습니다.", {icon: '⚠️'});
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("이 이벤트를 정말 삭제하시겠습니까?")) return;
+        if (!(await confirm("이 이벤트를 정말 삭제하시겠습니까?", {title: "이벤트 삭제", confirmText: "삭제", danger: true}))) return;
         try {
             await axios.delete(`/api/events/${id}`, getAuthHeader());
             await fetchEvents();
         } catch (err) {
-            alert("삭제에 실패했습니다.");
+            notify("삭제에 실패했습니다.", {icon: '⚠️'});
         }
     };
 
