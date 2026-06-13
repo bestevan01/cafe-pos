@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import {useState, useEffect, useMemo} from 'react';
 import axios from 'axios';
 
 // 💵 화폐 단위 정의 (5만원 ~ 10원)
 const MONEY_TYPES = [50000, 10000, 5000, 1000, 500, 100, 50, 10];
 
-function CashSettlement({ onClose }) {
+function CashSettlement({onClose}) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -33,7 +33,7 @@ function CashSettlement({ onClose }) {
     });
 
     useEffect(() => {
-        axios.get('/api/settlement/status', getAuthHeader()).then(res => {
+        axios.get('/api/settlements/status', getAuthHeader()).then(res => {
             if (res.data.status === 'not_opened') {
                 setStep('open');
                 const safeAmount = Number(res.data.prevClosing) || 0;
@@ -51,7 +51,7 @@ function CashSettlement({ onClose }) {
 
     const fetchCalcData = async () => {
         try {
-            const res = await axios.get('/api/settlement/calc');
+            const res = await axios.get('/api/settlements/calc', getAuthHeader());
             setCalcData(res.data);
             setStep('close');
         } catch (err) {
@@ -66,7 +66,7 @@ function CashSettlement({ onClose }) {
     const handleCountChange = (type, value) => {
         let numValue = parseInt(value) || 0;
         if (numValue < 0) numValue = 0;
-        setCounts(prev => ({ ...prev, [type]: numValue }));
+        setCounts(prev => ({...prev, [type]: numValue}));
     };
 
     const handleOpen = async () => {
@@ -79,7 +79,7 @@ function CashSettlement({ onClose }) {
         }
 
         try {
-            await axios.post('/api/settlement/open', { amount: totalAmount });
+            await axios.post('/api/settlements/open', {amount: totalAmount}, getAuthHeader());
             alert(`✅ 오픈 완료! 시작 시재금: ${totalAmount.toLocaleString()}원`);
             onClose();
         } catch (err) {
@@ -96,7 +96,7 @@ function CashSettlement({ onClose }) {
         }
 
         try {
-            await axios.post('/api/settlement/close', {
+            await axios.post('/api/settlements/close', {
                 closingAmount: totalAmount,
                 salesCash: calcData.sales,
                 diff: diff
