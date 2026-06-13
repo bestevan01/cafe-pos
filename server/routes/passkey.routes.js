@@ -19,7 +19,7 @@ const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
 const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
 
 router.get('/passkey/register-options', authenticateToken, async (req, res) => {
-    const {userId} = req.query;
+    const userId = req.user.id; // 인증된 본인 계정에만 등록 옵션 생성 (클라이언트 userId 신뢰 안 함)
 
     try {
         const [users] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
@@ -62,7 +62,8 @@ router.get('/passkey/register-options', authenticateToken, async (req, res) => {
 });
 
 router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
-    const {userId, body} = req.body;
+    const userId = req.user.id; // 인증된 본인 계정에만 패스키 등록
+    const {body} = req.body;
     const expectedChallenge = currentChallenges[userId];
 
     if (!expectedChallenge) {
@@ -196,7 +197,7 @@ router.post('/passkey/login-verify', async (req, res) => {
 });
 
 router.get('/passkeys', authenticateToken, async (req, res) => {
-    const {userId} = req.query;
+    const userId = req.user.id; // 본인 패스키 목록만 조회
     try {
         const [rows] = await pool.query(
             'SELECT id, device_name, created_at FROM passkeys WHERE user_id = ? ORDER BY created_at DESC',
@@ -216,7 +217,11 @@ router.get('/passkeys', authenticateToken, async (req, res) => {
 router.delete('/passkeys/:id', authenticateToken, async (req, res) => {
     const {id} = req.params;
     try {
-        await pool.query('DELETE FROM passkeys WHERE id = ?', [id]);
+        // 본인 소유의 패스키만 삭제 가능
+        const [result] = await pool.query('DELETE FROM passkeys WHERE id = ? AND user_id = ?', [id, req.user.id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({success: false, message: '삭제할 패스키를 찾을 수 없습니다.'});
+        }
         res.json({success: true});
     } catch (err) {
         console.error(`[🔥 DELETE /api/passkeys/${id} 에러]`, err);
