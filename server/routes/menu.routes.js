@@ -42,7 +42,7 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
         fields.push('name = ?');
         values.push(name);
     }
-    if (price) {
+    if (price !== undefined) {
         fields.push('price = ?');
         values.push(price);
     }

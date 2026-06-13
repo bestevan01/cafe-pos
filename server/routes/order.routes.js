@@ -14,17 +14,31 @@ router.post('', authenticateToken, async (req, res) => {
         conn = await pool.getConnection();
         await conn.beginTransaction();
 
-        // 중복 주문 방지 (1분 내 동일 메뉴/수량)
+        // 중복 주문 방지: 최근 1분 내에 '동일한 주문 묶음'(같은 메뉴 구성·총수량)이
+        // 이미 들어왔는지 검사한다. (실수로 '주문 전송'을 두 번 누른 경우 감지)
         if (!force && items.length > 0) {
-            const [rows] = await conn.query(`
-                SELECT *
-                FROM orders
-                WHERE menu_name = ?
-                  AND quantity = ?
-                  AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
-            `, [items[0].menu_name, items[0].quantity]);
+            // 메뉴별 총수량으로 정규화한 시그니처. 이벤트로 행이 쪼개져도 합쳐서 비교.
+            const signatureOf = (list) => {
+                const agg = {};
+                for (const i of list) agg[i.menu_name] = (agg[i.menu_name] || 0) + Number(i.quantity);
+                return Object.keys(agg).sort().map(k => `${k}×${agg[k]}`).join('|');
+            };
+            const currentSig = signatureOf(items);
 
-            if (rows.length > 0) {
+            const [recentRows] = await conn.query(`
+                SELECT display_id, menu_name, quantity
+                FROM orders
+                WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+            `);
+
+            // 최근 주문들을 display_id별로 묶어 같은 시그니처가 있으면 중복으로 판단
+            const groups = {};
+            for (const r of recentRows) {
+                (groups[r.display_id] = groups[r.display_id] || []).push(r);
+            }
+            const isDuplicate = Object.values(groups).some(g => signatureOf(g) === currentSig);
+
+            if (isDuplicate) {
                 await conn.rollback();
                 return res.json({success: false, isDuplicate: true});
             }
@@ -130,11 +144,17 @@ router.post('', authenticateToken, async (req, res) => {
             isEventUpdated = true;
         }
 
-        // 주문 번호 생성
-        const [rows] = await conn.query(`SELECT MAX(daily_number) as maxNum
-                                         FROM orders
-                                         WHERE DATE(created_at) = CURDATE()`);
-        const nextDailyNum = (rows[0]['maxNum'] || 0) + 1;
+        // 주문 번호 생성: 날짜별 카운터 행을 원자적으로 증가시킨다.
+        // INSERT...ON DUPLICATE KEY UPDATE가 PK(order_date) 행에 잠금을 잡으므로
+        // 동시에 들어온 주문들도 직렬화되어 번호가 중복되지 않는다.
+        // (LAST_INSERT_ID는 커넥션 단위라 같은 conn 안에서 안전하게 값을 회수한다)
+        await conn.query(`
+            INSERT INTO daily_order_counters (order_date, last_number)
+            VALUES (CURDATE(), LAST_INSERT_ID(1))
+            ON DUPLICATE KEY UPDATE last_number = LAST_INSERT_ID(last_number + 1)
+        `);
+        const [seqRows] = await conn.query('SELECT LAST_INSERT_ID() AS seq');
+        const nextDailyNum = seqRows[0].seq;
         const formattedID = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(nextDailyNum).padStart(3, "0")}`;
 
         for (const item of computedItems) {

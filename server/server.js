@@ -58,13 +58,29 @@ const io = new Server(server, {
 // [4] 데이터베이스 연결 확인 (DB Connection)
 // ---------------------------------------------------------
 pool.getConnection()
-    .then(conn => {
+    .then(async conn => {
         console.log("✅ [DB] 데이터베이스 연결 성공!");
         conn.release();
+        await ensureSchema();
     })
     .catch(err => {
         console.error("❌ [DB] 데이터베이스 연결 실패:", err);
     });
+
+// 주문번호 카운터 테이블 보장 (없으면 생성). 권한이 없으면 경고만 남기고 진행.
+async function ensureSchema() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS daily_order_counters
+            (
+                order_date  DATE NOT NULL PRIMARY KEY,
+                last_number INT  NOT NULL DEFAULT 0
+            )
+        `);
+    } catch (err) {
+        console.error("⚠️ [DB] daily_order_counters 테이블 생성 실패 (수동 마이그레이션 필요):", err.message);
+    }
+}
 
 // ---------------------------------------------------------
 // [5] 미들웨어 설정 (Middlewares)

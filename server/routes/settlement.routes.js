@@ -26,9 +26,19 @@ router.get('/status', authenticateToken, async (req, res) => {
 
 router.post('/open', authenticateToken, async (req, res) => {
     try {
+        // 1차 방어(앱 레벨): 오늘 이미 오픈했으면 거부 — 중복 레코드 생성 방지
+        const [existing] = await pool.query('SELECT 1 FROM cash_settlements WHERE date = CURDATE() LIMIT 1');
+        if (existing.length > 0) {
+            return res.status(409).json({success: false, message: '오늘은 이미 오픈되었습니다.'});
+        }
+
         await pool.query('INSERT INTO cash_settlements (date, opening_amount) VALUES (CURDATE(), ?)', [req.body.amount]);
         res.json({success: true});
     } catch (err) {
+        // 2차 방어(DB 레벨): date에 UNIQUE 제약이 있으면 동시 오픈 경쟁도 여기서 차단됨
+        if (err && err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({success: false, message: '오늘은 이미 오픈되었습니다.'});
+        }
         console.error('[🔥 POST /api/settlement/open 에러]', err);
         res.status(500).json({
             success: false,

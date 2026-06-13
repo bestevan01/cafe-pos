@@ -83,7 +83,7 @@ function CashSettlement({onClose}) {
             alert(`✅ 오픈 완료! 시작 시재금: ${totalAmount.toLocaleString()}원`);
             onClose();
         } catch (err) {
-            alert("오픈 처리 실패");
+            alert(err.response?.data?.message || "오픈 처리 실패");
         }
     };
 
@@ -100,7 +100,7 @@ function CashSettlement({onClose}) {
                 closingAmount: totalAmount,
                 salesCash: calcData.sales,
                 diff: diff
-            });
+            }, getAuthHeader());
             alert("🔒 마감 처리되었습니다. 수고하셨습니다!");
             onClose();
         } catch (err) {
@@ -204,8 +204,10 @@ function CashSettlement({onClose}) {
                 {step === 'close' && calcData && (
                     <>
                         <div className="cs-info-box">
-                            <div className="cs-row"><span>➕ 오픈 시재:</span> <span>{calcData.opening.toLocaleString()}원</span></div>
-                            <div className="cs-row"><span>➕ 현금 매출:</span> <span>{calcData.sales.toLocaleString()}원</span></div>
+                            <div className="cs-row"><span>➕ 오픈 시재:</span>
+                                <span>{calcData.opening.toLocaleString()}원</span></div>
+                            <div className="cs-row"><span>➕ 현금 매출:</span>
+                                <span>{calcData.sales.toLocaleString()}원</span></div>
                             <hr style={{margin: '8px 0', border: 'none', borderTop: '1px solid var(--border-color)'}}/>
                             <div className="cs-row" style={{fontWeight: 'bold', color: '#007bff'}}>
                                 <span>= 전산상 합계:</span><span>{calcData.expected.toLocaleString()}원</span>
