@@ -40,6 +40,7 @@ function App() {
     // ---------------------------------------------------------
     const handleLogout = useCallback(() => {
         socket.emit('logout');
+        socket.disconnect();
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('lastActivity');
@@ -123,6 +124,7 @@ function App() {
         };
 
         if (socket.connected) registerMyUser();
+        else socket.connect(); // 로그인 상태면 소켓 연결 시작 (핸드셰이크에 토큰 전송)
         socket.on('connect', registerMyUser);
 
         socket.on('cashier_status', (isTaken) => setIsCashierTaken(isTaken));
