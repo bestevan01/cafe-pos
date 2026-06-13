@@ -5,7 +5,7 @@ const {authenticateToken} = require("../middlewares/auth");
 const debugInfo = require("../utils/debugInfo");
 
 router.post('', authenticateToken, async (req, res) => {
-    const {items, force, paymentMethod, staff_name, applied_event_id, applied_event_qty} = req.body;
+    const {items, force, paymentMethod, staff_name, applied_event_id} = req.body;
     const io = req.app.get('io');
     let conn;
     let isEventUpdated = false;
@@ -30,37 +30,104 @@ router.post('', authenticateToken, async (req, res) => {
             }
         }
 
-        if (applied_event_id && applied_event_qty > 0) {
-            // FOR UPDATE를 붙여서 다른 캐셔가 동시에 결제하지 못하게 잠깐 줄을 세웁니다.
+        // 메뉴 가격표를 DB에서 직접 로드 (클라이언트가 보낸 price는 신뢰하지 않음)
+        const [menuRows] = await conn.query('SELECT name, price FROM menu');
+        const menuMap = new Map(menuRows.map(m => [m.name, Number(m.price)]));
+
+        const SHOT_SUFFIX = ' (샷추가)';
+        const SHOT_EXTRA = 500;
+
+        // 메뉴명으로 서버 기준 단가를 계산 (샷추가는 +500). 모르는 메뉴면 null.
+        const resolveBaseUnitPrice = (menuName) => {
+            const isShot = menuName.endsWith(SHOT_SUFFIX);
+            const baseName = isShot ? menuName.slice(0, -SHOT_SUFFIX.length) : menuName;
+            if (!menuMap.has(baseName)) return null;
+            return menuMap.get(baseName) + (isShot ? SHOT_EXTRA : 0);
+        };
+
+        // 이벤트가 지정된 경우, 가격 재계산에 필요한 필드까지 모두 잠금(FOR UPDATE) 조회
+        let event = null;
+        if (applied_event_id) {
             const [eventRows] = await conn.query(`
-                SELECT daily_limit, IF(last_used_date = CURDATE(), used_count, 0) AS current_used_count
+                SELECT id, type, discount_amount, daily_limit, target_menus, is_active,
+                       IF(last_used_date = CURDATE(), used_count, 0) AS current_used_count
                 FROM events
-                WHERE id = ? FOR
-                UPDATE
+                WHERE id = ? FOR UPDATE
             `, [applied_event_id]);
 
-            if (eventRows.length > 0) {
-                const ev = eventRows[0];
-
-                // 한도 초과 검사
-                if (ev.daily_limit !== null && (ev['current_used_count'] + applied_event_qty > ev.daily_limit)) {
-                    await conn.rollback(); // 수량이 초과되면 주문 전체를 취소(롤백)합니다.
-                    return res.json({
-                        success: false,
-                        message: `해당 이벤트 한도를 초과했습니다. (오늘 남은 수량: ${ev.daily_limit - ev['current_used_count']}잔)`
-                    });
-                }
-
-                // 통과했다면 차감 업데이트! (어제면 덮어씌우고, 오늘이면 기존 값에 더합니다. 날짜는 오늘로 갱신)
-                await conn.query(`
-                    UPDATE events
-                    SET used_count     = IF(last_used_date = CURDATE(), used_count + ?, ?),
-                        last_used_date = CURDATE()
-                    WHERE id = ?
-                `, [applied_event_qty, applied_event_qty, applied_event_id]);
-
-                isEventUpdated = true;
+            if (eventRows.length === 0 || eventRows[0].is_active !== 1) {
+                await conn.rollback();
+                return res.json({success: false, message: '유효하지 않거나 종료된 이벤트입니다.'});
             }
+            event = eventRows[0];
+        }
+
+        // 해당 메뉴가 이벤트 적용 대상인지 검사 (target_menus 기준)
+        const isEligibleForEvent = (menuName) => {
+            if (!event) return false;
+            if (!event.target_menus || event.target_menus === 'all') return true;
+            try {
+                return JSON.parse(event.target_menus).some(t => menuName.includes(t));
+            } catch (e) {
+                return false;
+            }
+        };
+
+        // 각 아이템의 단가와 합계를 서버에서 재계산
+        const computedItems = [];
+        let eventQty = 0;
+        for (const item of items) {
+            const qty = parseInt(item.quantity, 10);
+            if (!Number.isInteger(qty) || qty <= 0) {
+                await conn.rollback();
+                return res.json({success: false, message: '주문 수량이 올바르지 않습니다.'});
+            }
+
+            const baseUnit = resolveBaseUnitPrice(item.menu_name);
+            if (baseUnit === null) {
+                await conn.rollback();
+                return res.json({success: false, message: `알 수 없는 메뉴입니다: ${item.menu_name}`});
+            }
+
+            // 이벤트 할인으로 태깅됐고 실제로 적용 가능한 경우에만 할인가 적용
+            let unitPrice = baseUnit;
+            let itemEventId = null;
+            if (item.applied_event_id && event
+                && Number(item.applied_event_id) === Number(applied_event_id)
+                && isEligibleForEvent(item.menu_name)) {
+                if (event.type === 'free') unitPrice = 0;
+                else if (event.type === 'discount') unitPrice = Math.max(0, baseUnit - Number(event.discount_amount));
+                itemEventId = event.id;
+                eventQty += qty;
+            }
+
+            computedItems.push({
+                menu_name: item.menu_name,
+                quantity: qty,
+                total_price: unitPrice * qty,
+                applied_event_id: itemEventId
+            });
+        }
+
+        // 이벤트 한도 검사 (서버가 계산한 eventQty 기준)
+        if (event && eventQty > 0 && event.daily_limit !== null
+            && (event.current_used_count + eventQty > event.daily_limit)) {
+            await conn.rollback();
+            return res.json({
+                success: false,
+                message: `해당 이벤트 한도를 초과했습니다. (오늘 남은 수량: ${event.daily_limit - event.current_used_count}잔)`
+            });
+        }
+
+        // 이벤트 사용량 차감 (오늘이면 누적, 날짜가 바뀌었으면 새로 시작)
+        if (event && eventQty > 0) {
+            await conn.query(`
+                UPDATE events
+                SET used_count     = IF(last_used_date = CURDATE(), used_count + ?, ?),
+                    last_used_date = CURDATE()
+                WHERE id = ?
+            `, [eventQty, eventQty, event.id]);
+            isEventUpdated = true;
         }
 
         // 주문 번호 생성
@@ -70,12 +137,12 @@ router.post('', authenticateToken, async (req, res) => {
         const nextDailyNum = (rows[0]['maxNum'] || 0) + 1;
         const formattedID = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(nextDailyNum).padStart(3, "0")}`;
 
-        for (const item of items) {
+        for (const item of computedItems) {
             await conn.query(
                 `INSERT INTO orders (menu_name, quantity, total_price, daily_number, display_id, payment_method,
                                      staff_name, applied_event_id)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [item.menu_name, item.quantity, item.price * item.quantity, nextDailyNum, formattedID, paymentMethod || 'cash', staff_name || '키오스크', item.applied_event_id || null]
+                [item.menu_name, item.quantity, item.total_price, nextDailyNum, formattedID, paymentMethod || 'cash', staff_name || '키오스크', item.applied_event_id]
             );
         }
 
@@ -88,7 +155,7 @@ router.post('', authenticateToken, async (req, res) => {
         io.emit('new_order', {
             display_id: formattedID,
             daily_number: String(nextDailyNum).padStart(3, "0"),
-            items: items.map(i => ({menu_name: i.menu_name, quantity: i.quantity, price: i.price * i.quantity})),
+            items: computedItems.map(i => ({menu_name: i.menu_name, quantity: i.quantity, price: i.total_price})),
             created_at: new Date(),
             payment_method: paymentMethod || 'cash',
             staff_name: staff_name || '키오스크',
