@@ -1,12 +1,14 @@
-import {useState, useCallback, useMemo, useEffect} from 'react';
+import {useState, useCallback, useMemo, useEffect, useRef} from 'react';
 import {createPortal} from 'react-dom';
 import {motion, AnimatePresence} from 'framer-motion';
+import axios from 'axios';
 import {NotificationContext} from '../hooks/useNotification';
 
 /**
  * 전역 알림 시스템.
  * - notify(message, options?)  : 오른쪽 상단 토스트 (alert 대체, 논블로킹). 토스트 id 반환.
- *      options = { icon, title, duration(ms, 0이면 수동 닫기) }
+ *      options = { icon, title, duration(ms, 0이면 수동 닫기),
+ *                  dedupeKey(같은 키로 dedupeWindow(기본 3초) 내 재호출 시 무시 → 화면당 1개) }
  * - confirm(message, options?) : 중앙 확인 다이얼로그 (window.confirm 대체). Promise<boolean> 반환.
  *      options = { title, confirmText, cancelText, danger }
  *
@@ -22,7 +24,16 @@ export function NotificationProvider({children}) {
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
 
+    const dedupeRef = useRef({}); // { [dedupeKey]: 마지막 표시 시각 }
+
     const notify = useCallback((message, options = {}) => {
+        // 같은 dedupeKey로 짧은 시간 내 재호출되면 무시 (동시 로딩 실패 등을 하나로 묶음)
+        if (options.dedupeKey) {
+            const now = Date.now();
+            const win = options.dedupeWindow ?? 3000;
+            if (now - (dedupeRef.current[options.dedupeKey] || 0) < win) return null;
+            dedupeRef.current[options.dedupeKey] = now;
+        }
         const id = ++idCounter;
         const duration = options.duration ?? 3000;
         setToasts(prev => [...prev, {id, message, icon: options.icon, title: options.title, loading: options.loading}]);
@@ -70,6 +81,83 @@ export function NotificationProvider({children}) {
             document.body.style.overflow = prevOverflow;
         };
     }, [confirmState, closeConfirm]);
+
+    // 전역 로딩 표시: 느린 백엔드 요청(1초+)에 자동으로 로딩 토스트를 띄운다.
+    // /ping(예열) 및 { meta: { silent: true } } 요청은 제외.
+    useEffect(() => {
+        const SHOW_DELAY = 1000;       // 1초 안에 안 끝나면 토스트 표시
+        const ESCALATE_DELAY = 4000;   // 4초 넘으면 "서버 깨우는 중" 문구로 전환
+
+        let pending = 0;
+        let toastId = null;
+        let showTimer = null;
+        let escalateTimer = null;
+
+        const isSilent = (config) => {
+            const url = (config && config.url) || '';
+            return url.includes('/ping') || !!(config && config.meta && config.meta.silent);
+        };
+
+        const startTimers = () => {
+            if (showTimer || toastId != null) return; // 이미 진행 중이면 중복 시작 안 함
+            showTimer = setTimeout(() => {
+                showTimer = null;
+                toastId = notify('서버 응답을 기다리는 중이에요...', {loading: true, title: '잠시만 기다려주세요', duration: 0});
+                escalateTimer = setTimeout(() => {
+                    escalateTimer = null;
+                    if (toastId != null) update(toastId, {message: '서버를 깨우는 중이에요. 최대 1분 정도 걸릴 수 있어요 ☕'});
+                }, ESCALATE_DELAY - SHOW_DELAY);
+            }, SHOW_DELAY);
+        };
+
+        const clearTimers = () => {
+            if (showTimer) {
+                clearTimeout(showTimer);
+                showTimer = null;
+            }
+            if (escalateTimer) {
+                clearTimeout(escalateTimer);
+                escalateTimer = null;
+            }
+            if (toastId != null) {
+                removeToast(toastId);
+                toastId = null;
+            }
+        };
+
+        const settle = (config) => {
+            if (config && config.meta && config.meta._loadingCounted) {
+                pending = Math.max(0, pending - 1);
+                if (pending === 0) clearTimers();
+            }
+        };
+
+        const reqId = axios.interceptors.request.use((config) => {
+            if (!isSilent(config)) {
+                config.meta = {...(config.meta || {}), _loadingCounted: true};
+                pending += 1;
+                startTimers();
+            }
+            return config;
+        });
+
+        const resId = axios.interceptors.response.use(
+            (response) => {
+                settle(response.config);
+                return response;
+            },
+            (error) => {
+                settle(error.config);
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            axios.interceptors.request.eject(reqId);
+            axios.interceptors.response.eject(resId);
+            clearTimers();
+        };
+    }, [notify, update, removeToast]);
 
     const value = useMemo(() => ({
         notify,

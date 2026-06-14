@@ -35,7 +35,7 @@ function EditProfile({onBack}) {
             const res = await axios.get(`/api/passkeys?userId=${userId}`, getAuthHeader());
             setPasskeys(res.data);
         } catch (err) {
-            console.error("패스키 목록 로드 실패");
+            notify("패스키 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-passkey'});
         }
     };
 
@@ -85,6 +85,7 @@ function EditProfile({onBack}) {
             }
         } catch (error) {
             console.error(error);
+            notify("패스키 등록에 실패했습니다.", {icon: '⚠️'});
         }
     };
 

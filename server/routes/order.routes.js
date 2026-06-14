@@ -48,15 +48,23 @@ router.post('', authenticateToken, async (req, res) => {
         const [menuRows] = await conn.query('SELECT name, price FROM menu');
         const menuMap = new Map(menuRows.map(m => [m.name, Number(m.price)]));
 
-        const SHOT_SUFFIX = ' (샷추가)';
         const SHOT_EXTRA = 500;
 
-        // 메뉴명으로 서버 기준 단가를 계산 (샷추가는 +500). 모르는 메뉴면 null.
+        // 메뉴명으로 서버 기준 단가를 계산. 샷은 "(샷 N개)" 접미사로 N잔당 +500*N.
+        // 레거시 "(샷추가)"(=1샷)도 호환. 모르는 메뉴면 null.
         const resolveBaseUnitPrice = (menuName) => {
-            const isShot = menuName.endsWith(SHOT_SUFFIX);
-            const baseName = isShot ? menuName.slice(0, -SHOT_SUFFIX.length) : menuName;
+            let baseName = menuName;
+            let shots = 0;
+            const m = menuName.match(/^(.*) \(샷추가 (\d+)개\)$/);
+            if (m) {
+                baseName = m[1];
+                shots = parseInt(m[2], 10);
+            } else if (menuName.endsWith(' (샷추가)')) {
+                baseName = menuName.slice(0, -' (샷추가)'.length);
+                shots = 1;
+            }
             if (!menuMap.has(baseName)) return null;
-            return menuMap.get(baseName) + (isShot ? SHOT_EXTRA : 0);
+            return menuMap.get(baseName) + SHOT_EXTRA * shots;
         };
 
         // 이벤트가 지정된 경우, 가격 재계산에 필요한 필드까지 모두 잠금(FOR UPDATE) 조회

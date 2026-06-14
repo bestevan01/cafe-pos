@@ -40,7 +40,7 @@ function EventDashboard({onBack}) {
             const res = await axios.get('/api/events', getAuthHeader());
             setEvents(res.data);
         } catch (err) {
-            console.error("이벤트 로딩 실패");
+            notify("이벤트 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-event'});
         }
     };
 
@@ -49,7 +49,7 @@ function EventDashboard({onBack}) {
             const res = await axios.get('/api/menu', getAuthHeader());
             setMenuList(res.data);
         } catch (err) {
-            console.error("메뉴 로딩 실패");
+            notify("이벤트 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-event'});
         }
     };
 

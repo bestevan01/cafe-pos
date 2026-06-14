@@ -17,6 +17,8 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
     // 🌟 이벤트 관련 상태 추가
     const [activeEvents, setActiveEvents] = useState([]);
     const [selectedEventId, setSelectedEventId] = useState(null);
+    const [shotConfig, setShotConfig] = useState({}); // 커피 잔별 샷: { [메뉴명]: [0번잔 샷, 1번잔 샷, ...] }
+    const [expandedShots, setExpandedShots] = useState({}); // 메뉴별 '샷 추가' 패널 펼침 여부
 
     // UI 상태 (모바일 반응형)
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -75,6 +77,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
             const res = await axios.get('/api/menu', getAuthHeader());
             setMenuList(res.data);
         } catch (err) {
+            notify("주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-pos'});
         }
     };
 
@@ -83,6 +86,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
             const res = await axios.get('/api/orders', getAuthHeader());
             setOrderGroups(groupOrdersById(res.data));
         } catch (err) {
+            notify("주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-pos'});
         }
     };
 
@@ -98,7 +102,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 return prevId;
             });
         } catch (err) {
-            console.error("이벤트 로딩 실패");
+            notify("주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-pos'});
         }
     };
 
@@ -121,77 +125,97 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
     // ---------------------------------------------------------
     // [4] 장바구니 및 🌟 이벤트 할인 로직
     // ---------------------------------------------------------
-    const addToCart = (menu, isShotAdded = false) => {
-        const finalName = isShotAdded ? `${menu.name} (샷추가)` : menu.name;
-        const finalPrice = isShotAdded ? menu.price + 500 : menu.price;
-        setCart(prev => {
-            const existingIdx = prev.findIndex(item => item.name === finalName);
-            if (existingIdx !== -1) {
-                const newCart = [...prev];
-                newCart[existingIdx] = {...newCart[existingIdx], quantity: newCart[existingIdx].quantity + 1};
-                return newCart;
-            }
-            return [...prev, {name: finalName, price: finalPrice, quantity: 1}];
-        });
-    };
-
-    const removeFromCart = (menuName) => {
-        setCart(prev => {
-            const idx = prev.findIndex(item => item.name === menuName);
-            if (idx === -1) return prev;
-            const newCart = [...prev];
-            if (newCart[idx].quantity > 1) newCart[idx] = {...newCart[idx], quantity: newCart[idx].quantity - 1};
-            else newCart.splice(idx, 1);
-            return newCart;
-        });
-    };
-
-    const getMenuCounts = (menu) => {
-        const normalQty = cart.find(i => i.name === menu.name)?.quantity || 0;
-        const shotQty = cart.find(i => i.name === `${menu.name} (샷추가)`)?.quantity || 0;
-        return {normal: normalQty, shot: shotQty, total: normalQty + shotQty};
-    };
-
-    const handleTotalChange = (menu, delta) => {
-        const {normal, shot} = getMenuCounts(menu);
-        if (delta === 1) addToCart(menu, false);
-        else {
-            if (normal > 0) removeFromCart(menu.name); else if (shot > 0) removeFromCart(`${menu.name} (샷추가)`);
-        }
-    };
-
-    const handleShotChange = (menu, delta) => {
-        const {normal, shot} = getMenuCounts(menu);
-        if (delta === 1) {
-            if (normal > 0) {
-                removeFromCart(menu.name);
-                addToCart(menu, true);
-            }
-        } else {
-            if (shot > 0) {
-                removeFromCart(`${menu.name} (샷추가)`);
-                addToCart(menu, false);
-            }
-        }
-    };
-
+    const SHOT_PRICE = 500;
     const isCoffee = (name) => name.includes('아메리카노') || name.includes('라떼') || name.includes('아샷추');
 
+    // 메뉴의 잔 수(total)와 잔별 샷 배열(slots) 반환.
+    // 커피는 잔마다 샷을 따로 두므로 shotConfig에서, 비커피는 cart 수량에서 읽는다.
+    const getMenuCounts = (menu) => {
+        if (isCoffee(menu.name)) {
+            const slots = shotConfig[menu.name] || [];
+            return {total: slots.length, slots};
+        }
+        const qty = cart.find(i => i.name === menu.name)?.quantity || 0;
+        return {total: qty, slots: []};
+    };
+
+    // 잔 수 증감. 커피는 잔 슬롯을 추가/제거(새 잔은 0샷), 비커피는 cart 수량 증감.
+    const handleTotalChange = (menu, delta) => {
+        if (isCoffee(menu.name)) {
+            setShotConfig(prev => {
+                const slots = [...(prev[menu.name] || [])];
+                if (delta > 0) slots.push(0); else slots.pop();
+                const next = {...prev};
+                if (slots.length > 0) next[menu.name] = slots; else delete next[menu.name];
+                return next;
+            });
+            return;
+        }
+        setCart(prev => {
+            const idx = prev.findIndex(i => i.name === menu.name);
+            if (delta > 0) {
+                if (idx >= 0) {
+                    const c = [...prev];
+                    c[idx] = {...c[idx], quantity: c[idx].quantity + 1};
+                    return c;
+                }
+                return [...prev, {name: menu.name, price: menu.price, quantity: 1}];
+            }
+            if (idx < 0) return prev;
+            const c = [...prev];
+            if (c[idx].quantity > 1) c[idx] = {...c[idx], quantity: c[idx].quantity - 1};
+            else c.splice(idx, 1);
+            return c;
+        });
+    };
+
+    // 특정 잔(slotIndex)의 샷 수 증감
+    const handleSlotShotChange = (menu, slotIndex, delta) => {
+        setShotConfig(prev => {
+            const slots = [...(prev[menu.name] || [])];
+            if (slotIndex < 0 || slotIndex >= slots.length) return prev;
+            slots[slotIndex] = Math.max(0, slots[slotIndex] + delta);
+            return {...prev, [menu.name]: slots};
+        });
+    };
+
+    // '샷 추가' 패널 펼치기/접기
+    const toggleShotPanel = (menuName) => {
+        setExpandedShots(prev => ({...prev, [menuName]: !prev[menuName]}));
+    };
+
+    // 비커피(cart) + 커피(shotConfig를 같은 샷끼리 묶어 라인화) → 결제/주문에 쓰는 통합 목록
+    const coffeeItems = [];
+    Object.entries(shotConfig).forEach(([menuName, slots]) => {
+        const menu = menuList.find(m => m.name === menuName);
+        if (!menu || slots.length === 0) return;
+        const byShot = {};
+        slots.forEach(s => {
+            byShot[s] = (byShot[s] || 0) + 1;
+        });
+        Object.entries(byShot).forEach(([shotStr, qty]) => {
+            const shots = parseInt(shotStr, 10);
+            const name = shots > 0 ? `${menuName} (샷추가 ${shots}개)` : menuName;
+            coffeeItems.push({name, price: menu.price + SHOT_PRICE * shots, quantity: qty});
+        });
+    });
+    const allItems = [...cart, ...coffeeItems];
+
     // 🌟 원가 및 이벤트 할인가 계산 로직
-    const originalTotalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const originalTotalAmount = allItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     let finalTotalAmount = originalTotalAmount;
     let eventAppliedQty = 0;
 
     const selectedEvent = activeEvents.find(ev => ev.id === selectedEventId);
 
-    if (selectedEvent && cart.length > 0) {
+    if (selectedEvent && allItems.length > 0) {
         let totalDiscount = 0;
 
         let remainingQty = selectedEvent.daily_limit !== null
             ? (selectedEvent.daily_limit - (selectedEvent['used_count'] || 0))
             : Infinity;
 
-        cart.forEach(item => {
+        allItems.forEach(item => {
             let isEligible = true;
 
             // 1. 특정 메뉴에만 적용되는 이벤트인지 검사
@@ -228,7 +252,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
     // [5] 주문 및 상태 관리 핸들러
     // ---------------------------------------------------------
     const submitOrder = async (isForced = false) => {
-        if (cart.length === 0) return notify("메뉴를 하나 이상 선택해주세요!", {icon: '⚠️'});
+        if (allItems.length === 0) return notify("메뉴를 하나 이상 선택해주세요!", {icon: '⚠️'});
 
         const itemsToSend = [];
 
@@ -236,7 +260,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
             ? (selectedEvent.daily_limit - (selectedEvent['used_count'] || 0))
             : Infinity;
 
-        cart.forEach(item => {
+        allItems.forEach(item => {
             let isEligible = true;
             if (selectedEvent && selectedEvent.target_menus && selectedEvent.target_menus !== 'all') {
                 try {
@@ -301,6 +325,8 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
 
             if (res.data.success) {
                 setCart([]);
+                setShotConfig({});
+                setExpandedShots({}); // 주문 후 샷 패널 모두 접힌 상태로 초기화
                 setSelectedEventId(null);
             } else if (res.data.message) {
                 notify(res.data.message, {icon: '⚠️'});
@@ -329,6 +355,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
         try {
             await axios.patch(`/api/orders/${displayId}/deliver`, {}, getAuthHeader());
         } catch (err) {
+            notify("전달 처리 실패", {icon: '⚠️'});
         }
     };
     const handleDelete = async (displayId) => {
@@ -336,6 +363,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
         try {
             await axios.delete(`/api/orders/${displayId}`, getAuthHeader());
         } catch (err) {
+            notify("주문 삭제 실패", {icon: '⚠️'});
         }
     };
 
@@ -392,7 +420,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                         <div key={idx} className="receipt-item">
                                             <div style={{display: 'flex', flexDirection: 'column'}}>
                                             <span
-                                                style={{color: item.menu_name.includes('샷추가') ? '#007bff' : 'inherit'}}>{item.menu_name}</span>
+                                                style={{color: item.menu_name.includes('(샷') ? '#007bff' : 'inherit'}}>{item.menu_name}</span>
                                                 <span style={{
                                                     fontSize: '0.85rem',
                                                     color: 'var(--text-secondary, #888)'
@@ -445,6 +473,14 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 .qty-text { font-size: 1.4rem; font-weight: bold; width: 30px; text-align: center; color: var(--text-primary, #333); }
                 .shot-box { margin-top: 15px; padding: 10px; background-color: rgba(0, 123, 255, 0.05); border-radius: var(--radius-sm); border: 1px dashed rgba(0, 123, 255, 0.3); animation: slideDown 0.2s ease-out forwards; transform-origin: top center; }
                 @keyframes slideDown { from { opacity: 0; transform: scaleY(0.8); } to { opacity: 1; transform: scaleY(1); } }
+                .shot-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; color: var(--text-secondary, #555); padding: 2px 0; }
+                .shot-toggle > span:last-child { font-size: 0.8rem; color: #007bff; }
+                .shot-slots { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(0, 123, 255, 0.25); }
+                .shot-slot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+                .shot-slot-label { font-size: 0.85rem; font-weight: bold; color: var(--text-primary, #333); width: 48px; flex-shrink: 0; }
+                .shot-slot-stepper { display: flex; align-items: center; gap: 10px; }
+                .shot-slot-count { font-size: 1.05rem; font-weight: bold; width: 18px; text-align: center; color: #007bff; }
+                .shot-slot-price { font-size: 0.8rem; color: var(--text-secondary, #888); width: 64px; text-align: right; flex-shrink: 0; }
                 .mini-circle-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #007bff; background-color: var(--card-bg, #fff); color: #007bff; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
                 .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 90; backdrop-filter: blur(3px); }
                 .sidebar-panel { position: fixed; top: 0; right: 0; width: 100%; height: 100dvh; background-color: var(--bg-color, #eef2f5); z-index: 100; display: flex; flex-direction: column; padding: 20px; padding-top: 65px; box-sizing: border-box; box-shadow: -10px 0 30px rgba(0,0,0,0.15); }
@@ -495,7 +531,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
 
                 <div className="menu-list">
                     {menuList.map(menu => {
-                        const {total, shot} = getMenuCounts(menu);
+                        const {total, slots} = getMenuCounts(menu);
                         const isSoldOut = menu.is_soldout === 1;
                         return (
                             <div key={menu.id}
@@ -527,36 +563,31 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                 </div>
                                 {!isSoldOut && isCoffee(menu.name) && total > 0 && (
                                     <div className="shot-box" onClick={(e) => e.stopPropagation()}>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            width: '100%'
-                                        }}>
-                                            <div style={{
-                                                fontSize: '0.9rem',
-                                                fontWeight: 'bold',
-                                                color: 'var(--text-secondary, #555)'
-                                            }}>☕ 샷 추가 <span style={{fontSize: '0.8rem', opacity: 0.7}}>(+500원)</span>
+                                        <button className="shot-toggle" onClick={() => toggleShotPanel(menu.name)}>
+                                            <span>☕ 샷 추가{slots.reduce((a, b) => a + b, 0) > 0 ? ` · 총 ${slots.reduce((a, b) => a + b, 0)}샷` : ''}</span>
+                                            <span>{expandedShots[menu.name] ? '▴ 접기' : '▾ 잔별 설정'}</span>
+                                        </button>
+                                        {expandedShots[menu.name] && (
+                                            <div className="shot-slots">
+                                                {slots.map((s, i) => (
+                                                    <div key={i} className="shot-slot">
+                                                        <span className="shot-slot-label">{i + 1}번 잔</span>
+                                                        <div className="shot-slot-stepper">
+                                                            <button className="mini-circle-btn"
+                                                                    onClick={() => handleSlotShotChange(menu, i, -1)}
+                                                                    disabled={s === 0}>-
+                                                            </button>
+                                                            <span className="shot-slot-count">{s}</span>
+                                                            <button className="mini-circle-btn"
+                                                                    onClick={() => handleSlotShotChange(menu, i, 1)}>+
+                                                            </button>
+                                                        </div>
+                                                        <span
+                                                            className="shot-slot-price">{s > 0 ? `샷추가 ${s}개` : '기본'}</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                                                <button className="mini-circle-btn"
-                                                        onClick={() => handleShotChange(menu, -1)}
-                                                        disabled={shot === 0}>-
-                                                </button>
-                                                <span style={{
-                                                    fontSize: '1.1rem',
-                                                    fontWeight: 'bold',
-                                                    width: '20px',
-                                                    textAlign: 'center',
-                                                    color: '#007bff'
-                                                }}>{shot}</span>
-                                                <button className="mini-circle-btn"
-                                                        onClick={() => handleShotChange(menu, 1)}
-                                                        disabled={shot >= total}>+
-                                                </button>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -628,7 +659,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                         </div>
                     </div>
                     <button onClick={() => submitOrder(false)} className="btn-submit">
-                        주문 전송 ({cart.reduce((a, c) => a + c.quantity, 0)}건)
+                        주문 전송 ({allItems.reduce((a, c) => a + c.quantity, 0)}건)
                     </button>
                 </div>
             </div>

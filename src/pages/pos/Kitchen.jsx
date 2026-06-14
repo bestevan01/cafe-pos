@@ -60,7 +60,7 @@ function Kitchen({onBack}) {
             const grouped = groupOrdersById(res.data);
             setOrderGroups(grouped);
         } catch (err) {
-            console.error("주문 목록 로드 실패");
+            notify("주문 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-kitchen'});
         }
     };
 
@@ -185,7 +185,7 @@ function Kitchen({onBack}) {
                                 <div style={{flex: 1, overflowY: 'auto', marginBottom: '5px'}}>
                                     {group.items.map((item, idx) => (
                                         <div key={idx} className="receipt-item">
-                                        <span style={{color: item.menu_name.includes('샷추가') ? '#007bff' : 'inherit'}}>
+                                        <span style={{color: item.menu_name.includes('(샷') ? '#007bff' : 'inherit'}}>
                                             {item.menu_name}
                                         </span>
                                             <span className="item-qty">{item.quantity}</span>

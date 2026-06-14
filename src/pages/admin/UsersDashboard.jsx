@@ -29,7 +29,7 @@ function UsersDashboard({onBack}) {
             const res = await axios.get('/api/admin/users', getAuthHeader());
             setUsers(res.data);
         } catch (err) {
-            console.error('회원 목록 로딩 실패');
+            notify("직원 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-users'});
         }
     };
 
