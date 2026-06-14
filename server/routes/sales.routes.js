@@ -4,9 +4,40 @@ const pool = require('../config/db');
 const {authenticateToken, requireAdmin} = require("../middlewares/auth");
 const debugInfo = require("../utils/debugInfo");
 
+// 요약 통계: 행을 받지 않고 서버에서 SUM 집계 → 데이터가 아무리 쌓여도 즉시.
+router.get('/summary', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const [[today]] = await pool.query("SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND DATE(created_at)=CURDATE()");
+        const [[month]] = await pool.query("SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
+        const [[total]] = await pool.query("SELECT IFNULL(SUM(total_price),0) AS s, COUNT(*) AS c FROM orders WHERE is_paid=1");
+        const [periods] = await pool.query("SELECT DISTINCT YEAR(created_at) AS year, MONTH(created_at) AS month FROM orders WHERE is_paid=1 ORDER BY year DESC, month DESC");
+        res.json({
+            today: Number(today.s),
+            month: Number(month.s),
+            total: Number(total.s),
+            totalCount: Number(total.c),
+            periods: periods.map(p => ({year: Number(p.year), month: Number(p.month)}))
+        });
+    } catch (err) {
+        console.error('[🔥 GET /api/admin/sales/summary 에러]', err);
+        res.status(500).json({success: false, message: '매출 요약을 불러오지 못했습니다.', debug_info: debugInfo(err)});
+    }
+});
+
+// 상세 내역: 연+월 단위로만 조회 (전체 로딩 방지). 미지정 시 이번 달.
 router.get('', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM orders WHERE is_paid = 1 ORDER BY created_at DESC');
+        const year = parseInt(req.query.year, 10);
+        const month = parseInt(req.query.month, 10);
+        let sql, params;
+        if (year && month) {
+            sql = 'SELECT * FROM orders WHERE is_paid=1 AND YEAR(created_at)=? AND MONTH(created_at)=? ORDER BY created_at DESC';
+            params = [year, month];
+        } else {
+            sql = 'SELECT * FROM orders WHERE is_paid=1 AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE()) ORDER BY created_at DESC';
+            params = [];
+        }
+        const [rows] = await pool.query(sql, params);
         res.json(rows);
     } catch (err) {
         console.error('[🔥 GET /api/admin/sales 에러]', err);

@@ -1,4 +1,4 @@
-import {useState, useEffect, useMemo} from 'react';
+import {useState, useEffect, useMemo, useRef} from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import AdvancedStats from "./AdvancedStats.jsx";
@@ -10,12 +10,15 @@ function SalesDashboard({onBack}) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
+    const now = new Date();
     const [salesData, setSalesData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [summary, setSummary] = useState({today: 0, month: 0, total: 0, totalCount: 0, periods: []});
+    const monthCacheRef = useRef({}); // { 'year-month': rows } — 받은 달 캐싱
 
-    // 필터링 상태
-    const [selectedYear, setSelectedYear] = useState('all');
-    const [selectedMonth, setSelectedMonth] = useState('all');
+    // 필터링 상태 (연·월 = 서버 fetch 단위(기본 이번 달), 일·시·결제 = 클라 필터)
+    const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
+    const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1));
     const [selectedDay, setSelectedDay] = useState('all');
     const [selectedHour, setSelectedHour] = useState('all');
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
@@ -33,22 +36,39 @@ function SalesDashboard({onBack}) {
     // [2] 데이터 조회 및 API
     // ---------------------------------------------------------
     useEffect(() => {
-        void fetchSales();
+        void fetchSummary();
     }, []);
 
-    const fetchSales = async () => {
+    useEffect(() => {
+        void fetchMonth(selectedYear, selectedMonth);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedYear, selectedMonth]);
+
+    const fetchSummary = async () => {
+        try {
+            const res = await axios.get('/api/admin/sales/summary', getAuthHeader());
+            setSummary(res.data);
+        } catch (err) {
+            notify("매출 요약을 불러오지 못했습니다.", {icon: '⚠️', dedupeKey: 'load-sales'});
+        }
+    };
+
+    // 연+월 단위로 받아 캐싱. 이미 받은 달은 재요청 없이 즉시 표시.
+    const fetchMonth = async (year, month, {force = false} = {}) => {
+        const key = `${year}-${month}`;
+        if (!force && monthCacheRef.current[key]) {
+            setSalesData(monthCacheRef.current[key]);
+            return;
+        }
         try {
             setLoading(true);
-            const res = await axios.get('/api/admin/sales', getAuthHeader());
-
+            const res = await axios.get(`/api/admin/sales?year=${year}&month=${month}`, getAuthHeader());
+            monthCacheRef.current[key] = res.data;
             setSalesData(res.data);
-            setLoading(false);
         } catch (err) {
-            if (err.response && err.response.status === 401) {
-                notify("로그인 세션이 만료되었습니다.", {icon: '🔒'});
-            } else {
-                notify("데이터 로딩 실패", {icon: '⚠️'});
-            }
+            if (err.response && err.response.status === 401) notify("로그인 세션이 만료되었습니다.", {icon: '🔒'});
+            else notify("매출 데이터를 불러오지 못했습니다.", {icon: '⚠️', dedupeKey: 'load-sales'});
+        } finally {
             setLoading(false);
         }
     };
@@ -57,8 +77,8 @@ function SalesDashboard({onBack}) {
         if (!(await confirm('정말 삭제(환불) 처리하시겠습니까?', {title: '매출 삭제', confirmText: '삭제', danger: true}))) return;
         try {
             await axios.delete(`/api/admin/sales/${id}`, getAuthHeader());
-
-            await fetchSales();
+            await fetchMonth(selectedYear, selectedMonth, {force: true});
+            await fetchSummary();
         } catch (err) {
             notify('삭제 실패: 권한이 없거나 오류가 발생했습니다.', {icon: '⚠️'});
         }
@@ -103,19 +123,16 @@ function SalesDashboard({onBack}) {
     // [4] 통계 계산 로직
     // ---------------------------------------------------------
     const stats = useMemo(() => {
-        const getKSTDateStr = (isoString) => new Date(isoString).toLocaleString('en-CA', {
-            hour12: false,
-            timeZone: 'Asia/Seoul'
-        }).slice(0, 10);
-        const todayKST = getKSTDateStr(new Date().toISOString());
-        const monthKST = todayKST.slice(0, 7);
-
-        const todaySum = salesData.filter(item => getKSTDateStr(item.created_at) === todayKST).reduce((acc, cur) => acc + cur.total_price, 0);
-        const monthSum = salesData.filter(item => getKSTDateStr(item.created_at).startsWith(monthKST)).reduce((acc, cur) => acc + cur.total_price, 0);
+        // 오늘/이번달/전체는 서버 집계(summary), 현재 조회 기간 합계/건수는 클라(filteredData)
         const filteredTotal = filteredData.reduce((acc, cur) => acc + cur.total_price, 0);
-
-        return {today: todaySum, month: monthSum, count: filteredData.length, filteredTotal: filteredTotal};
-    }, [salesData, filteredData]);
+        return {
+            today: summary.today,
+            month: summary.month,
+            total: summary.total,
+            count: filteredData.length,
+            filteredTotal
+        };
+    }, [summary, filteredData]);
 
     // ---------------------------------------------------------
     // [5] 헬퍼 함수 (정렬, 엑셀, 옵션 생성)
@@ -148,39 +165,36 @@ function SalesDashboard({onBack}) {
         const ws = XLSX.utils.json_to_sheet(excelData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "매출내역");
-        XLSX.writeFile(wb, `매출내역_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(wb, `매출내역_${selectedYear}-${String(selectedMonth).padStart(2, '0')}.xlsx`);
     };
 
     const resetFilters = () => {
-        setSelectedYear('all');
-        setSelectedMonth('all');
+        const d = new Date();
+        setSelectedYear(String(d.getFullYear()));
+        setSelectedMonth(String(d.getMonth() + 1));
         setSelectedDay('all');
         setSelectedHour('all');
         setSelectedPaymentMethod('all');
         setSortConfig({key: null, direction: 'default'});
     };
 
-    // 드롭다운 옵션 동적 생성
-    const getAvailableYears = () => Array.from(new Set(salesData.map(item => new Date(item.created_at).getFullYear()))).sort((a, b) => b - a);
-    const getAvailableMonths = () => selectedYear === 'all' ? [] : Array.from(new Set(salesData.filter(item => new Date(item.created_at).getFullYear() === parseInt(selectedYear)).map(item => new Date(item.created_at).getMonth() + 1))).sort((a, b) => a - b);
-    const getAvailableDays = () => (selectedYear === 'all' || selectedMonth === 'all') ? [] : Array.from(new Set(salesData.filter(item => new Date(item.created_at).getFullYear() === parseInt(selectedYear) && (new Date(item.created_at).getMonth() + 1) === parseInt(selectedMonth)).map(item => new Date(item.created_at).getDate()))).sort((a, b) => a - b);
-    const getAvailableHours = () => (selectedYear === 'all' || selectedMonth === 'all' || selectedDay === 'all') ? [] : Array.from(new Set(salesData.filter(item => new Date(item.created_at).getFullYear() === parseInt(selectedYear) && (new Date(item.created_at).getMonth() + 1) === parseInt(selectedMonth) && new Date(item.created_at).getDate() === parseInt(selectedDay)).map(item => new Date(item.created_at).getHours()))).sort((a, b) => a - b);
+    // 연·월 옵션은 서버 요약(periods)에서, 일·시 옵션은 받은 달(salesData)에서
+    const getAvailableYears = () => Array.from(new Set(summary.periods.map(p => p.year))).sort((a, b) => b - a);
+    const getAvailableMonths = () => summary.periods.filter(p => p.year === parseInt(selectedYear)).map(p => p.month).sort((a, b) => a - b);
+    const getAvailableDays = () => Array.from(new Set(salesData.map(item => new Date(item.created_at).getDate()))).sort((a, b) => a - b);
+    const getAvailableHours = () => selectedDay === 'all' ? [] : Array.from(new Set(salesData.filter(item => new Date(item.created_at).getDate() === parseInt(selectedDay)).map(item => new Date(item.created_at).getHours()))).sort((a, b) => a - b);
 
     const periodLabel = useMemo(() => {
-        if (selectedYear === 'all') return `전체 기간 ${selectedPaymentMethod !== 'all' ? `(${selectedPaymentMethod === 'bank' ? '계좌' : '현금'})` : ''}`;
-        let label = `${selectedYear}년`;
-        if (selectedMonth !== 'all') label += ` ${selectedMonth}월`;
+        let label = `${selectedYear}년 ${selectedMonth}월`;
         if (selectedDay !== 'all') label += ` ${selectedDay}일`;
         if (selectedHour !== 'all') label += ` ${selectedHour}시`;
-        if (selectedPaymentMethod !== 'all') label += ` (${selectedPaymentMethod === 'bank' ? '계좌' : '현금'})`;
+        if (selectedPaymentMethod !== 'all') label += ` (${selectedPaymentMethod === 'bank' ? '계좌' : selectedPaymentMethod === 'event' ? '이벤트' : '현금'})`;
         return label;
     }, [selectedYear, selectedMonth, selectedDay, selectedHour, selectedPaymentMethod]);
 
     // ---------------------------------------------------------
     // [6] 렌더링 (Render)
     // ---------------------------------------------------------
-    if (loading) return <div style={{padding: '50px', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터를 불러오는
-        중입니다...</div>;
     if (showAdvanced) return <AdvancedStats onBack={() => setShowAdvanced(false)}/>;
 
     return (
@@ -267,55 +281,44 @@ function SalesDashboard({onBack}) {
                 </div>
                 <div className="header-right">
                     <div className="theme-wrapper"><ThemeToggle/></div>
-                    <button onClick={fetchSales} className="btn-refresh">🔄 새로고침</button>
+                    <button onClick={() => {
+                        void fetchMonth(selectedYear, selectedMonth, {force: true});
+                        void fetchSummary();
+                    }} className="btn-refresh">🔄 새로고침
+                    </button>
                     <button onClick={() => setShowAdvanced(true)} className="btn-advanced">📊 고급 통계</button>
                     <button onClick={exportExcel} className="btn-excel">📗 엑셀 다운로드</button>
                 </div>
             </div>
 
-            {/* 요약 통계 카드 */}
+            {/* 요약 통계 카드 (서버 집계 — 데이터가 쌓여도 즉시) */}
             <div className="stats-grid">
-                {selectedYear === 'all' && selectedPaymentMethod === 'all' ? (
-                    <>
-                        <div className="stat-card">
-                            <h3 className="stat-title">📅 오늘 매출</h3>
-                            <p className="stat-val">{stats.today.toLocaleString()}원</p>
-                        </div>
-                        <div className="stat-card">
-                            <h3 className="stat-title">🗓 이번 달 매출</h3>
-                            <p className="stat-val green">{stats.month.toLocaleString()}원</p>
-                        </div>
-                        <div className="stat-card">
-                            <h3 className="stat-title">🧾 전체 주문 수</h3>
-                            <p className="stat-val blue">{stats.count}건</p>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <div className="stat-card">
-                            <h3 className="stat-title">🔍 조회 기간</h3>
-                            <p className="stat-val" style={{fontSize: '1.2rem'}}>{periodLabel}</p>
-                        </div>
-                        <div className="stat-card">
-                            <h3 className="stat-title">💰 기간 총 매출</h3>
-                            <p className="stat-val green">{stats.filteredTotal.toLocaleString()}원</p>
-                        </div>
-                        <div className="stat-card">
-                            <h3 className="stat-title">🧾 조회된 주문 수</h3>
-                            <p className="stat-val blue">{stats.count}건</p>
-                        </div>
-                    </>
-                )}
+                <div className="stat-card">
+                    <h3 className="stat-title">📅 오늘 매출</h3>
+                    <p className="stat-val">{stats.today.toLocaleString()}원</p>
+                </div>
+                <div className="stat-card">
+                    <h3 className="stat-title">🗓 이번 달 매출</h3>
+                    <p className="stat-val green">{stats.month.toLocaleString()}원</p>
+                </div>
+                <div className="stat-card">
+                    <h3 className="stat-title">💰 전체 누적 매출</h3>
+                    <p className="stat-val blue">{stats.total.toLocaleString()}원</p>
+                </div>
             </div>
 
             {/* 상세 내역 테이블 및 필터 */}
             <div className="table-card">
                 <div className="filter-area">
-                    <h3 className="filter-title" style={{margin: 0}}>상세 내역</h3>
+                    <h3 className="filter-title" style={{margin: 0}}>상세 내역 · {periodLabel}{' '}
+                        <span style={{fontWeight: 'normal', fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
+                            ({stats.count}건 · {stats.filteredTotal.toLocaleString()}원)
+                        </span>
+                    </h3>
                     <div className="filter-group">
                         <div className="filter-row top-row">
                             <button onClick={resetFilters} className="btn-filter"
-                                    style={{backgroundColor: selectedYear === 'all' && selectedPaymentMethod === 'all' ? '#007bff' : '#6c757d'}}>초기화
+                                    style={{backgroundColor: '#6c757d'}}>이번 달로
                             </button>
                             <select value={selectedPaymentMethod}
                                     onChange={(e) => setSelectedPaymentMethod(e.target.value)} className="filter-select"
@@ -327,34 +330,35 @@ function SalesDashboard({onBack}) {
                         </div>
                         <div className="filter-row bottom-row">
                             <select value={selectedYear} onChange={(e) => {
-                                setSelectedYear(e.target.value);
-                                setSelectedMonth('all');
+                                const y = e.target.value;
+                                setSelectedYear(y);
+                                const ms = summary.periods.filter(p => p.year === parseInt(y)).map(p => p.month).sort((a, b) => b - a);
+                                if (ms.length > 0 && !ms.includes(parseInt(selectedMonth))) setSelectedMonth(String(ms[0]));
                                 setSelectedDay('all');
                                 setSelectedHour('all');
                             }} className="filter-select">
-                                <option value="all">연도 선택</option>
-                                {getAvailableYears().map(year => (<option key={year} value={year}>{year}년</option>))}
+                                {getAvailableYears().map(year => (
+                                    <option key={year} value={String(year)}>{year}년</option>))}
                             </select>
                             <select value={selectedMonth} onChange={(e) => {
                                 setSelectedMonth(e.target.value);
                                 setSelectedDay('all');
                                 setSelectedHour('all');
-                            }} className="filter-select" disabled={selectedYear === 'all'}>
-                                <option value="all">월 선택</option>
+                            }} className="filter-select">
                                 {getAvailableMonths().map(month => (
                                     <option key={String(month)} value={String(month)}>{month}월</option>))}
                             </select>
                             <select value={selectedDay} onChange={(e) => {
                                 setSelectedDay(e.target.value);
                                 setSelectedHour('all');
-                            }} className="filter-select" disabled={selectedMonth === 'all'}>
-                                <option value="all">일 선택</option>
+                            }} className="filter-select">
+                                <option value="all">일 전체</option>
                                 {getAvailableDays().map(day => (
                                     <option key={String(day)} value={String(day)}>{day}일</option>))}
                             </select>
                             <select value={selectedHour} onChange={(e) => setSelectedHour(e.target.value)}
                                     className="filter-select" disabled={selectedDay === 'all'}>
-                                <option value="all">시간 선택</option>
+                                <option value="all">시간 전체</option>
                                 {getAvailableHours().map(hour => (
                                     <option key={String(hour)} value={String(hour)}>{hour}시</option>))}
                             </select>
@@ -378,7 +382,14 @@ function SalesDashboard({onBack}) {
                         </tr>
                         </thead>
                         <tbody>
-                        {sortedData.length === 0 ? (
+                        {loading ? (
+                            <tr>
+                                <td colSpan="8"
+                                    style={{padding: '30px', textAlign: 'center', color: 'var(--text-secondary)'}}>불러오는
+                                    중...
+                                </td>
+                            </tr>
+                        ) : sortedData.length === 0 ? (
                             <tr>
                                 <td colSpan="8"
                                     style={{padding: '30px', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터가
@@ -424,7 +435,10 @@ function SalesDashboard({onBack}) {
 
                 {/* 모바일 카드 뷰 */}
                 <div className="sales-card-view">
-                    {sortedData.length === 0 ? (
+                    {loading ? (
+                        <div style={{textAlign: 'center', padding: '30px', color: 'var(--text-secondary)'}}>불러오는
+                            중...</div>
+                    ) : sortedData.length === 0 ? (
                         <div style={{textAlign: 'center', padding: '30px', color: 'var(--text-secondary)'}}>데이터가
                             없습니다.</div>
                     ) : (

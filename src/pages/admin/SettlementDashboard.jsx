@@ -110,119 +110,127 @@ function SettlementDashboard({onBack}) {
             </div>
 
             <div className="settle-content">
-                {loading ? (
-                    <p style={{color: 'var(--text-secondary)', textAlign: 'center'}}>데이터를 불러오는 중입니다...</p>
-                ) : (
-                    <>
-                        {/* PC용 테이블 뷰 */}
-                        <table className="settle-table-view">
-                            <thead>
+                <>
+                    {/* PC용 테이블 뷰 */}
+                    <table className="settle-table-view">
+                        <thead>
+                        <tr>
+                            <th>날짜</th>
+                            <th>상태</th>
+                            <th>오픈 시재</th>
+                            <th>+ 현금 매출</th>
+                            <th>= 전산 합계</th>
+                            <th>실제 마감액</th>
+                            <th>차액 (오차)</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {loading ? (
                             <tr>
-                                <th>날짜</th>
-                                <th>상태</th>
-                                <th>오픈 시재</th>
-                                <th>+ 현금 매출</th>
-                                <th>= 전산 합계</th>
-                                <th>실제 마감액</th>
-                                <th>차액 (오차)</th>
+                                <td colSpan="7" style={{
+                                    padding: '30px',
+                                    textAlign: 'center',
+                                    color: 'var(--text-secondary)'
+                                }}>불러오는 중...
+                                </td>
                             </tr>
-                            </thead>
-                            <tbody>
-                            {settlements.length === 0 ? (
-                                <tr>
-                                    <td colSpan="7" style={{
-                                        padding: '30px',
-                                        textAlign: 'center',
-                                        color: 'var(--text-secondary)'
-                                    }}>정산 기록이 없습니다.
-                                    </td>
-                                </tr>
-                            ) : (
-                                settlements.map(item => {
-                                    const expected = item['opening_amount'] + item['sales_cash'];
-                                    return (
-                                        <tr key={item.id}>
-                                            <td>{new Date(item.date).toLocaleDateString()}</td>
-                                            <td>{item['is_closed'] ? <span className="badge-closed">마감완료</span> :
-                                                <span className="badge-open">영업중</span>}</td>
-                                            <td>{item['opening_amount'].toLocaleString()}원</td>
-                                            <td>{item['sales_cash'].toLocaleString()}원</td>
-                                            <td className="text-blue">{expected.toLocaleString()}원</td>
-                                            <td>{item['is_closed'] ? item['closing_amount'].toLocaleString() + '원' : '-'}</td>
-                                            <td>
-                                                {item['is_closed'] ? (
-                                                    <span className={item.difference !== 0 ? "diff-bad" : "diff-good"}>
+                        ) : settlements.length === 0 ? (
+                            <tr>
+                                <td colSpan="7" style={{
+                                    padding: '30px',
+                                    textAlign: 'center',
+                                    color: 'var(--text-secondary)'
+                                }}>정산 기록이 없습니다.
+                                </td>
+                            </tr>
+                        ) : (
+                            settlements.map(item => {
+                                const expected = item['opening_amount'] + item['sales_cash'];
+                                return (
+                                    <tr key={item.id}>
+                                        <td>{new Date(item.date).toLocaleDateString()}</td>
+                                        <td>{item['is_closed'] ? <span className="badge-closed">마감완료</span> :
+                                            <span className="badge-open">영업중</span>}</td>
+                                        <td>{item['opening_amount'].toLocaleString()}원</td>
+                                        <td>{item['sales_cash'].toLocaleString()}원</td>
+                                        <td className="text-blue">{expected.toLocaleString()}원</td>
+                                        <td>{item['is_closed'] ? item['closing_amount'].toLocaleString() + '원' : '-'}</td>
+                                        <td>
+                                            {item['is_closed'] ? (
+                                                <span className={item.difference !== 0 ? "diff-bad" : "diff-good"}>
                                                             {item.difference > 0 ? '+' : ''}{item.difference.toLocaleString()}원
                                                         </span>
-                                                ) : '-'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                            </tbody>
-                        </table>
+                                            ) : '-'}
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                        </tbody>
+                    </table>
 
-                        {/* 모바일용 카드 뷰 */}
-                        <div className="settle-card-view">
-                            {settlements.length === 0 ? (
-                                <p style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '20px'}}>정산 기록이
-                                    없습니다.</p>
-                            ) : (
-                                settlements.map(item => {
-                                    const expected = item['opening_amount'] + item['sales_cash'];
-                                    return (
-                                        <div key={item.id} className="settle-card">
-                                            <div className="card-header">
-                                                <div
-                                                    className="card-date">{new Date(item.date).toLocaleDateString()}</div>
-                                                {item['is_closed'] ? <span className="badge-closed">마감완료</span> :
-                                                    <span className="badge-open">영업중</span>}
-                                            </div>
+                    {/* 모바일용 카드 뷰 */}
+                    <div className="settle-card-view">
+                        {loading ? (
+                            <p style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '20px'}}>불러오는
+                                중...</p>
+                        ) : settlements.length === 0 ? (
+                            <p style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '20px'}}>정산 기록이
+                                없습니다.</p>
+                        ) : (
+                            settlements.map(item => {
+                                const expected = item['opening_amount'] + item['sales_cash'];
+                                return (
+                                    <div key={item.id} className="settle-card">
+                                        <div className="card-header">
+                                            <div
+                                                className="card-date">{new Date(item.date).toLocaleDateString()}</div>
+                                            {item['is_closed'] ? <span className="badge-closed">마감완료</span> :
+                                                <span className="badge-open">영업중</span>}
+                                        </div>
 
-                                            <div className="card-row">
-                                                <span>오픈 시재</span>
-                                                <span
-                                                    className="card-val">{item['opening_amount'].toLocaleString()}원</span>
-                                            </div>
-                                            <div className="card-row">
-                                                <span>+ 현금 매출</span>
-                                                <span className="card-val">{item['sales_cash'].toLocaleString()}원</span>
-                                            </div>
-                                            <div className="card-total-row text-blue">
-                                                <span>= 전산 합계</span>
-                                                <span>{expected.toLocaleString()}원</span>
-                                            </div>
+                                        <div className="card-row">
+                                            <span>오픈 시재</span>
+                                            <span
+                                                className="card-val">{item['opening_amount'].toLocaleString()}원</span>
+                                        </div>
+                                        <div className="card-row">
+                                            <span>+ 현금 매출</span>
+                                            <span className="card-val">{item['sales_cash'].toLocaleString()}원</span>
+                                        </div>
+                                        <div className="card-total-row text-blue">
+                                            <span>= 전산 합계</span>
+                                            <span>{expected.toLocaleString()}원</span>
+                                        </div>
 
-                                            {item['is_closed'] && (
-                                                <div className="card-closing-section">
-                                                    <div>
-                                                        <div className="closing-label">실제 마감액</div>
-                                                        <div
-                                                            className="closing-val">{item['closing_amount'].toLocaleString()}원
-                                                        </div>
-                                                    </div>
-                                                    <div style={{textAlign: 'right'}}>
-                                                        <div style={{
-                                                            fontSize: '0.8rem',
-                                                            color: 'var(--text-secondary)',
-                                                            marginBottom: '3px'
-                                                        }}>차액 (오차)
-                                                        </div>
-                                                        <span
-                                                            className={item.difference !== 0 ? "diff-bad" : "diff-good"}>
-                                                            {item.difference > 0 ? '+' : ''}{item.difference.toLocaleString()}원
-                                                        </span>
+                                        {item['is_closed'] && (
+                                            <div className="card-closing-section">
+                                                <div>
+                                                    <div className="closing-label">실제 마감액</div>
+                                                    <div
+                                                        className="closing-val">{item['closing_amount'].toLocaleString()}원
                                                     </div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </>
-                )}
+                                                <div style={{textAlign: 'right'}}>
+                                                    <div style={{
+                                                        fontSize: '0.8rem',
+                                                        color: 'var(--text-secondary)',
+                                                        marginBottom: '3px'
+                                                    }}>차액 (오차)
+                                                    </div>
+                                                    <span
+                                                        className={item.difference !== 0 ? "diff-bad" : "diff-good"}>
+                                                            {item.difference > 0 ? '+' : ''}{item.difference.toLocaleString()}원
+                                                        </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </>
             </div>
         </div>
     );

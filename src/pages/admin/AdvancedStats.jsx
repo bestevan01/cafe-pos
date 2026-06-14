@@ -35,9 +35,6 @@ function AdvancedStats({onBack}) {
     const maxItemSales = Math.max(...stats.itemStats.map(i => Number(i['total_sales'])), 1);
     const maxTimeSales = Math.max(...stats.timeStats.map(t => Number(t['total_sales'])), 1);
 
-    if (loading) return <div style={{padding: '50px', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터 분석 중...
-        📊</div>;
-
     // ---------------------------------------------------------
     // [3] 렌더링 (Render)
     // ---------------------------------------------------------
@@ -124,22 +121,24 @@ function AdvancedStats({onBack}) {
                 <div className="main-card">
                     <h2 className="card-title">🍔 메뉴별 인기 순위</h2>
                     <div className="item-list">
-                        {stats.itemStats.length === 0 ? <p style={{color: 'var(--text-secondary)'}}>데이터가
-                            없습니다.</p> : stats.itemStats.map((item, idx) => (
-                            <div key={idx} className="item-row">
-                                <div className="item-info">
-                                    <span className="item-name">{idx + 1}. {item.menu_name}</span>
-                                    <span
-                                        className="item-sales">{Number(item['total_qty']).toLocaleString()}잔 / {Number(item['total_sales']).toLocaleString()}원</span>
-                                </div>
-                                <div className="bar-bg">
-                                    <div className="bar-fill" style={{
-                                        width: `${(Number(item['total_sales']) / maxItemSales) * 100}%`,
-                                        backgroundColor: idx < 3 ? '#ff7043' : '#42a5f5'
-                                    }}/>
-                                </div>
-                            </div>
-                        ))}
+                        {loading ?
+                            <p style={{color: 'var(--text-secondary)'}}>불러오는 중...</p> : stats.itemStats.length === 0 ?
+                                <p style={{color: 'var(--text-secondary)'}}>데이터가
+                                    없습니다.</p> : stats.itemStats.map((item, idx) => (
+                                    <div key={idx} className="item-row">
+                                        <div className="item-info">
+                                            <span className="item-name">{idx + 1}. {item.menu_name}</span>
+                                            <span
+                                                className="item-sales">{Number(item['total_qty']).toLocaleString()}잔 / {Number(item['total_sales']).toLocaleString()}원</span>
+                                        </div>
+                                        <div className="bar-bg">
+                                            <div className="bar-fill" style={{
+                                                width: `${(Number(item['total_sales']) / maxItemSales) * 100}%`,
+                                                backgroundColor: idx < 3 ? '#ff7043' : '#42a5f5'
+                                            }}/>
+                                        </div>
+                                    </div>
+                                ))}
                     </div>
                 </div>
 
@@ -149,7 +148,8 @@ function AdvancedStats({onBack}) {
 
                     {/* PC: 세로 막대 차트 */}
                     <div className="desktop-time-chart">
-                        {stats.timeStats.length === 0 ?
+                        {loading ? <p style={{width: '100%', textAlign: 'center', color: 'var(--text-secondary)'}}>불러오는
+                            중...</p> : stats.timeStats.length === 0 ?
                             <p style={{width: '100%', textAlign: 'center', color: 'var(--text-secondary)'}}>데이터가
                                 없습니다.</p> : stats.timeStats.map((time, idx) => (
                                 <div key={idx} className="time-col">
@@ -163,23 +163,25 @@ function AdvancedStats({onBack}) {
 
                     {/* 모바일: 가로 막대 차트 (반응형) */}
                     <div className="mobile-time-chart">
-                        {stats.timeStats.length === 0 ? <p style={{color: 'var(--text-secondary)'}}>데이터가
-                            없습니다.</p> : stats.timeStats.map((time, idx) => (
-                            <div key={idx} className="item-row">
-                                <div className="item-info">
-                                    <span className="item-name">{time.hour}시</span>
-                                    <span
-                                        className="item-sales time-val">{Number(time['total_sales']).toLocaleString()}원</span>
-                                </div>
-                                <div className="bar-bg">
-                                    <div className="bar-fill time-bar-vertical" style={{
-                                        width: `${(Number(time['total_sales']) / maxTimeSales) * 100}%`,
-                                        height: '100%',
-                                        borderRadius: 'var(--radius-sm)'
-                                    }}/>
-                                </div>
-                            </div>
-                        ))}
+                        {loading ?
+                            <p style={{color: 'var(--text-secondary)'}}>불러오는 중...</p> : stats.timeStats.length === 0 ?
+                                <p style={{color: 'var(--text-secondary)'}}>데이터가
+                                    없습니다.</p> : stats.timeStats.map((time, idx) => (
+                                    <div key={idx} className="item-row">
+                                        <div className="item-info">
+                                            <span className="item-name">{time.hour}시</span>
+                                            <span
+                                                className="item-sales time-val">{Number(time['total_sales']).toLocaleString()}원</span>
+                                        </div>
+                                        <div className="bar-bg">
+                                            <div className="bar-fill time-bar-vertical" style={{
+                                                width: `${(Number(time['total_sales']) / maxTimeSales) * 100}%`,
+                                                height: '100%',
+                                                borderRadius: 'var(--radius-sm)'
+                                            }}/>
+                                        </div>
+                                    </div>
+                                ))}
                     </div>
                 </div>
             </div>
