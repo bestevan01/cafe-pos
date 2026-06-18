@@ -4,6 +4,7 @@ import SettlementDashboard from './SettlementDashboard';
 import MenuDashboard from './MenuDashboard';
 import EventDashboard from './EventDashboard';
 import UsersDashboard from './UsersDashboard';
+import CostAnalysis from './CostAnalysis';
 import ThemeToggle from '../../components/ThemeToggle';
 import {socket} from '../../utils/socket';
 import {useNotification} from '../../hooks/useNotification';
@@ -33,6 +34,7 @@ function AdminDashboard({onLogout, onEditProfile}) {
     if (view === 'menu') return <MenuDashboard onBack={() => setView('home')}/>;
     if (view === 'event') return <EventDashboard onBack={() => setView('home')}/>;
     if (view === 'users') return <UsersDashboard onBack={() => setView('home')}/>;
+    if (view === 'cost') return <CostAnalysis onBack={() => setView('home')}/>;
 
     // 메인(Home) 화면 렌더링
     return (
@@ -146,6 +148,11 @@ function AdminDashboard({onLogout, onEditProfile}) {
                         <div className="card-icon">📋</div>
                         <div className="card-title">메뉴 관리</div>
                         <div className="card-desc">메뉴 추가/품절 변경</div>
+                    </button>
+                    <button onClick={() => setView('cost')} className="admin-card">
+                        <div className="card-icon">🧮</div>
+                        <div className="card-title">원가/순익 분석</div>
+                        <div className="card-desc">원재료·레시피로 잔당 마진 계산</div>
                     </button>
                     <button onClick={() => setView('event')} className="admin-card">
                         <div className="card-icon">🎉</div>

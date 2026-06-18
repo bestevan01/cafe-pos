@@ -21,6 +21,7 @@ const eventRoutes = require('./routes/event.routes');
 const salesRoutes = require('./routes/sales.routes');
 const settlementRoutes = require('./routes/settlement.routes');
 const statsRoutes = require('./routes/stats.routes');
+const costRoutes = require('./routes/cost.routes');
 const passkeyRoutes = require('./routes/passkey.routes');
 const healthRoutes = require('./routes/health.routes');
 
@@ -80,6 +81,44 @@ async function ensureSchema() {
     } catch (err) {
         console.error("⚠️ [DB] daily_order_counters 테이블 생성 실패 (수동 마이그레이션 필요):", err.message);
     }
+
+    // 원가·순익 분석 테이블 (ingredients / menu_recipes). 참조 순서상 ingredients 먼저 생성.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS ingredients
+            (
+                id              INT AUTO_INCREMENT PRIMARY KEY,
+                name            VARCHAR(100)   NOT NULL,
+                purchase_price  INT            NOT NULL,
+                purchase_amount DECIMAL(10, 2) NOT NULL,
+                unit            VARCHAR(10)    NOT NULL DEFAULT 'g',
+                updated_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS menu_recipes
+            (
+                id            INT AUTO_INCREMENT PRIMARY KEY,
+                menu_id       VARCHAR(36) COLLATE utf8mb4_bin NOT NULL,
+                ingredient_id INT                             NOT NULL,
+                amount        DECIMAL(10, 2)                  NOT NULL,
+                UNIQUE KEY uq_menu_ingredient (menu_id, ingredient_id),
+                CONSTRAINT fk_recipe_menu FOREIGN KEY (menu_id) REFERENCES menu (id) ON DELETE CASCADE,
+                CONSTRAINT fk_recipe_ingredient FOREIGN KEY (ingredient_id) REFERENCES ingredients (id) ON DELETE CASCADE
+            )
+        `);
+    } catch (err) {
+        console.error("⚠️ [DB] 원가분석 테이블 생성 실패 (수동 마이그레이션 필요):", err.message);
+    }
+
+    // menu.cost_override 컬럼 보장 (이미 있으면 무시)
+    try {
+        await pool.query('ALTER TABLE menu ADD COLUMN cost_override INT NULL DEFAULT NULL');
+    } catch (err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error("⚠️ [DB] menu.cost_override 컬럼 추가 실패 (수동 마이그레이션 필요):", err.message);
+        }
+    }
 }
 
 // ---------------------------------------------------------
@@ -108,6 +147,7 @@ app.use('/api', passkeyRoutes);
 // 관리자, 정산 및 통계 API
 app.use('/api/admin/sales', salesRoutes);
 app.use('/api/admin/stats', statsRoutes);
+app.use('/api/admin', costRoutes);
 app.use('/api/settlements', settlementRoutes);
 
 // 상태 확인용 API (Health Check)
