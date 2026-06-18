@@ -12,7 +12,7 @@ const {
 } = require('@simplewebauthn/server');
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const FRONTEND_URL = 'bu-cafe-pos.vercel.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'bu-cafe-pos.vercel.app';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const currentChallenges = {}; // 챌린지 임시 저장소
 const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
