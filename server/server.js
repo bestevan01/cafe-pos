@@ -34,7 +34,7 @@ const setupSocketHandlers = require('./sockets/socketHandlers')
 // [2] 환경 변수 및 상수 설정 (Constants)
 // ---------------------------------------------------------
 const PORT = process.env.PORT || 3000;
-const FRONTEND_URL = 'bu-cafe-pos.vercel.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'bu-cafe-pos.vercel.app';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const JWT_SECRET = process.env.JWT_SECRET;
 
