@@ -119,6 +119,15 @@ async function ensureSchema() {
             console.error("⚠️ [DB] menu.cost_override 컬럼 추가 실패 (수동 마이그레이션 필요):", err.message);
         }
     }
+
+    // ingredients.category 컬럼 보장 (식재료/부자재 분류, 이미 있으면 무시)
+    try {
+        await pool.query("ALTER TABLE ingredients ADD COLUMN category VARCHAR(10) NOT NULL DEFAULT '식재료'");
+    } catch (err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error("⚠️ [DB] ingredients.category 컬럼 추가 실패 (수동 마이그레이션 필요):", err.message);
+        }
+    }
 }
 
 // ---------------------------------------------------------

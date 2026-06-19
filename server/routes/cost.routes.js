@@ -7,7 +7,9 @@ const debugInfo = require('../utils/debugInfo');
 // 이 라우터의 모든 엔드포인트는 관리자 전용
 router.use(authenticateToken, requireAdmin);
 
-const ALLOWED_UNITS = ['g', 'ml', 'ea'];
+const ALLOWED_UNITS = ['g', 'ml', '개', 'ea']; // 'ea'는 레거시 호환용(신규는 '개')
+const ALLOWED_CATEGORIES = ['식재료', '부자재']; // 부자재 = 컵/빨대/뚜껑 등 포장재
+const normalizeCategory = (c) => (ALLOWED_CATEGORIES.includes(c) ? c : '식재료');
 
 // 단위당 원가(원/단위). 구매 용량이 0 이하이면 0으로 안전 처리.
 const unitCostOf = (ing) => {
@@ -20,7 +22,10 @@ const unitCostOf = (ing) => {
 // ============================================================
 router.get('/ingredients', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM ingredients ORDER BY name');
+        // 식재료 → 부자재 순으로 그룹핑되도록 정렬
+        const [rows] = await pool.query(
+            "SELECT * FROM ingredients ORDER BY CASE WHEN category = '부자재' THEN 1 ELSE 0 END, name"
+        );
         res.json(rows.map(r => ({...r, unit_cost: unitCostOf(r)})));
     } catch (err) {
         console.error('[🔥 GET /api/admin/ingredients 에러]', err);
@@ -29,14 +34,14 @@ router.get('/ingredients', async (req, res) => {
 });
 
 router.post('/ingredients', async (req, res) => {
-    const {name, purchase_price, purchase_amount, unit} = req.body;
+    const {name, purchase_price, purchase_amount, unit, category} = req.body;
     if (!name || !ALLOWED_UNITS.includes(unit) || !(Number(purchase_amount) > 0) || !(Number(purchase_price) >= 0)) {
         return res.status(400).json({success: false, message: '입력값이 올바르지 않습니다. (이름·가격·용량·단위 확인)'});
     }
     try {
         const [result] = await pool.query(
-            'INSERT INTO ingredients (name, purchase_price, purchase_amount, unit) VALUES (?, ?, ?, ?)',
-            [name, purchase_price, purchase_amount, unit]
+            'INSERT INTO ingredients (name, purchase_price, purchase_amount, unit, category) VALUES (?, ?, ?, ?, ?)',
+            [name, purchase_price, purchase_amount, unit, normalizeCategory(category)]
         );
         res.json({success: true, id: result.insertId});
     } catch (err) {
@@ -47,12 +52,16 @@ router.post('/ingredients', async (req, res) => {
 
 router.patch('/ingredients/:id', async (req, res) => {
     const {id} = req.params;
-    const {name, purchase_price, purchase_amount, unit} = req.body;
+    const {name, purchase_price, purchase_amount, unit, category} = req.body;
     const fields = [], values = [];
 
     if (name !== undefined) {
         fields.push('name = ?');
         values.push(name);
+    }
+    if (category !== undefined) {
+        fields.push('category = ?');
+        values.push(normalizeCategory(category));
     }
     if (purchase_price !== undefined) {
         if (!(Number(purchase_price) >= 0)) return res.status(400).json({
