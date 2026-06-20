@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 const {authenticateToken} = require("../middlewares/auth");
 const debugInfo = require("../utils/debugInfo");
+const {issueToken, consumeToken} = require("../utils/ephemeralTokens");
 const {
     generateRegistrationOptions,
     verifyRegistrationResponse,
@@ -14,7 +15,6 @@ const {
 const JWT_SECRET = process.env.JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'bu-cafe-pos.vercel.app';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const currentChallenges = {}; // 챌린지 임시 저장소
 const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
 const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
 
@@ -38,17 +38,17 @@ router.get('/passkey/register-options', authenticateToken, async (req, res) => {
                 transports: key.transports ? key.transports.split(',') : []
             })),
             authenticatorSelection: {
-                residentKey: 'preferred',
-                userVerification: 'preferred',
+                residentKey: 'required',      // Conditional UI(자동완성) 노출을 위해 discoverable 보장
+                userVerification: 'required', // 생체/PIN 검증 강제
                 authenticatorAttachment: 'platform'
             },
         });
 
-        currentChallenges[userId] = options.challenge;
-        // 5분 후 챌린지 자동 삭제 (메모리 관리)
-        setTimeout(() => {
-            if (currentChallenges[userId]) delete currentChallenges[userId];
-        }, 5 * 60 * 1000);
+        // 등록용 챌린지를 사용자별 키로 저장(5분). 같은 유저가 다시 요청하면 갱신됨.
+        await issueToken('webauthn_register', 5 * 60, {
+            token: `webauthn_register:${userId}`,
+            payload: options.challenge
+        });
 
         res.json(options);
     } catch (err) {
@@ -64,16 +64,17 @@ router.get('/passkey/register-options', authenticateToken, async (req, res) => {
 router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
     const userId = req.user.id; // 인증된 본인 계정에만 패스키 등록
     const {body} = req.body;
-    const expectedChallenge = currentChallenges[userId];
-
-    if (!expectedChallenge) {
-        return res.status(400).json({error: 'Challenge not found'});
-    }
 
     try {
+        // 사용자별 등록 챌린지를 1회용으로 소비
+        const consumed = await consumeToken(`webauthn_register:${userId}`, 'webauthn_register');
+        if (!consumed) {
+            return res.status(400).json({error: 'Challenge not found'});
+        }
+
         const verification = await verifyRegistrationResponse({
             response: body,
-            expectedChallenge,
+            expectedChallenge: consumed.payload,
             expectedOrigin: EXPECTED_ORIGIN,
             expectedRPID: RP_ID,
         });
@@ -107,7 +108,6 @@ router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
                 ]
             );
 
-            delete currentChallenges[userId];
             res.json({success: true});
         } else {
             res.status(400).json({success: false, message: '패스키 검증에 실패했습니다.'});
@@ -126,9 +126,10 @@ router.get('/passkey/login-options', async (req, res) => {
     try {
         const options = await generateAuthenticationOptions({
             rpID: RP_ID,
-            userVerification: 'preferred',
+            userVerification: 'required',
         });
-        currentChallenges[options.challenge] = options.challenge;
+        // 로그인용 챌린지 저장(15분). 메모리 대신 DB → 재시작에도 생존.
+        await issueToken('webauthn_login', 15 * 60, {token: options.challenge});
         res.json(options);
     } catch (err) {
         console.error('[🔥 GET /api/passkey/login-options 에러]', err);
@@ -155,13 +156,8 @@ router.post('/passkey/login-verify', async (req, res) => {
         const user = users[0];
         const verification = await verifyAuthenticationResponse({
             response: body,
-            expectedChallenge: (challenge) => {
-                if (currentChallenges[challenge]) {
-                    delete currentChallenges[challenge];
-                    return true;
-                }
-                return false;
-            },
+            // 챌린지를 DB에서 1회용으로 소비(원자적). 동시/재전송 replay 방지.
+            expectedChallenge: async (challenge) => (await consumeToken(challenge, 'webauthn_login')) !== null,
             expectedOrigin: EXPECTED_ORIGIN,
             expectedRPID: RP_ID,
             credential: {
@@ -170,7 +166,7 @@ router.post('/passkey/login-verify', async (req, res) => {
                 counter: Number(passkey.counter),
                 transports: passkey.transports ? passkey.transports.split(',') : [],
             },
-            requireUserVerification: false,
+            requireUserVerification: true,
         });
 
         if (verification.verified) {

@@ -1,6 +1,6 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import axios from 'axios';
-import {startAuthentication} from "@simplewebauthn/browser";
+import {startAuthentication, browserSupportsWebAuthnAutofill} from "@simplewebauthn/browser";
 import {useSystemTheme} from '../../hooks/useSystemTheme';
 import {useNotification} from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
@@ -163,7 +163,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                         value={formData.username}
                         onChange={handleChange}
                         className="login-input"
-                        autoComplete="username"
+                        autoComplete="username webauthn"
                         required
                     />
                     <input

@@ -128,6 +128,23 @@ async function ensureSchema() {
             console.error("⚠️ [DB] ingredients.category 컬럼 추가 실패 (수동 마이그레이션 필요):", err.message);
         }
     }
+
+    // 단기·1회용 토큰 저장소 (WebAuthn 챌린지 등). 메모리 대신 DB로 재시작/스케일아웃 대비.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS ephemeral_tokens
+            (
+                token      VARCHAR(255) NOT NULL,
+                purpose    VARCHAR(40)  NOT NULL,
+                payload    TEXT         NULL,
+                expires_at DATETIME     NOT NULL,
+                PRIMARY KEY (token),
+                KEY idx_purpose_expires (purpose, expires_at)
+            )
+        `);
+    } catch (err) {
+        console.error("⚠️ [DB] ephemeral_tokens 테이블 생성 실패 (수동 마이그레이션 필요):", err.message);
+    }
 }
 
 // ---------------------------------------------------------
