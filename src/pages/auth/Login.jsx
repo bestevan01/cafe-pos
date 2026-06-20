@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useRef} from 'react';
 import axios from 'axios';
 import {startAuthentication, browserSupportsWebAuthnAutofill} from "@simplewebauthn/browser";
 import {useSystemTheme} from '../../hooks/useSystemTheme';
@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button';
 function Login({onLoginSuccess, onSwitchToRegister}) {
     const [formData, setFormData] = useState({username: '', password: ''});
     const [submitting, setSubmitting] = useState(false);
+    const formRef = useRef(null);
     const {notify} = useNotification();
 
     // 로그인 화면은 시스템(OS) 테마 설정을 따름
@@ -60,13 +61,28 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
         initConditionalPasskey();
     }, []);
 
+    const handleAutoFill = (e) => {
+        if (e.animationName === 'onAutoFillDetected') {
+            // 브라우저가 DOM에 값을 채울 시간을 아주 짧게(50ms) 준 뒤 폼 제출
+            setTimeout(() => {
+                if (formRef.current) formRef.current.requestSubmit();
+            }, 50);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (submitting) return; // 중복 제출 방지
         setSubmitting(true);
+
+        const payload = {
+            username: e.target.username.value,
+            password: e.target.password.value
+        };
+
         try {
             // 느린 응답 시 로딩 토스트는 전역 인터셉터(NotificationProvider)가 자동 처리
-            const res = await axios.post('/api/login', formData);
+            const res = await axios.post('/api/login', payload);
             if (res.data.success) {
                 handleSuccess(res.data);
             }
@@ -148,6 +164,15 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                 .register-text { margin-top: 30px; font-size: 0.95rem; color: var(--text-secondary, #666); }
                 .register-link { color: var(--accent); cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
                 .register-link:active { color: var(--accent-hover); }
+                
+                @keyframes onAutoFillDetected {
+                    from { opacity: 1; }
+                    to { opacity: 1; }
+                }
+                .login-input:-webkit-autofill {
+                    animation-name: onAutoFillDetected;
+                    animation-duration: 0.1s;
+                }
                 `}
             </style>
 
@@ -155,7 +180,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                 <div className="login-emoji">☕</div>
                 <h2 className="login-title">직원 로그인</h2>
 
-                <form onSubmit={handleSubmit} className="login-form">
+                <form ref={formRef} onSubmit={handleSubmit} className="login-form">
                     <input
                         id="username"
                         name="username"
@@ -176,6 +201,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                         className="login-input"
                         autoComplete="current-password"
                         required
+                        onAnimationStart={handleAutoFill}
                     />
                     <Button type="submit" size="lg" full disabled={submitting}>
                         {submitting ? '로그인 중...' : '로그인'}
