@@ -145,6 +145,22 @@ async function ensureSchema() {
     } catch (err) {
         console.error("⚠️ [DB] ephemeral_tokens 테이블 생성 실패 (수동 마이그레이션 필요):", err.message);
     }
+
+    // 로그인 레이트리밋 카운터 (brute-force 방어). 메모리 대신 DB로 재시작/스케일아웃 대비.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS login_attempts
+            (
+                attempt_key VARCHAR(255) NOT NULL,
+                failures    INT          NOT NULL DEFAULT 0,
+                reset_at    DATETIME     NOT NULL,
+                PRIMARY KEY (attempt_key),
+                KEY idx_reset (reset_at)
+            )
+        `);
+    } catch (err) {
+        console.error("⚠️ [DB] login_attempts 테이블 생성 실패 (수동 마이그레이션 필요):", err.message);
+    }
 }
 
 // ---------------------------------------------------------

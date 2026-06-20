@@ -34,11 +34,11 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
 
         if (users.length === 0 || !(await bcrypt.compare(password, users[0].password))) {
-            recordLoginFailure(req.loginKey);
+            await recordLoginFailure(req.loginKey);
             return res.status(401).json({success: false, message: '아이디 혹은 비밀번호가 일치하지 않습니다.'});
         }
 
-        recordLoginSuccess(req.loginKey); // 비밀번호 일치 → 실패 카운터 초기화
+        await recordLoginSuccess(req.loginKey); // 비밀번호 일치 → 실패 카운터 초기화
         const user = users[0];
         if (user.role === 'pending') {
             return res.status(403).json({success: false, message: '승인 대기 중입니다.'});
