@@ -163,17 +163,17 @@ function CashSettlement({onClose}) {
                 .cs-input-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
                 .cs-label { width: 70px; text-align: right; font-weight: bold; color: var(--text-primary, #495057); }
                 .cs-mini-input { width: 60px; padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-color, #ced4da); text-align: center; font-size: 1rem; background-color: var(--card-bg, #fff); color: var(--text-primary, #333); outline: none; transition: border-color 0.2s; }
-                .cs-mini-input:focus { border-color: #007bff; }
+                .cs-mini-input:focus { border-color: var(--accent); }
                 .cs-sub-total { width: 75px; text-align: right; color: var(--text-secondary, #868e96); }
                 .cs-total-row { margin-top: 10px; border-top: 2px dashed var(--border-color, #ced4da); padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: var(--text-primary, #333); }
-                .cs-total-val { color: #007bff; font-size: 1.3rem; }
+                .cs-total-val { color: var(--accent); font-size: 1.3rem; }
 
                 /* 버튼 스타일 */
                 .btn-base, .btn-cancel { width: 100%; padding: 14px; border: none; border-radius: var(--radius-md); font-size: 1.05rem; cursor: pointer; font-weight: bold; transition: transform 0.1s; color: white; }
                 .btn-base:active, .btn-cancel:active { transform: scale(0.97); }
-                .btn-open { background-color: #007bff; }
-                .btn-finish { background-color: #28a745; }
-                .btn-cancel { background-color: #dc3545; margin-top: 5px; }
+                .btn-open { background-color: var(--accent); }
+                .btn-finish { background-color: var(--success); }
+                .btn-cancel { background-color: var(--danger); margin-top: 5px; }
 
                 /* 다크모드 대응 */
                 [data-theme='dark'] .cs-info-box, [data-theme='dark'] .cs-grid { background-color: rgba(255, 255, 255, 0.05); }
@@ -190,9 +190,9 @@ function CashSettlement({onClose}) {
                         {prevClosing !== null && (
                             <div style={{
                                 fontSize: '0.9rem',
-                                color: '#dc3545',
+                                color: 'var(--danger)',
                                 fontWeight: 'bold',
-                                backgroundColor: 'rgba(220,53,69,0.1)',
+                                backgroundColor: 'var(--danger-bg)',
                                 padding: '8px',
                                 borderRadius: 'var(--radius-sm)'
                             }}>
@@ -214,7 +214,7 @@ function CashSettlement({onClose}) {
                             <div className="cs-row"><span>➕ 현금 매출:</span>
                                 <span>{calcData.sales.toLocaleString()}원</span></div>
                             <hr style={{margin: '8px 0', border: 'none', borderTop: '1px solid var(--border-color)'}}/>
-                            <div className="cs-row" style={{fontWeight: 'bold', color: '#007bff'}}>
+                            <div className="cs-row" style={{fontWeight: 'bold', color: 'var(--accent)'}}>
                                 <span>= 전산상 합계:</span><span>{calcData.expected.toLocaleString()}원</span>
                             </div>
                         </div>
@@ -224,9 +224,9 @@ function CashSettlement({onClose}) {
                         <div style={{
                             padding: '10px',
                             borderRadius: 'var(--radius-md)',
-                            backgroundColor: (totalAmount - calcData.expected) === 0 ? 'rgba(40,167,69,0.1)' : 'rgba(220,53,69,0.1)',
+                            backgroundColor: (totalAmount - calcData.expected) === 0 ? 'var(--success-bg)' : 'var(--danger-bg)',
                             fontWeight: 'bold',
-                            color: (totalAmount - calcData.expected) === 0 ? '#28a745' : '#dc3545'
+                            color: (totalAmount - calcData.expected) === 0 ? 'var(--success)' : 'var(--danger)'
                         }}>
                             차액: {(totalAmount - calcData.expected).toLocaleString()}원
                             {(totalAmount - calcData.expected) === 0 ? " (정상 ✅)" : " (불일치 ⚠️)"}

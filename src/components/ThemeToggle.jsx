@@ -132,7 +132,7 @@ export default function ThemeToggle() {
                 
                 .theme-menu-item.active {
                     background-color: rgba(0, 123, 255, 0.1);
-                    color: #007bff; font-weight: bold;
+                    color: var(--accent); font-weight: bold;
                 }
                 
                 @media (max-width: 768px) {

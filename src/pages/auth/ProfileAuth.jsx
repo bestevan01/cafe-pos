@@ -3,6 +3,7 @@ import axios from 'axios';
 import {startAuthentication} from "@simplewebauthn/browser";
 import ThemeToggle from "../../components/ThemeToggle.jsx";
 import {useNotification} from '../../hooks/useNotification';
+import Button from '../../components/ui/Button';
 
 function ProfileAuth({currentUser, onSuccess, onCancel}) {
     const {notify} = useNotification();
@@ -95,7 +96,7 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                     font-size: 1rem; background-color: var(--bg-color); color: var(--text-primary);
                     width: 100%; box-sizing: border-box; outline: none; -webkit-appearance: none;
                 }
-                .auth-input:focus { border-color: #007bff; }
+                .auth-input:focus { border-color: var(--accent); }
                 
                 /* 버튼 스타일 */
                 .auth-btn {
@@ -104,9 +105,7 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                     transition: transform 0.1s, background-color 0.2s;
                 }
                 .auth-btn:active { transform: scale(0.97); }
-                .btn-submit { background-color: #007bff; color: white; }
                 .btn-passkey { background-color: #6f42c1; color: white; margin-bottom: 12px; }
-                .btn-cancel { background-color: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
                 
                 .divider { margin: 20px 0; color: var(--text-secondary); font-size: 0.85rem; }
                 `}
@@ -126,13 +125,13 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                         autoComplete="password"
                         autoFocus
                     />
-                    <button type="submit" className="auth-btn btn-submit">확인</button>
+                    <Button type="submit" size="lg" full>확인</Button>
                 </form>
 
                 <div className="divider">또는</div>
 
                 <button onClick={handlePasskeyAuth} className="auth-btn btn-passkey">🔑 패스키로 인증</button>
-                <button onClick={onCancel} className="auth-btn btn-cancel">취소</button>
+                <Button onClick={onCancel} variant="secondary" size="lg" full>취소</Button>
             </div>
         </div>
     );

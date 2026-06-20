@@ -1,6 +1,7 @@
 import axios from 'axios';
 import {useState, useEffect} from 'react';
 import ThemeToggle from '../../components/ThemeToggle';
+import Button from '../../components/ui/Button';
 import {useNotification} from '../../hooks/useNotification';
 
 function MenuDashboard({onBack}) {
@@ -105,7 +106,6 @@ function MenuDashboard({onBack}) {
                 .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: nowrap; gap: 15px; }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .menu-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (폼 + 리스트) */
@@ -115,13 +115,8 @@ function MenuDashboard({onBack}) {
                 .form-section { width: 320px; flex-shrink: 0; background-color: var(--card-bg, white); padding: 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; border: 1px solid var(--border-color, transparent); position: sticky; top: 20px; }
                 .form-title { margin-top: 0; margin-bottom: 15px; color: var(--text-primary, #333); }
                 .menu-input { padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color, #ddd); font-size: 1rem; background-color: var(--bg-color, #f4f6f8); color: var(--text-primary, #333); width: 100%; box-sizing: border-box; margin-bottom: 10px; -webkit-appearance: none; }
-                .menu-input:focus { outline: none; border-color: #007bff; }
+                .menu-input:focus { outline: none; border-color: var(--accent); }
                 
-                .btn-submit { padding: 12px; border-radius: var(--radius-md); border: none; font-weight: bold; width: 100%; cursor: pointer; color: white; font-size: 1rem; transition: transform 0.1s; }
-                .btn-submit:active { transform: scale(0.97); }
-                .btn-add { background-color: #007bff; }
-                .btn-update { background-color: #ff9800; }
-                .btn-cancel { padding: 12px; border-radius: var(--radius-md); border: none; font-weight: bold; width: 100%; cursor: pointer; background-color: #6c757d; color: white; margin-top: 8px; font-size: 1rem; }
 
                 /* 리스트 섹션 */
                 .list-section { flex: 1; background-color: var(--card-bg, white); padding: 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; width: 100%; box-sizing: border-box; border: 1px solid var(--border-color, transparent); }
@@ -133,12 +128,12 @@ function MenuDashboard({onBack}) {
                 .menu-card-view { display: none; }
 
                 /* 버튼 및 뱃지 스타일 */
-                .badge-type { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .btn-sale { padding: 6px 12px; background-color: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s; }
-                .btn-soldout { padding: 6px 12px; background-color: #ffebee; color: #c62828; border: 1px solid #c62828; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s; }
+                .badge-type { background-color: var(--accent-bg); color: #1565c0; padding: 4px 10px; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .btn-sale { padding: 6px 12px; background-color: var(--success-bg); color: var(--success); border: 1px solid var(--success); border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s; }
+                .btn-soldout { padding: 6px 12px; background-color: var(--danger-bg); color: #c62828; border: 1px solid #c62828; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s; }
                 .btn-action { padding: 6px 12px; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: background-color 0.2s; }
-                .btn-edit { background-color: #ff9800; color: white; margin-right: 5px; }
-                .btn-del { background-color: #dc3545; color: white; }
+                .btn-edit { background-color: var(--warning); color: white; margin-right: 5px; }
+                .btn-del { background-color: var(--danger); color: white; }
 
                 /* 다크모드 오버라이드 */
                 [data-theme='dark'] .badge-type { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
@@ -174,7 +169,7 @@ function MenuDashboard({onBack}) {
             {/* 헤더 */}
             <div className="menu-header">
                 <div className="header-left">
-                    <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
                     <h1 className="menu-title">📋 메뉴 관리</h1>
                 </div>
                 <div className="theme-wrapper">
@@ -200,14 +195,14 @@ function MenuDashboard({onBack}) {
                             <option value="dessert">디저트</option>
                         </select>
 
-                        <button type="submit" className={`btn-submit ${editingId ? 'btn-update' : 'btn-add'}`}>
+                        <Button type="submit" full variant={editingId ? 'warning' : 'primary'}>
                             {editingId ? "수정 완료" : "추가하기"}
-                        </button>
+                        </Button>
                         {editingId && (
-                            <button type="button" onClick={() => {
+                            <Button type="button" variant="neutral" full style={{marginTop: 8}} onClick={() => {
                                 setEditingId(null);
                                 setFormData({name: '', price: '', type: 'coffee'});
-                            }} className="btn-cancel">취소</button>
+                            }}>취소</Button>
                         )}
                     </form>
                 </div>

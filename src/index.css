@@ -1,30 +1,88 @@
 /* 🌞 1. 라이트 모드 (기본 팔레트) */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
 
-  --bg-color: #f4f6f8;       /* 전체 배경색 */
-  --card-bg: #ffffff;        /* 카드, 모달 배경색 */
-  --text-primary: #333333;   /* 기본 텍스트 (제목 등) */
-  --text-secondary: #666666; /* 보조 텍스트 (설명 등) */
-  --border-color: #eeeeee;   /* 테두리, 구분선 색상 */
-  color-scheme: light;
-  --btn-hover: rgba(0,0,0,0.05); /* 버튼 눌렀을 때 효과 */
+    --bg-color: #f4f6f8; /* 전체 배경색 */
+    --card-bg: #ffffff; /* 카드, 모달 배경색 */
+    --text-primary: #333333; /* 기본 텍스트 (제목 등) */
+    --text-secondary: #666666; /* 보조 텍스트 (설명 등) */
+    --border-color: #eeeeee; /* 테두리, 구분선 색상 */
+    color-scheme: light;
+    --btn-hover: rgba(0, 0, 0, 0.05); /* 버튼 눌렀을 때 효과 */
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 25px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 25px;
+
+    /* 🎨 액센트 (브랜드 포인트 컬러) */
+    --accent: #42a5f5;
+    --accent-hover: #1e88e5;
+    --accent-bg: #e3f2fd; /* 액센트 연한 배경 (선택 칩/하이라이트) */
+    --on-accent: #ffffff; /* 액센트 위에 올라가는 글자색 */
+    --neutral: #6c757d; /* 중립 버튼(뒤로/취소/보조 액션) */
+    --neutral-hover: #5a6169;
+
+    /* 🚦 시맨틱 컬러 (상태 표현) — 색마다 진한 색 + 연한 배경 한 쌍 */
+    --success: #2e7d32;
+    --success-bg: #e8f5e9;
+    --danger: #e53935;
+    --danger-bg: #ffebee;
+    --warning: #f57c00;
+    --warning-bg: #fff3e0;
+    --info: #1976d2;
+    --info-bg: #e3f2fd;
+
+    /* 🌫️ 그림자 (depth 3단계) */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07);
+    --shadow-md: 0 4px 18px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.06);
+
+    /* 📏 간격 스케일 */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+
+    /* 🔤 타이포 스케일 */
+    --fs-xs: 0.75rem;
+    --fs-sm: 0.85rem;
+    --fs-base: 1rem;
+    --fs-lg: 1.2rem;
+    --fs-xl: 1.5rem;
+    --fs-2xl: 1.8rem;
 }
 
 /* 🌙 2. 다크 모드 (다크모드가 켜졌을 때 변할 팔레트) */
 [data-theme="dark"] {
-  --bg-color: #121212;
-  --card-bg: #1e1e1e;
-  --text-primary: #f5f5f5;
-  --text-secondary: #aaaaaa;
-  --border-color: #333333;
-  color-scheme: dark;
-  --btn-hover: rgba(255,255,255,0.05);
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-primary: #f5f5f5;
+    --text-secondary: #aaaaaa;
+    --border-color: #333333;
+    color-scheme: dark;
+    --btn-hover: rgba(255, 255, 255, 0.05);
+
+    /* 다크 배경 대비 보정: 액센트 호버는 밝게, 시맨틱 글자색도 밝게, 연한 배경은 반투명으로 */
+    --accent-hover: #64b5f6;
+    --accent-bg: rgba(66, 165, 245, 0.16);
+    --neutral: #565d66;
+    --neutral-hover: #646c75;
+
+    --success: #66bb6a;
+    --success-bg: rgba(76, 175, 80, 0.16);
+    --danger: #ef5350;
+    --danger-bg: rgba(229, 57, 53, 0.18);
+    --warning: #ffa726;
+    --warning-bg: rgba(245, 124, 0, 0.18);
+    --info: #42a5f5;
+    --info-bg: rgba(25, 118, 210, 0.20);
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.40);
+    --shadow-md: 0 4px 18px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.50);
 }
 
 /* 3. 시스템 테마 자동 연동 (나중에 JS로 제어하기 위해 일단 주석 처리해둡니다) */
@@ -36,11 +94,11 @@
 
 /* 4. 전역 스타일 적용 (하드코딩된 색상 대신 변수를 사용) */
 body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  /* 변수를 가져다 씁니다. 나중에 테마가 바뀌면 알아서 색이 변합니다! */
-  background-color: var(--bg-color);
-  color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease; /* 테마 변경 시 부드럽게 전환 */
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    /* 변수를 가져다 씁니다. 나중에 테마가 바뀌면 알아서 색이 변합니다! */
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease; /* 테마 변경 시 부드럽게 전환 */
 }

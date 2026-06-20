@@ -186,7 +186,7 @@ export function NotificationProvider({children}) {
                             box-sizing: border-box;
                         }
                         .ntf-toast-icon { flex-shrink: 0; font-size: 1.6rem; line-height: 1; }
-                        .ntf-toast-spinner { flex-shrink: 0; width: 24px; height: 24px; border: 3px solid var(--border-color, #e0e0e0); border-top-color: #007bff; border-radius: 50%; animation: ntf-spin 0.8s linear infinite; }
+                        .ntf-toast-spinner { flex-shrink: 0; width: 24px; height: 24px; border: 3px solid var(--border-color, #e0e0e0); border-top-color: var(--accent); border-radius: 50%; animation: ntf-spin 0.8s linear infinite; }
                         @keyframes ntf-spin { to { transform: rotate(360deg); } }
                         .ntf-toast-text { flex: 1; min-width: 0; text-align: left; }
                         .ntf-toast-title { margin: 0 0 2px 0; font-size: 0.95rem; font-weight: 700; }
@@ -204,8 +204,8 @@ export function NotificationProvider({children}) {
                         .ntf-btn { flex: 1; padding: 13px; border: none; border-radius: var(--radius-md, 10px); font-size: 1rem; font-weight: bold; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
                         .ntf-btn:active { transform: scale(0.97); }
                         .ntf-btn-cancel { background-color: var(--border-color, #e9ecef); color: var(--text-primary, #333); }
-                        .ntf-btn-confirm { background-color: #007bff; color: #fff; }
-                        .ntf-btn-danger { background-color: #dc3545; color: #fff; }
+                        .ntf-btn-confirm { background-color: var(--accent); color: #fff; }
+                        .ntf-btn-danger { background-color: var(--danger); color: #fff; }
 
                         @media (max-width: 480px) {
                             .ntf-toast-stack { top: 12px; right: 12px; left: 12px; }

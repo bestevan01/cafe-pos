@@ -3,6 +3,7 @@ import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 import {startRegistration} from '@simplewebauthn/browser';
 import {useNotification} from '../../hooks/useNotification';
+import Button from '../../components/ui/Button';
 
 function EditProfile({onBack}) {
     const {notify, confirm} = useNotification();
@@ -126,27 +127,23 @@ function EditProfile({onBack}) {
                 .ep-row { display: flex; flex-direction: column; gap: 8px; width: 100%; }
                 .ep-label { font-size: 0.9rem; color: var(--text-secondary, #666); font-weight: bold; }
                 .ep-input { padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color, #ddd); font-size: 1rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333); outline: none; box-sizing: border-box; width: 100%; -webkit-appearance: none; }
-                .ep-input:focus { border-color: #007bff; }
+                .ep-input:focus { border-color: var(--accent); }
                 
-                .btn-link { padding: 14px; background-color: transparent; color: #007bff; border: 1px solid #007bff; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; font-size: 1rem; text-align: center; transition: background-color 0.2s; width: 100%; box-sizing: border-box; }
-                .btn-link:active { background-color: rgba(0,123,255,0.1); }
+                .btn-link { padding: 14px; background-color: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-md); cursor: pointer; font-weight: bold; font-size: 1rem; text-align: center; transition: background-color 0.2s; width: 100%; box-sizing: border-box; }
+                .btn-link:active { background-color: var(--accent-bg); }
                 
                 .divider { margin: 5px 0; border: none; border-top: 1px solid var(--border-color, #eee); }
                 
                 .passkey-header { display: flex; justify-content: space-between; align-items: center; }
                 .passkey-title { margin: 0; font-size: 1.1rem; color: var(--text-primary, #333); font-weight: bold; }
-                .btn-add { padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; }
                 
                 .passkey-list { background-color: var(--bg-color, #f8f9fa); border-radius: var(--radius-md); padding: 15px; border: 1px solid var(--border-color, #eee); max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
                 .passkey-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background-color: var(--card-bg, white); border-radius: var(--radius-md); border: 1px solid var(--border-color, #eee); }
                 .pk-name { font-weight: bold; color: var(--text-primary, #333); font-size: 1rem; margin-bottom: 4px; }
                 .pk-date { font-size: 0.8rem; color: var(--text-secondary, #888); }
-                .btn-del { padding: 8px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s; }
+                .btn-del { padding: 8px 12px; background-color: var(--danger-bg); color: var(--danger); border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s; }
                 
                 .footer-btns { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; }
-                .btn-base { flex: 1; padding: 14px; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; font-size: 1rem; text-align: center; color: white; transition: transform 0.1s; }
-                .btn-base:active { transform: scale(0.97); }
-                .btn-back { background-color: #6c757d; } .btn-logout { background-color: #dc3545; } .btn-save { background-color: #007bff; }
 
                 /* 다크모드 오버라이드 */
                 [data-theme='dark'] .btn-link { color: #4facfe; border-color: #4facfe; }
@@ -173,9 +170,9 @@ function EditProfile({onBack}) {
                                    className="ep-input" autoComplete="new-password"/>
                         </div>
                         <div className="footer-btns">
-                            <button onClick={() => setIsChangingPassword(false)} className="btn-base btn-back">취소
-                            </button>
-                            <button onClick={handleChangePassword} className="btn-base btn-save">변경 저장</button>
+                            <Button variant="neutral" onClick={() => setIsChangingPassword(false)}
+                                    style={{flex: 1, padding: 14}}>취소</Button>
+                            <Button onClick={handleChangePassword} style={{flex: 1, padding: 14}}>변경 저장</Button>
                         </div>
                     </>
                 ) : (
@@ -196,7 +193,7 @@ function EditProfile({onBack}) {
 
                         <div className="passkey-header">
                             <h3 className="passkey-title">🔐 패스키 관리</h3>
-                            <button onClick={handleRegisterPasskey} className="btn-add">+ 기기 등록</button>
+                            <Button size="sm" onClick={handleRegisterPasskey}>+ 기기 등록</Button>
                         </div>
                         <div className="passkey-list">
                             {passkeys.length === 0 ? (
@@ -221,8 +218,8 @@ function EditProfile({onBack}) {
                             )}
                         </div>
                         <div className="footer-btns">
-                            <button onClick={onBack} className="btn-base btn-back">뒤로 가기</button>
-                            <button onClick={handleLogout} className="btn-base btn-logout">로그아웃</button>
+                            <Button variant="neutral" onClick={onBack} style={{flex: 1, padding: 14}}>뒤로 가기</Button>
+                            <Button variant="danger" onClick={handleLogout} style={{flex: 1, padding: 14}}>로그아웃</Button>
                         </div>
                     </>
                 )}

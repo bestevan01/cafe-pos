@@ -48,7 +48,7 @@ function RoleSelection({onSelectRole, isCashierTaken}) {
                     border: 1px solid var(--border-color, transparent); 
                     border-radius: var(--radius-lg); 
                     background-color: var(--card-bg, white);
-                    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+                    box-shadow: var(--shadow-lg);
                     cursor: pointer; display: flex; align-items: center; justify-content: center; 
                     transition: transform 0.1s, background-color 0.3s, opacity 0.3s;
                     color: var(--text-primary, #333); box-sizing: border-box;
@@ -62,8 +62,8 @@ function RoleSelection({onSelectRole, isCashierTaken}) {
                 .role-name { font-size: 1.4rem; font-weight: bold; margin: 0 0 8px 0; }
                 .role-status { font-size: 0.95rem; font-weight: bold; margin: 0; }
                 
-                .status-red { color: #dc3545; }
-                .status-green { color: #28a745; }
+                .status-red { color: var(--danger); }
+                .status-green { color: var(--success); }
 
                 /* 모바일 화면 최적화 */
                 @media (max-width: 768px) {

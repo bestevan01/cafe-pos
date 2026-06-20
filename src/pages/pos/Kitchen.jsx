@@ -120,7 +120,7 @@ function Kitchen({onBack}) {
                 .kitchen-container { position: relative; display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh; background-color: var(--bg-color, #f4f6f8); padding: 20px; padding-top: 65px; box-sizing: border-box; transition: background-color 0.3s ease; }
                 
                 /* 상단 헤더 및 버튼 */
-                .btn-back-floating { position: absolute; top: 15px; left: 20px; z-index: 10000; padding: 8px 12px; font-size: 0.95rem; font-weight: bold; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s; }
+                .btn-back-floating { position: absolute; top: 15px; left: 20px; z-index: 10000; padding: 8px 12px; font-size: 0.95rem; font-weight: bold; background-color: var(--neutral); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s; }
                 .btn-back-floating:active { transform: scale(0.95); }
                 .kitchen-header-bar { border-bottom: 3px solid var(--text-primary, #333); padding-bottom: 15px; margin-bottom: 20px; }
                 .kitchen-title { margin: 0; font-size: 2rem; font-weight: 800; color: var(--text-primary, #333); }
@@ -129,20 +129,20 @@ function Kitchen({onBack}) {
                 .order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); alignItems: start; gap: 20px; overflow-y: auto; height: 100%; padding-right: 5px; scrollbar-width: thin; align-content: start; }
                 
                 /* 영수증 카드 스타일 */
-                .receipt-card { background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-top: 6px solid #d32f2f; border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: flex; flex-direction: column; }
+                .receipt-card { background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-top: 6px solid var(--danger); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-md); display: flex; flex-direction: column; }
                 .receipt-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed var(--border-color, #ddd); padding-bottom: 10px; margin-bottom: 10px; }
-                .receipt-num { margin: 0; color: #d32f2f; font-size: 2.5rem; font-weight: bold; }
+                .receipt-num { margin: 0; color: var(--danger); font-size: 2.5rem; font-weight: bold; }
                 
                 /* 뱃지 및 리스트 아이템 */
-                .badge-paid { color: #28a745; border: 2px solid #28a745; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: rgba(40,167,69,0.1); }
-                .badge-unpaid { color: #ff9800; border: 2px solid #ff9800; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: rgba(255,152,0,0.1); }
+                .badge-paid { color: var(--success); border: 2px solid var(--success); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: var(--success-bg); }
+                .badge-unpaid { color: var(--warning); border: 2px solid var(--warning); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: var(--warning-bg); }
                 .receipt-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; margin-bottom: 8px; border-bottom: 1px solid var(--border-color, #f0f0f0); padding-bottom: 5px; color: var(--text-primary, #333); }
                 .item-qty { font-weight: bold; color: var(--text-primary, #111); font-size: 1.3rem; }
                 
                 /* 액션 버튼 그룹 */
                 .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-                .btn-cancel { flex: 1; padding: 15px; font-size: 1.1rem; background-color: #dc3545; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
-                .btn-complete { flex: 2; padding: 15px; font-size: 1.2rem; background-color: #28a745; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+                .btn-cancel { flex: 1; padding: 15px; font-size: 1.1rem; background-color: var(--danger); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+                .btn-complete { flex: 2; padding: 15px; font-size: 1.2rem; background-color: var(--success); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
                 .btn-cancel:active, .btn-complete:active { opacity: 0.8; }
 
                 /* 모바일 반응형 */
@@ -185,7 +185,8 @@ function Kitchen({onBack}) {
                                 <div style={{flex: 1, overflowY: 'auto', marginBottom: '5px'}}>
                                     {group.items.map((item, idx) => (
                                         <div key={idx} className="receipt-item">
-                                        <span style={{color: item.menu_name.includes('(샷') ? '#007bff' : 'inherit'}}>
+                                        <span
+                                            style={{color: item.menu_name.includes('(샷') ? 'var(--accent)' : 'inherit'}}>
                                             {item.menu_name}
                                         </span>
                                             <span className="item-qty">{item.quantity}</span>

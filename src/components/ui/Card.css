@@ -1,0 +1,56 @@
+/* 공용 카드 — 디자인 토큰 기반. 한 번만 로드되어 모든 <Card> 인스턴스가 공유한다. */
+.ui-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-md);
+    box-sizing: border-box;
+    transition: box-shadow .2s ease, background-color .3s ease, border-color .3s ease;
+}
+
+.ui-card-flush {
+    padding: 0;
+}
+
+.ui-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ui-card-flush .ui-card-head {
+    margin: var(--space-5) var(--space-5) 0;
+}
+
+.ui-card-title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--fs-lg);
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.ui-card-icon {
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+.ui-card-sub {
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.ui-card-actions {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    flex-wrap: wrap;
+}

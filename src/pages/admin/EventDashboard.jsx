@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
+import Button from '../../components/ui/Button';
 import {useNotification} from '../../hooks/useNotification';
 
 function EventDashboard({onBack}) {
@@ -146,8 +147,6 @@ function EventDashboard({onBack}) {
                 .event-dashboard-container { padding: 20px; background-color: var(--bg-color); min-height: 100vh; box-sizing: border-box; transition: background-color 0.3s ease, color 0.3s ease; }
                 .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
                 .header-left { display: flex; align-items: center; gap: 15px; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; transition: transform 0.1s; }
-                .btn-back:active { transform: scale(0.95); }
                 .page-title { margin: 0; font-size: 1.8rem; color: var(--text-primary); }
 
                 .add-event-card { background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid var(--border-color); transition: background-color 0.3s ease, border-color 0.3s ease; }
@@ -158,15 +157,13 @@ function EventDashboard({onBack}) {
                 
                 .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-primary); font-weight: bold; font-size: 0.95rem; margin: 0; }
                 
-                .btn-add { padding: 12px 25px; background-color: #007bff; color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; font-size: 1rem; white-space: nowrap; transition: background-color 0.2s; }
-                .btn-add:hover { background-color: #0056b3; }
 
                 /* 🌟 메뉴 선택 뱃지 스타일 */
                 .menu-pill-box { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding: 15px; background-color: var(--bg-color); border-radius: var(--radius-md); border: 1px dashed var(--border-color); width: 100%; box-sizing: border-box; animation: slideDown 0.2s ease-out; }
                 @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
                 
                 .menu-pill { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 20px; background-color: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-size: 0.9rem; transition: all 0.2s ease; user-select: none; }
-                .menu-pill.selected { background-color: rgba(0, 123, 255, 0.1); border-color: #007bff; color: #007bff; font-weight: bold; }
+                .menu-pill.selected { background-color: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: bold; }
 
                 /* 이벤트 리스트 */
                 .event-list { display: flex; flex-direction: column; gap: 15px; }
@@ -176,16 +173,15 @@ function EventDashboard({onBack}) {
                 .event-desc { font-size: 0.95rem; color: var(--text-secondary); }
                 
                 .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; vertical-align: middle; }
-                .badge-free { background-color: rgba(0,123,255,0.1); color: #007bff; border: 1px solid #007bff; }
-                .badge-discount { background-color: rgba(255,152,0,0.1); color: #ff9800; border: 1px solid #ff9800; }
+                .badge-free { background-color: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent); }
+                .badge-discount { background-color: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
                 .badge-target { background-color: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color); }
 
                 .action-buttons { display: flex; gap: 10px; align-items: center; }
                 .btn-toggle { padding: 8px 15px; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; color: white; transition: background-color 0.2s, transform 0.1s; }
-                .btn-toggle.active { background-color: #28a745; }
-                .btn-toggle.inactive { background-color: #6c757d; }
+                .btn-toggle.active { background-color: var(--success); }
+                .btn-toggle.inactive { background-color: var(--neutral); }
                 .btn-toggle:active { transform: scale(0.95); }
-                .btn-delete { padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; }
 
                 @media (max-width: 768px) {
                     .event-item { flex-direction: column; align-items: flex-start; }
@@ -200,7 +196,7 @@ function EventDashboard({onBack}) {
 
             <div className="header-bar">
                 <div className="header-left">
-                    <button onClick={onBack} className="btn-back">⬅ 뒤로가기</button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
                     <h1 className="page-title">🎉 이벤트 관리</h1>
                 </div>
                 <ThemeToggle/>
@@ -275,7 +271,7 @@ function EventDashboard({onBack}) {
                                    onChange={(e) => setDailyLimitQty(e.target.value)}/>
                         )}
                     </div>
-                    <button onClick={handleAddEvent} className="btn-add">+ 등록</button>
+                    <Button onClick={handleAddEvent}>+ 등록</Button>
                 </div>
             </div>
 
@@ -293,9 +289,9 @@ function EventDashboard({onBack}) {
                                     </span>
                                     {ev.daily_limit && (
                                         <span className="badge" style={{
-                                            backgroundColor: 'rgba(220,53,69,0.1)',
-                                            color: '#dc3545',
-                                            border: '1px solid #dc3545'
+                                            backgroundColor: 'var(--danger-bg)',
+                                            color: 'var(--danger)',
+                                            border: '1px solid var(--danger)'
                                         }}>
                                             🔥 하루 {ev.daily_limit}잔 한정
                                         </span>
@@ -315,7 +311,7 @@ function EventDashboard({onBack}) {
                                         className={`btn-toggle ${ev.is_active ? 'active' : 'inactive'}`}>
                                     {ev.is_active ? '🟢 POS 노출 중' : '⚫ POS 숨김'}
                                 </button>
-                                <button onClick={() => handleDelete(ev.id)} className="btn-delete">삭제</button>
+                                <Button variant="danger" size="sm" onClick={() => handleDelete(ev.id)}>삭제</Button>
                             </div>
                         </div>
                     ))

@@ -2,6 +2,7 @@ import {useState} from 'react';
 import axios from 'axios';
 import {useSystemTheme} from "../../hooks/useSystemTheme.js";
 import {useNotification} from '../../hooks/useNotification';
+import Button from '../../components/ui/Button';
 
 function Register({onSwitchToLogin}) {
     const {notify} = useNotification();
@@ -77,19 +78,9 @@ function Register({onSwitchToLogin}) {
                 .register-input:focus { border-color: var(--text-primary, #333); }
                 .register-input::placeholder { color: var(--text-secondary, #aaa); }
                 
-                .btn-submit {
-                    padding: 14px; border-radius: var(--radius-md);
-                    border: none; 
-                    background-color: var(--text-primary, #333); 
-                    color: var(--bg-color, white);
-                    font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px;
-                    transition: transform 0.1s, opacity 0.2s;
-                }
-                .btn-submit:active { transform: scale(0.97); opacity: 0.8; }
-                
                 .login-text { margin-top: 30px; font-size: 0.95rem; color: var(--text-secondary, #666); }
-                .login-link { color: #007bff; cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
-                .login-link:active { color: #0056b3; }
+                .login-link { color: var(--accent); cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
+                .login-link:active { color: var(--accent-hover); }
                 `}
             </style>
 
@@ -141,7 +132,7 @@ function Register({onSwitchToLogin}) {
                         autoComplete="name"
                         required
                     />
-                    <button type="submit" className="btn-submit">가입 신청</button>
+                    <Button type="submit" variant="dark" size="lg" full style={{marginTop: 5}}>가입 신청</Button>
                 </form>
 
                 <div className="login-text">

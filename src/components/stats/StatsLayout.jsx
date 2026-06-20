@@ -1,3 +1,5 @@
+import Button from '../ui/Button';
+
 /**
  * 통계 페이지 공용 셸: 헤더(뒤로/제목/우측 액션) + 자동 정렬 카드 그리드.
  * 카드(StatCard)를 children으로 넣기만 하면 반응형으로 흐른다.
@@ -15,8 +17,6 @@ function StatsLayout({title, onBack, actions, children}) {
                 .stats-layout-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
                 .stats-layout-left { display: flex; align-items: center; gap: 14px; }
                 .stats-layout-title { margin: 0; font-size: 1.7rem; font-weight: 800; color: var(--text-primary, #222); white-space: nowrap; }
-                .stats-layout-back { padding: 9px 16px; background: var(--card-bg, #fff); color: var(--text-primary, #333); border: 1px solid var(--border-color, #ddd); border-radius: 10px; font-weight: bold; cursor: pointer; transition: transform .1s ease; }
-                .stats-layout-back:active { transform: scale(.96); }
                 /* 데스크탑 2열 고정: 카드가 좌→우로 채워지고, wide 카드만 한 줄 전체 차지 */
                 .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
                 @media (max-width: 900px) { .stats-grid { grid-template-columns: 1fr; } }
@@ -25,7 +25,7 @@ function StatsLayout({title, onBack, actions, children}) {
 
             <div className="stats-layout-header">
                 <div className="stats-layout-left">
-                    <button className="stats-layout-back" onClick={onBack}>⬅ 뒤로</button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
                     <h1 className="stats-layout-title">{title}</h1>
                 </div>
                 {actions && <div className="stats-layout-actions">{actions}</div>}

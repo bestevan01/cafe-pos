@@ -420,7 +420,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                         <div key={idx} className="receipt-item">
                                             <div style={{display: 'flex', flexDirection: 'column'}}>
                                             <span
-                                                style={{color: item.menu_name.includes('(샷') ? '#007bff' : 'inherit'}}>{item.menu_name}</span>
+                                                style={{color: item.menu_name.includes('(샷') ? 'var(--accent)' : 'inherit'}}>{item.menu_name}</span>
                                                 <span style={{
                                                     fontSize: '0.85rem',
                                                     color: 'var(--text-secondary, #888)'
@@ -432,7 +432,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                 </div>
                                 <div className="receipt-total">
                                     <span>합계</span><span
-                                    style={{color: '#d32f2f'}}>{groupTotal.toLocaleString()}원</span>
+                                    style={{color: 'var(--danger)'}}>{groupTotal.toLocaleString()}원</span>
                                 </div>
                             </motion.div>
                         );
@@ -458,48 +458,48 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 .pos-right { flex: 1; display: flex; flex-direction: column; padding: 65px 20px 20px 20px; background-color: var(--bg-color, #eef2f5); overflow: hidden; box-sizing: border-box; min-height: 0; min-width: 0; }
                 .header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 3px solid var(--text-primary, #333); }
                 .pos-title { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #333); }
-                .btn-sidebar-toggle { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 10px rgba(0,123,255,0.3); transition: transform 0.1s, background-color 0.2s; }
-                .btn-sidebar-toggle:active { transform: scale(0.96); background-color: #0056b3; }
-                .btn-back { margin-bottom: 15px; padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; align-self: flex-start; font-size: 0.9rem; transition: transform 0.1s; }
+                .btn-sidebar-toggle { padding: 10px 15px; background-color: var(--accent); color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 10px rgba(66, 165, 245, 0.35); transition: transform 0.1s, background-color 0.2s; }
+                .btn-sidebar-toggle:active { transform: scale(0.96); background-color: var(--accent-hover); }
+                .btn-back { margin-bottom: 15px; padding: 10px 15px; background-color: var(--neutral); color: white; border: none; border-radius: var(--radius-md); font-weight: bold; cursor: pointer; align-self: flex-start; font-size: 0.9rem; transition: transform 0.1s; }
                 .btn-back:active { transform: scale(0.95); }
                 .btn-submit { width: 100%; padding: 15px; font-size: 1.5rem; font-weight: bold; background-color: var(--text-primary, #222); color: var(--bg-color, white); border: none; border-radius: var(--radius-md); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.1s; }
                 .btn-submit:active { transform: scale(0.98); }
                 .menu-card { display: flex; flex-direction: column; justify-content: flex-start; border: 1px solid var(--border-color, #eee); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: all 0.2s; background-color: var(--card-bg, #fff); cursor: pointer; box-sizing: border-box; height: fit-content; }
-                .menu-card.selected { border: 2px solid #007bff; background-color: rgba(0, 123, 255, 0.05); }
+                .menu-card.selected { border: 2px solid var(--accent); background-color: var(--accent-bg); }
                 .menu-card.soldout { opacity: 0.5; cursor: not-allowed; background-color: var(--border-color, #e0e0e0); }
                 .menu-name { font-size: 1.2rem; font-weight: bold; color: var(--text-primary, #333); margin-bottom: 4px; }
                 .menu-price { color: var(--text-secondary, #666); font-size: 1rem; }
                 .circle-btn { width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, #fff); color: var(--text-primary, #333); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
                 .qty-text { font-size: 1.4rem; font-weight: bold; width: 30px; text-align: center; color: var(--text-primary, #333); }
-                .shot-box { margin-top: 15px; padding: 10px; background-color: rgba(0, 123, 255, 0.05); border-radius: var(--radius-sm); border: 1px dashed rgba(0, 123, 255, 0.3); animation: slideDown 0.2s ease-out forwards; transform-origin: top center; }
+                .shot-box { margin-top: 15px; padding: 10px; background-color: var(--accent-bg); border-radius: var(--radius-sm); border: 1px dashed rgba(66, 165, 245, 0.35); animation: slideDown 0.2s ease-out forwards; transform-origin: top center; }
                 @keyframes slideDown { from { opacity: 0; transform: scaleY(0.8); } to { opacity: 1; transform: scaleY(1); } }
                 .shot-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; color: var(--text-secondary, #555); padding: 2px 0; }
-                .shot-toggle > span:last-child { font-size: 0.8rem; color: #007bff; }
-                .shot-slots { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(0, 123, 255, 0.25); }
+                .shot-toggle > span:last-child { font-size: 0.8rem; color: var(--accent); }
+                .shot-slots { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(66, 165, 245, 0.3); }
                 .shot-slot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
                 .shot-slot-label { font-size: 0.85rem; font-weight: bold; color: var(--text-primary, #333); width: 48px; flex-shrink: 0; }
                 .shot-slot-stepper { display: flex; align-items: center; gap: 10px; }
-                .shot-slot-count { font-size: 1.05rem; font-weight: bold; width: 18px; text-align: center; color: #007bff; }
+                .shot-slot-count { font-size: 1.05rem; font-weight: bold; width: 18px; text-align: center; color: var(--accent); }
                 .shot-slot-price { font-size: 0.8rem; color: var(--text-secondary, #888); width: 64px; text-align: right; flex-shrink: 0; }
-                .mini-circle-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #007bff; background-color: var(--card-bg, #fff); color: #007bff; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+                .mini-circle-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--accent); background-color: var(--card-bg, #fff); color: var(--accent); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
                 .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 90; backdrop-filter: blur(3px); }
                 .sidebar-panel { position: fixed; top: 0; right: 0; width: 100%; height: 100dvh; background-color: var(--bg-color, #eef2f5); z-index: 100; display: flex; flex-direction: column; padding: 20px; padding-top: 65px; box-sizing: border-box; box-shadow: -10px 0 30px rgba(0,0,0,0.15); }
                 .btn-close { background: none; border: none; font-size: 2.5rem; cursor: pointer; color: var(--text-primary, #333); line-height: 1; padding: 0 5px; }
                 .order-grid { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; height: 100%; padding-right: 5px; scrollbar-width: thin; }
-                .receipt-card { background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-top: 5px solid #d32f2f; border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; flex-shrink: 0; }
+                .receipt-card { background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-top: 5px solid var(--danger); border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; flex-shrink: 0; }
                 .receipt-header { border-bottom: 2px dashed var(--border-color, #ddd); padding-bottom: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-                .receipt-num { margin: 0; color: #d32f2f; font-size: 1.8rem; font-weight: bold; }
+                .receipt-num { margin: 0; color: var(--danger); font-size: 1.8rem; font-weight: bold; }
                 .receipt-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; margin-bottom: 8px; border-bottom: 1px solid var(--border-color, #f0f0f0); padding-bottom: 5px; color: var(--text-primary, #333); }
                 .receipt-total { border-top: 2px solid var(--text-primary, #333); padding-top: 10px; margin-top: 10px; display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: bold; color: var(--text-primary, #333); }
                 .badge { padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .badge-cooking { border: 1px solid #ff9800; color: #ff9800; background-color: rgba(255,152,0,0.1); }
-                .badge-done { border: 1px solid #007bff; color: #007bff; background-color: rgba(0,123,255,0.1); }
-                .badge-paid { color: #28a745; border: 2px solid #28a745; background-color: rgba(40,167,69,0.1); }
+                .badge-cooking { border: 1px solid var(--warning); color: var(--warning); background-color: var(--warning-bg); }
+                .badge-done { border: 1px solid var(--accent); color: var(--accent); background-color: var(--accent-bg); }
+                .badge-paid { color: var(--success); border: 2px solid var(--success); background-color: var(--success-bg); }
                 .btn-action { padding: 8px 12px; font-size: 0.9rem; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
                 .btn-action:active { opacity: 0.8; }
-                .btn-cancel { background-color: #dc3545; color: white; }
-                .btn-pay { background-color: #28a745; color: white; }
-                .btn-deliver { background-color: #007bff; color: white; }
+                .btn-cancel { background-color: var(--danger); color: white; }
+                .btn-pay { background-color: var(--success); color: white; }
+                .btn-deliver { background-color: var(--accent); color: white; }
                 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
                 .modal-content { background-color: var(--card-bg, white); padding: 30px; border-radius: var(--radius-lg); text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 90%; max-width: 450px; box-sizing: border-box; }
                 .btn-modal-opt { flex: 1; padding: 20px; border: none; border-radius: var(--radius-md); color: white; font-size: 1.1rem; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.2s; }
@@ -510,7 +510,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 .event-chip-container { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
                 .event-chip-container::-webkit-scrollbar { display: none; } /* 크롬/사파리 스크롤바 숨김 */
                 .event-chip { flex-shrink: 0; padding: 8px 15px; border: 1px solid var(--border-color, #ccc); border-radius: 20px; background-color: var(--card-bg, #fff); color: var(--text-secondary, #666); font-size: 0.95rem; cursor: pointer; white-space: nowrap; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-                .event-chip.active { background-color: #dc3545; color: white; border-color: #dc3545; font-weight: bold; box-shadow: 0 4px 8px rgba(220,53,69,0.3); }
+                .event-chip.active { background-color: var(--danger); color: white; border-color: var(--danger); font-weight: bold; box-shadow: 0 4px 8px rgba(220,53,69,0.3); }
                 .event-chip.soldout { opacity: 0.5; background-color: var(--border-color, #eee); cursor: not-allowed; text-decoration: line-through; box-shadow: none; }
 
                 @media (max-width: 768px) {
@@ -545,7 +545,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                 }}>
                                     <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
                                         <div className="menu-name">{menu.name}{isSoldOut &&
-                                            <span style={{color: '#dc3545', marginLeft: '5px'}}>(품절)</span>}</div>
+                                            <span style={{color: 'var(--danger)', marginLeft: '5px'}}>(품절)</span>}</div>
                                         <div className="menu-price">{menu.price.toLocaleString()}원</div>
                                     </div>
                                     {!isSoldOut && (
@@ -637,7 +637,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                             {selectedEvent && (
                                 <span style={{
                                     fontSize: '0.9rem',
-                                    color: '#dc3545',
+                                    color: 'var(--danger)',
                                     fontWeight: 'normal',
                                     marginTop: '4px'
                                 }}>
@@ -655,7 +655,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                     {originalTotalAmount.toLocaleString()}원
                                 </div>
                             )}
-                            <span style={{color: '#d32f2f'}}>{finalTotalAmount.toLocaleString()}원</span>
+                            <span style={{color: 'var(--danger)'}}>{finalTotalAmount.toLocaleString()}원</span>
                         </div>
                     </div>
                     <button onClick={() => submitOrder(false)} className="btn-submit">

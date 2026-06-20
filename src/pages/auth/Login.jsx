@@ -3,6 +3,7 @@ import axios from 'axios';
 import {startAuthentication} from "@simplewebauthn/browser";
 import {useSystemTheme} from '../../hooks/useSystemTheme';
 import {useNotification} from '../../hooks/useNotification';
+import Button from '../../components/ui/Button';
 
 function Login({onLoginSuccess, onSwitchToRegister}) {
     const [formData, setFormData] = useState({username: '', password: ''});
@@ -28,6 +29,36 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
         notify(`${data.name}님, 환영합니다!`, {icon: '✅'});
         onLoginSuccess(data);
     };
+
+    useEffect(() => {
+        const initConditionalPasskey = async () => {
+            if (!(await browserSupportsWebAuthnAutofill())) return;
+
+            try {
+                const resp = await axios.get('/api/passkey/login-options');
+                const asseResp = await startAuthentication({
+                    optionsJSON: resp.data,
+                    useBrowserAutofill: true
+                });
+
+                const verificationResp = await axios.post('/api/passkey/login-verify', {
+                    body: asseResp,
+                });
+
+                if (verificationResp.data.success) {
+                    handleSuccess(verificationResp.data);
+                }
+            } catch (error) {
+                // 백그라운드 동작이라 조용히 처리:
+                //  - NotAllowedError: 사용자가 취소
+                //  - AbortError: '패스키로 로그인' 버튼 클릭 등으로 의식이 중단됨(정상)
+                if (error.name === 'NotAllowedError' || error.name === 'AbortError') return;
+                console.error(error);
+            }
+        };
+
+        initConditionalPasskey();
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -107,35 +138,16 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                     -webkit-appearance: none;
                     transition: border-color 0.3s, background-color 0.3s, color 0.3s;
                 }
-                .login-input:focus { border-color: #007bff; }
+                .login-input:focus { border-color: var(--accent); }
                 .login-input::placeholder { color: var(--text-secondary, #aaa); }
-                
-                .btn-submit {
-                    padding: 14px; border-radius: var(--radius-md);
-                    border: none; background-color: #007bff; color: white;
-                    font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;
-                    transition: transform 0.1s, background-color 0.2s;
-                }
-                .btn-submit:active { transform: scale(0.97); background-color: #0056b3; }
-                .btn-submit:disabled, .btn-passkey:disabled { opacity: 0.6; cursor: not-allowed; }
                 
                 .divider-container { width: 100%; display: flex; align-items: center; margin: 25px 0 15px 0; }
                 .divider-line { flex: 1; height: 1px; background-color: var(--border-color, #ddd); transition: background-color 0.3s; }
                 .divider-text { padding: 0 15px; color: var(--text-secondary, #999); font-size: 0.85rem; }
                 
-                .btn-passkey {
-                    padding: 14px; border-radius: var(--radius-md);
-                    border: 1px solid var(--border-color, #ccc);
-                    background-color: var(--card-bg, white); color: var(--text-primary, #333);
-                    font-size: 1rem; cursor: pointer; font-weight: bold; width: 100%;
-                    display: flex; align-items: center; justify-content: center; gap: 8px;
-                    transition: transform 0.1s, background-color 0.2s, border-color 0.3s, color 0.3s;
-                }
-                .btn-passkey:active { transform: scale(0.97); background-color: var(--bg-color, #f4f6f8); }
-                
                 .register-text { margin-top: 30px; font-size: 0.95rem; color: var(--text-secondary, #666); }
-                .register-link { color: #007bff; cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
-                .register-link:active { color: #0056b3; }
+                .register-link { color: var(--accent); cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
+                .register-link:active { color: var(--accent-hover); }
                 `}
             </style>
 
@@ -165,9 +177,9 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                         autoComplete="current-password"
                         required
                     />
-                    <button type="submit" className="btn-submit" disabled={submitting}>
+                    <Button type="submit" size="lg" full disabled={submitting}>
                         {submitting ? '로그인 중...' : '로그인'}
-                    </button>
+                    </Button>
                 </form>
 
                 <div className="divider-container">
@@ -176,9 +188,10 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                     <div className="divider-line"></div>
                 </div>
 
-                <button onClick={handlePasskeyLogin} className="btn-passkey" disabled={submitting}>
-                    🔑 패스키(지문/FaceID)로 로그인
-                </button>
+                <Button onClick={handlePasskeyLogin} variant="secondary" size="lg" full icon="🔑"
+                        disabled={submitting}>
+                    패스키(지문/FaceID)로 로그인
+                </Button>
 
                 <div className="register-text">
                     계정이 없으신가요?

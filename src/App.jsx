@@ -236,13 +236,13 @@ function App() {
                 
                 .btn-global-action { padding: 8px 12px; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s; font-size: 0.95rem; }
                 .btn-global-action:active { transform: scale(0.95); }
-                .btn-settle { background-color: #28a745; }
-                .btn-profile { background-color: #6c757d; }
-                .btn-back-role { background-color: #495057; margin-right: auto; }
+                .btn-settle { background-color: var(--success); }
+                .btn-profile { background-color: var(--neutral); }
+                .btn-back-role { background-color: var(--neutral); margin-right: auto; }
                 
                 .global-user-name { font-weight: bold; color: var(--text-primary, #333); font-size: 1rem; text-shadow: 0px 0px 8px var(--bg-color, rgba(255,255,255,0.8)); }
                 
-                .btn-global-logout { padding: 8px 12px; background-color: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: transform 0.1s; }
+                .btn-global-logout { padding: 8px 12px; background-color: var(--danger); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: transform 0.1s; }
                 .btn-global-logout:active { transform: scale(0.95); }
 
                 .desktop-user-menu { display: flex; align-items: center; gap: 12px; }
@@ -254,7 +254,7 @@ function App() {
                 
                 .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; }
                 .dropdown-item:last-child { border-bottom: none; }
-                .dropdown-item.logout { color: #dc3545; }
+                .dropdown-item.logout { color: var(--danger); }
                 .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
 
                 @media (max-width: 768px) {

@@ -5,6 +5,7 @@ import {useNotification} from '../../hooks/useNotification';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
 import BarList from '../../components/stats/BarList';
+import Button from '../../components/ui/Button';
 
 const UNITS = ['g', 'ml', '개'];
 const CATEGORIES = ['식재료', '부자재']; // 부자재 = 컵/빨대/뚜껑 등 포장재
@@ -228,18 +229,10 @@ function CostAnalysis({onBack}) {
                 .cost-input.unit { width: 64px; text-align: center; }
                 .cost-input.cat { width: 86px; text-align: center; }
                 .cost-unitcost { color: var(--text-secondary, #777); font-weight: 700; }
-                .cost-btn { padding: 7px 14px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: transform .1s ease, opacity .2s; }
-                .cost-btn:active { transform: scale(.96); }
-                .cost-btn.primary { background: #42a5f5; color: #fff; }
-                .cost-btn.ghost { background: transparent; border: 1px solid var(--border-color, #ddd); color: var(--text-primary, #333); }
-                .cost-btn.danger { background: transparent; color: #e53935; border: 1px solid #e5393544; padding: 5px 10px; font-size: .85rem; }
                 .cost-nav { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-                .cost-nav-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: var(--card-bg, #fff); color: var(--text-primary, #333); border: 1.5px solid var(--border-color, #d5d8dd); border-radius: 10px; font-weight: 700; font-size: .92rem; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.07); transition: border-color .15s ease, color .15s ease, transform .1s ease, box-shadow .15s ease; }
-                .cost-nav-btn:hover { border-color: #42a5f5; color: #1976d2; box-shadow: 0 3px 8px rgba(66,165,245,.18); }
-                .cost-nav-btn:active { transform: scale(.96); }
                 .menu-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
                 .menu-pill { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border-color, #ddd); background: var(--bg-color, #f7f7f7); color: var(--text-primary, #333); font-weight: 700; cursor: pointer; font-size: .9rem; transition: all .15s ease; }
-                .menu-pill.active { background: #42a5f5; border-color: #42a5f5; color: #fff; }
+                .menu-pill.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
                 .recipe-group { margin-bottom: 18px; }
                 .recipe-group-head { font-size: .9rem; font-weight: 800; color: var(--text-secondary, #777); margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color, #e3e3e3); }
                 .recipe-grid { display: grid; grid-template-columns: 1fr auto; gap: 10px 14px; align-items: center; }
@@ -251,7 +244,7 @@ function CostAnalysis({onBack}) {
                 .cost-summary .v { font-size: 1.5rem; font-weight: 800; color: var(--text-primary, #222); }
                 .badge { display: inline-block; font-size: .7rem; font-weight: 800; padding: 2px 7px; border-radius: 6px; margin-left: 6px; vertical-align: middle; }
                 .badge.manual { background: #ede7f6; color: #6a1b9a; }
-                .badge.norecipe { background: #fff3e0; color: #e65100; }
+                .badge.norecipe { background: var(--warning-bg); color: var(--warning); }
                 .pos { color: #2e7d32; font-weight: 800; }
                 .neg { color: #c62828; font-weight: 800; }
                 .editor-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color, #eee); flex-wrap: wrap; }
@@ -263,9 +256,9 @@ function CostAnalysis({onBack}) {
     // 분석 화면 우측 상단: 편집 탭으로 이동하는 버튼들
     const navActions = (
         <div className="cost-nav">
-            <button className="cost-nav-btn" onClick={() => setView('ingredients')}>🧺 원재료 관리</button>
-            <button className="cost-nav-btn" onClick={() => setView('recipes')}>📝 레시피 수정</button>
             <ThemeToggle/>
+            <Button variant="secondary" icon="🧺" onClick={() => setView('ingredients')}>원재료 관리</Button>
+            <Button variant="secondary" icon="📝" onClick={() => setView('recipes')}>레시피 수정</Button>
         </div>
     );
 
@@ -322,7 +315,7 @@ function CostAnalysis({onBack}) {
                             {unitCostOf(ing).toLocaleString(undefined, {maximumFractionDigits: 2})} 원/{unitLabel(ing.unit)}
                         </td>
                         <td>
-                            <button className="cost-btn danger" onClick={() => deleteIngredient(ing)}>삭제</button>
+                            <Button variant="danger" size="sm" onClick={() => deleteIngredient(ing)}>삭제</Button>
                         </td>
                     </tr>
                 ))}
@@ -356,7 +349,7 @@ function CostAnalysis({onBack}) {
                     </td>
                     <td className="cost-unitcost">—</td>
                     <td>
-                        <button className="cost-btn primary" onClick={addIngredient}>추가</button>
+                        <Button size="sm" onClick={addIngredient}>추가</Button>
                     </td>
                 </tr>
                 </tbody>
@@ -460,7 +453,7 @@ function CostAnalysis({onBack}) {
                                                 {won(selectedMenu.price - (overrideOn ? Number(overrideValue) || 0 : draftCost))}원
                                             </b>
                                         </span>
-                                    <button className="cost-btn primary" onClick={saveRecipe}>저장</button>
+                                    <Button onClick={saveRecipe}>저장</Button>
                                 </div>
                             </div>
                         </>

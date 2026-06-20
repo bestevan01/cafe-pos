@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
+import Button from '../../components/ui/Button';
 import {useNotification} from '../../hooks/useNotification';
 
 function UsersDashboard({onBack}) {
@@ -94,7 +95,6 @@ function UsersDashboard({onBack}) {
                 .users-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: nowrap; gap: 15px; }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .users-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (PC 테이블) */
@@ -107,13 +107,13 @@ function UsersDashboard({onBack}) {
 
                 /* 뱃지 및 버튼 스타일 */
                 .role-badge { padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: bold; display: inline-block; }
-                .role-admin { background-color: #e3f2fd; color: #1565c0; }
-                .role-staff { background-color: #e8f5e9; color: #2e7d32; }
-                .role-pending { background-color: #fff3e0; color: #ef6c00; }
+                .role-admin { background-color: var(--accent-bg); color: #1565c0; }
+                .role-staff { background-color: var(--success-bg); color: var(--success); }
+                .role-pending { background-color: var(--warning-bg); color: #ef6c00; }
                 
                 .btn-action-base { padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: bold; border: none; cursor: pointer; color: white; transition: transform 0.1s; }
-                .btn-approve { background-color: #4caf50; } .btn-demote { background-color: #9e9e9e; } .btn-promote { background-color: #2196f3; } .btn-wait { background-color: #ff9800; } .btn-delete { background-color: #d32f2f; }
-                .my-account-label { color: var(--text-blue, #007bff); font-weight: bold; font-size: 0.9rem; padding: 8px; }
+                .btn-approve { background-color: #4caf50; } .btn-demote { background-color: #9e9e9e; } .btn-promote { background-color: #2196f3; } .btn-wait { background-color: var(--warning); } .btn-delete { background-color: #d32f2f; }
+                .my-account-label { color: var(--text-blue, var(--accent)); font-weight: bold; font-size: 0.9rem; padding: 8px; }
 
                 /* 다크모드 오버라이드 */
                 [data-theme='dark'] .role-admin { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
@@ -148,7 +148,7 @@ function UsersDashboard({onBack}) {
 
             <div className="users-header">
                 <div className="header-left">
-                    <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
                     <h1 className="users-title">👥 직원 관리</h1>
                 </div>
                 <div className="theme-wrapper">

@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
+import Button from '../../components/ui/Button';
 import {useNotification} from '../../hooks/useNotification';
 
 function SettlementDashboard({onBack}) {
@@ -48,7 +49,6 @@ function SettlementDashboard({onBack}) {
                 .settle-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: nowrap; gap: 15px; }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .settle-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
-                .btn-back { padding: 10px 15px; background-color: #6c757d; color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; white-space: nowrap; }
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (PC 테이블) */
@@ -60,11 +60,11 @@ function SettlementDashboard({onBack}) {
                 .settle-card-view { display: none; }
 
                 /* 뱃지 및 텍스트 스타일 */
-                .badge-open { background-color: #e3f2fd; color: #1565c0; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .badge-closed { background-color: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; }
-                .diff-good { color: #28a745; font-weight: bold; background-color: #e8f5e9; padding: 5px 10px; border-radius: var(--radius-sm); display: inline-block; }
-                .diff-bad { color: #dc3545; font-weight: bold; background-color: #ffebee; padding: 5px 10px; border-radius: var(--radius-sm); display: inline-block; }
-                .text-blue { color: #007bff; font-weight: bold; }
+                .badge-open { background-color: var(--accent-bg); color: #1565c0; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .badge-closed { background-color: var(--success-bg); color: var(--success); padding: 4px 10px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; display: inline-block; }
+                .diff-good { color: var(--success); font-weight: bold; background-color: var(--success-bg); padding: 5px 10px; border-radius: var(--radius-sm); display: inline-block; }
+                .diff-bad { color: var(--danger); font-weight: bold; background-color: var(--danger-bg); padding: 5px 10px; border-radius: var(--radius-sm); display: inline-block; }
+                .text-blue { color: var(--accent); font-weight: bold; }
 
                 /* 다크모드 오버라이드 */
                 [data-theme='dark'] .badge-open { background-color: rgba(21, 101, 192, 0.2); color: #64b5f6; }
@@ -91,7 +91,7 @@ function SettlementDashboard({onBack}) {
                     .card-date { font-size: 1.1rem; font-weight: bold; color: var(--text-primary, #333); }
                     .card-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-secondary, #666); }
                     .card-val { color: var(--text-primary, #333); font-weight: bold; }
-                    .card-total-row { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 1px dashed var(--border-color, #ddd); font-size: 1rem; color: #007bff; font-weight: bold; }
+                    .card-total-row { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 1px dashed var(--border-color, #ddd); font-size: 1rem; color: var(--accent); font-weight: bold; }
                     .card-closing-section { margin-top: 15px; padding-top: 15px; border-top: 2px solid var(--border-color, #eee); display: flex; justify-content: space-between; align-items: center; }
                     .closing-label { font-size: 0.95rem; color: var(--text-primary, #333); font-weight: bold; }
                     .closing-val { font-size: 1.1rem; color: var(--text-primary, #333); font-weight: bold; }
@@ -101,7 +101,7 @@ function SettlementDashboard({onBack}) {
 
             <div className="settle-header">
                 <div className="header-left">
-                    <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
                     <h1 className="settle-title">💰 시재/정산 관리</h1>
                 </div>
                 <div className="theme-wrapper">

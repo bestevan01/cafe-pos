@@ -3,6 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import AdvancedStats from "./AdvancedStats.jsx";
 import ThemeToggle from '../../components/ThemeToggle';
+import Button from '../../components/ui/Button';
 import {useNotification} from '../../hooks/useNotification';
 
 function SalesDashboard({onBack}) {
@@ -206,18 +207,13 @@ function SalesDashboard({onBack}) {
                 .header-left, .header-right { display: flex; align-items: center; gap: 10px; }
                 .sales-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
                 
-                .btn-back, .btn-advanced, .btn-excel, .btn-refresh { padding: 10px 15px; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; color: white; display: flex; align-items: center; gap: 5px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-                .btn-back:active, .btn-advanced:active, .btn-excel:active, .btn-refresh:active { opacity: 0.8; }
-                .btn-back { background-color: #6c757d; }
-                .btn-advanced { background-color: #673ab7; }
-                .btn-excel { background-color: #217346; }
-                .btn-refresh { background-color: #0284c7; }
+                .sl-hdr-btn { white-space: nowrap; }
                 
                 .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; flex-shrink: 0; }
                 .stat-card { background-color: var(--card-bg, white); padding: 25px 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; transition: background-color 0.3s; }
                 .stat-title { margin: 0 0 10px 0; font-size: 1rem; color: var(--text-secondary, #666); font-weight: bold; }
                 .stat-val { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #333); }
-                .stat-val.green { color: #2e7d32; } .stat-val.blue { color: #1565c0; }
+                .stat-val.green { color: var(--success); } .stat-val.blue { color: #1565c0; }
 
                 .table-card { background-color: var(--card-bg, white); padding: 25px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); flex: 1; display: flex; flex-direction: column; min-height: 0; }
                 .filter-area { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; flex-shrink: 0; }
@@ -232,10 +228,10 @@ function SalesDashboard({onBack}) {
                 .sales-table td { padding: 12px; border-bottom: 1px solid var(--border-color, #eee); color: var(--text-primary, #333); }
                 
                 .pay-badge { padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: bold; }
-                .pay-cash { background-color: rgba(46, 125, 50, 0.1); color: #2e7d32; }
+                .pay-cash { background-color: rgba(46, 125, 50, 0.1); color: var(--success); }
                 .pay-bank { background-color: rgba(237, 108, 2, 0.1); color: #ed6c02; }
-                .pay-event { background-color: rgba(0, 123, 255, 0.1); color: #007bff; }
-                .btn-del { padding: 6px 12px; background-color: #ffebee; color: #dc3545; border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; }
+                .pay-event { background-color: rgba(0, 123, 255, 0.1); color: var(--accent); }
+                .btn-del { padding: 6px 12px; background-color: var(--danger-bg); color: var(--danger); border: none; border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; }
                 
                 .sales-card-view { display: none; }
                 
@@ -253,7 +249,7 @@ function SalesDashboard({onBack}) {
                     .sales-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
                     .header-left { width: 100%; } .header-right { width: 100%; margin-top: 5px; }
                     .theme-wrapper { position: absolute; top: 0; right: 0; }
-                    .btn-advanced, .btn-excel { flex: 1; justify-content: center; }
+                    .sl-hdr-btn { flex: 1; }
                     .stats-grid { grid-template-columns: 1fr; }
                     .table-card { padding: 0; background: none; border: none; box-shadow: none; display: block; }
                     .table-responsive { display: none; }
@@ -276,18 +272,19 @@ function SalesDashboard({onBack}) {
             {/* 헤더 영역 */}
             <div className="sales-header">
                 <div className="header-left">
-                    <button onClick={onBack} className="btn-back">⬅ 뒤로</button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
                     <h2 className="sales-title">💰 매출 통계</h2>
                 </div>
                 <div className="header-right">
                     <div className="theme-wrapper"><ThemeToggle/></div>
-                    <button onClick={() => {
+                    <Button variant="secondary" icon="🔄" className="sl-hdr-btn" onClick={() => {
                         void fetchMonth(selectedYear, selectedMonth, {force: true});
                         void fetchSummary();
-                    }} className="btn-refresh">🔄 새로고침
-                    </button>
-                    <button onClick={() => setShowAdvanced(true)} className="btn-advanced">📊 고급 통계</button>
-                    <button onClick={exportExcel} className="btn-excel">📗 엑셀 다운로드</button>
+                    }}>새로고침</Button>
+                    <Button variant="secondary" icon="📊" className="sl-hdr-btn"
+                            onClick={() => setShowAdvanced(true)}>고급 통계</Button>
+                    <Button variant="secondary" icon="📗" className="sl-hdr-btn"
+                            onClick={exportExcel}>엑셀 다운로드</Button>
                 </div>
             </div>
 
@@ -318,11 +315,11 @@ function SalesDashboard({onBack}) {
                     <div className="filter-group">
                         <div className="filter-row top-row">
                             <button onClick={resetFilters} className="btn-filter"
-                                    style={{backgroundColor: '#6c757d'}}>이번 달로
+                                    style={{backgroundColor: 'var(--neutral)'}}>이번 달로
                             </button>
                             <select value={selectedPaymentMethod}
                                     onChange={(e) => setSelectedPaymentMethod(e.target.value)} className="filter-select"
-                                    style={{borderColor: selectedPaymentMethod !== 'all' ? '#007bff' : 'var(--border-color, #ccc)'}}>
+                                    style={{borderColor: selectedPaymentMethod !== 'all' ? 'var(--accent)' : 'var(--border-color, #ccc)'}}>
                                 <option value="all">결제수단: 전체</option>
                                 <option value="cash">현금</option>
                                 <option value="bank">계좌이체</option>

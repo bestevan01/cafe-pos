@@ -6,6 +6,7 @@ import EventDashboard from './EventDashboard';
 import UsersDashboard from './UsersDashboard';
 import CostAnalysis from './CostAnalysis';
 import ThemeToggle from '../../components/ThemeToggle';
+import Button from '../../components/ui/Button';
 import {socket} from '../../utils/socket';
 import {useNotification} from '../../hooks/useNotification';
 
@@ -42,12 +43,8 @@ function AdminDashboard({onLogout, onEditProfile}) {
             {/* 상단 우측 헤더 영역 */}
             <div className="top-right-header">
                 <ThemeToggle/>
-                <button onClick={onEditProfile} className="btn-global btn-profile">
-                    ⚙️ 내 정보
-                </button>
-                <button onClick={onLogout} className="btn-global btn-logout">
-                    로그아웃
-                </button>
+                <Button variant="neutral" icon="⚙️" onClick={onEditProfile}>내 정보</Button>
+                <Button variant="danger" onClick={onLogout}>로그아웃</Button>
             </div>
 
             <style>
@@ -72,15 +69,6 @@ function AdminDashboard({onLogout, onEditProfile}) {
                     position: absolute; top: 15px; right: 20px;
                     display: flex; gap: 10px; align-items: center; z-index: 100;
                 }
-                .btn-global {
-                    padding: 8px 12px; color: white; border: none;
-                    border-radius: var(--radius-md); font-weight: bold;
-                    cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-                    transition: transform 0.1s; white-space: nowrap;
-                }
-                .btn-global:active { transform: scale(0.95); }
-                .btn-profile { background-color: #495057; }
-                .btn-logout { background-color: #dc3545; }
 
                 /* 대시보드 카드 그리드 */
                 .admin-grid { 
@@ -92,11 +80,11 @@ function AdminDashboard({onLogout, onEditProfile}) {
                     border: 1px solid var(--border-color, transparent);
                     border-radius: var(--radius-lg); 
                     padding: 35px 20px; 
-                    box-shadow: 0 10px 25px rgba(0,0,0,0.05); 
-                    cursor: pointer; display: flex; flex-direction: column; align-items: center; 
+                    box-shadow: var(--shadow-lg);
+                    cursor: pointer; display: flex; flex-direction: column; align-items: center;
                     text-align: center; transition: transform 0.1s, box-shadow 0.1s, background-color 0.3s; 
                 }
-                .admin-card:active { transform: scale(0.96); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+                .admin-card:active { transform: scale(0.96); box-shadow: var(--shadow-md); }
                 .card-icon { font-size: 3.5rem; margin-bottom: 15px; }
                 .card-title { font-size: 1.3rem; font-weight: bold; color: var(--text-primary, #333); margin-bottom: 8px; }
                 .card-desc { font-size: 0.95rem; color: var(--text-secondary, #888); word-break: keep-all; }
@@ -104,17 +92,16 @@ function AdminDashboard({onLogout, onEditProfile}) {
                 /* 비상용 캐셔 강제 해제 버튼 */
                 .btn-force-release {
                     padding: 12px 20px; background-color: transparent;
-                    color: #dc3545; border: 1px solid #dc3545; border-radius: var(--radius-md);
+                    color: var(--danger); border: 1px solid var(--danger); border-radius: var(--radius-md);
                     font-weight: bold; font-size: 0.95rem; cursor: pointer;
                     transition: background-color 0.2s, transform 0.1s;
                 }
-                .btn-force-release:hover { background-color: rgba(220,53,69,0.08); }
+                .btn-force-release:hover { background-color: var(--danger-bg); }
                 .btn-force-release:active { transform: scale(0.97); }
 
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
                     .top-right-header { top: 10px; right: 10px; gap: 8px; }
-                    .btn-global { padding: 6px 10px; font-size: 0.85rem; }
 
                     .admin-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
                     .admin-card { aspect-ratio: 1 / 1; justify-content: center; padding: 10px; }
