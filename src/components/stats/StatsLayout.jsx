@@ -19,8 +19,9 @@ function StatsLayout({title, onBack, actions, children}) {
                 .stats-layout-title { margin: 0; font-size: 1.7rem; font-weight: 800; color: var(--text-primary, #222); white-space: nowrap; }
                 /* 데스크탑 2열 고정: 카드가 좌→우로 채워지고, wide 카드만 한 줄 전체 차지 */
                 .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
-                @media (max-width: 900px) { .stats-grid { grid-template-columns: 1fr; } }
-                @media (max-width: 768px) { .stats-layout { padding: 16px; } }
+                /* 모바일: minmax(0,1fr)로 칸이 컨테이너를 넘지 않게 (넓은 표는 내부에서 가로 스크롤) */
+                @media (max-width: 900px) { .stats-grid { grid-template-columns: minmax(0, 1fr); } }
+                @media (max-width: 768px) { .stats-layout { padding: 16px; } .stats-layout-title { font-size: 1.35rem; } }
             `}</style>
 
             <div className="stats-layout-header">

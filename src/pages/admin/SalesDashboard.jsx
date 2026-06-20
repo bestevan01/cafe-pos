@@ -247,9 +247,12 @@ function SalesDashboard({onBack}) {
                 @media (max-width: 768px) {
                     .sales-container { height: auto; min-height: 100vh; padding: 15px; overflow: visible; }
                     .sales-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
-                    .header-left { width: 100%; } .header-right { width: 100%; margin-top: 5px; }
+                    .header-left { width: 100%; }
+                    /* 액션 버튼을 3등분 그리드로 → 컨테이너 폭에 갇혀 오른쪽으로 넘치지 않음 */
+                    .header-right { width: 100%; margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
                     .theme-wrapper { position: absolute; top: 0; right: 0; }
-                    .sl-hdr-btn { flex: 1; }
+                    /* 좁으면 버튼 글자가 두 줄로 줄바꿈(grid가 높이를 맞춤). nowrap·패딩 축소 */
+                    .sl-hdr-btn { white-space: normal; min-width: 0; padding-left: 6px; padding-right: 6px; font-size: 0.82rem; line-height: 1.25; }
                     .stats-grid { grid-template-columns: 1fr; }
                     .table-card { padding: 0; background: none; border: none; box-shadow: none; display: block; }
                     .table-responsive { display: none; }

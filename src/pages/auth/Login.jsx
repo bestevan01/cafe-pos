@@ -164,7 +164,13 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                 .register-text { margin-top: 30px; font-size: 0.95rem; color: var(--text-secondary, #666); }
                 .register-link { color: var(--accent); cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
                 .register-link:active { color: var(--accent-hover); }
-                
+
+                /* 패스키 버튼은 문구가 길어 lg 폰트(1.2rem)면 좁은 화면(예: iPhone SE 375px)에서 좌우 패딩을 먹는다 → 폰트만 축소(높이는 유지) */
+                .login-card .login-passkey { font-size: 1rem; }
+                @media (max-width: 400px) {
+                    .login-card .login-passkey { font-size: 0.85rem; }
+                }
+
                 @keyframes onAutoFillDetected {
                     from { opacity: 1; }
                     to { opacity: 1; }
@@ -215,7 +221,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                 </div>
 
                 <Button onClick={handlePasskeyLogin} variant="secondary" size="lg" full icon="🔑"
-                        disabled={submitting}>
+                        className="login-passkey" disabled={submitting}>
                     패스키(지문/FaceID)로 로그인
                 </Button>
 

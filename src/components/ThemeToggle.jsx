@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import {useState, useEffect, useRef} from 'react';
+import {useTheme} from '../hooks/useTheme';
 
 export default function ThemeToggle() {
-    const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'system');
+    const {theme, setTheme} = useTheme(); // 전역 공용 스토어
     const [isOpen, setIsOpen] = useState(false);
-    const [menuStyle, setMenuStyle] = useState({ left: '50%', transform: 'translateX(-50%)' });
+    const [menuStyle, setMenuStyle] = useState({left: '50%', transform: 'translateX(-50%)'});
     const dropdownRef = useRef(null);
 
     // 1. 드롭다운 외부 클릭 감지 (닫기)
@@ -13,6 +14,7 @@ export default function ThemeToggle() {
                 setIsOpen(false);
             }
         }
+
         document.addEventListener("pointerdown", handleClickOutside);
         return () => document.removeEventListener("pointerdown", handleClickOutside);
     }, []);
@@ -35,40 +37,10 @@ export default function ThemeToggle() {
             }
             // 공간이 충분하면 중앙 정렬
             else {
-                setMenuStyle({ left: '50%', transform: 'translateX(-50%)' });
+                setMenuStyle({left: '50%', transform: 'translateX(-50%)'});
             }
         }
     }, [isOpen]);
-
-    // 3. 테마 적용 및 시스템 설정 변경 감지
-    useEffect(() => {
-        const root = document.documentElement;
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-        const applyTheme = (currentTheme) => {
-            if (currentTheme === 'dark') {
-                root.setAttribute('data-theme', 'dark');
-            } else if (currentTheme === 'light') {
-                root.setAttribute('data-theme', 'light');
-            } else {
-                if (mediaQuery.matches) {
-                    root.setAttribute('data-theme', 'dark');
-                } else {
-                    root.setAttribute('data-theme', 'light');
-                }
-            }
-        };
-
-        applyTheme(theme);
-        localStorage.setItem('theme', String(theme));
-
-        const handleChange = () => {
-            if (theme === 'system') applyTheme('system');
-        };
-
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, [theme]);
 
     const getCurrentIcon = () => {
         if (theme === 'light') return '☀️';
@@ -149,13 +121,16 @@ export default function ThemeToggle() {
 
             {isOpen && (
                 <div className="theme-menu" style={menuStyle}>
-                    <button className={`theme-menu-item ${theme === 'light' ? 'active' : ''}`} onClick={() => setTheme('light')}>
+                    <button className={`theme-menu-item ${theme === 'light' ? 'active' : ''}`}
+                            onClick={() => setTheme('light')}>
                         <span>☀️</span> 라이트 모드
                     </button>
-                    <button className={`theme-menu-item ${theme === 'dark' ? 'active' : ''}`} onClick={() => setTheme('dark')}>
+                    <button className={`theme-menu-item ${theme === 'dark' ? 'active' : ''}`}
+                            onClick={() => setTheme('dark')}>
                         <span>🌙</span> 다크 모드
                     </button>
-                    <button className={`theme-menu-item ${theme === 'system' ? 'active' : ''}`} onClick={() => setTheme('system')}>
+                    <button className={`theme-menu-item ${theme === 'system' ? 'active' : ''}`}
+                            onClick={() => setTheme('system')}>
                         <span>💻</span> 시스템 설정
                     </button>
                 </div>

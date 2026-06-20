@@ -514,6 +514,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 .event-chip.soldout { opacity: 0.5; background-color: var(--border-color, #eee); cursor: not-allowed; text-decoration: line-through; box-shadow: none; }
 
                 @media (max-width: 768px) {
+                    /* 전역 헤더가 한 줄(테마는 사용자 드롭다운으로 이동)이라 65px면 충분 */
                     .pos-left { border-right: none; padding: 15px; padding-top: 65px; }
                     .menu-list { grid-template-columns: 1fr; }
                     .pos-title { font-size: 1.5rem; }

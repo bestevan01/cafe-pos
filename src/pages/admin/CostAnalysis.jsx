@@ -220,11 +220,12 @@ function CostAnalysis({onBack}) {
 
     const styleTag = (
         <style>{`
+                .cost-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
                 .cost-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
                 .cost-table th, .cost-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-color, #eee); text-align: right; white-space: nowrap; }
                 .cost-table th { color: var(--text-secondary, #888); font-weight: 700; font-size: .82rem; }
                 .cost-table td.l, .cost-table th.l { text-align: left; }
-                .cost-input { width: 92px; padding: 6px 8px; border: 1px solid var(--border-color, #ddd); border-radius: 8px; background: var(--bg-color, #fff); color: var(--text-primary, #222); text-align: right; box-sizing: border-box; }
+                .cost-input { width: 92px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border-color, #ddd); border-radius: 8px; background: var(--bg-color, #fff); color: var(--text-primary, #222); text-align: right; box-sizing: border-box; }
                 .cost-input.name { width: 130px; text-align: left; }
                 .cost-input.unit { width: 64px; text-align: center; }
                 .cost-input.cat { width: 86px; text-align: center; }
@@ -235,8 +236,9 @@ function CostAnalysis({onBack}) {
                 .menu-pill.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
                 .recipe-group { margin-bottom: 18px; }
                 .recipe-group-head { font-size: .9rem; font-weight: 800; color: var(--text-secondary, #777); margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color, #e3e3e3); }
-                .recipe-grid { display: grid; grid-template-columns: 1fr auto; gap: 10px 14px; align-items: center; }
-                .recipe-name { color: var(--text-primary, #333); font-weight: 600; }
+                /* 입력 칸을 고정 폭으로(=auto가 input 본질너비로 부풀어 이름 칸을 찌부시키는 문제 방지) */
+                .recipe-grid { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 10px 14px; align-items: center; }
+                .recipe-name { color: var(--text-primary, #333); font-weight: 600; word-break: keep-all; }
                 .recipe-sub { color: var(--text-secondary, #999); font-weight: 600; font-size: .8rem; margin-left: 6px; }
                 .cost-summary { display: flex; flex-wrap: wrap; gap: 22px; margin: 4px 0 20px; }
                 .cost-summary .item { display: flex; flex-direction: column; gap: 3px; }
@@ -265,7 +267,8 @@ function CostAnalysis({onBack}) {
     const ingredientsCard = (
         <StatCard title="원재료 관리" icon="🧺" loading={loading} wide
                   subtitle={ingredients.length > 0 ? `${ingredients.length}개 품목` : null}>
-            <table className="cost-table">
+            <div className="cost-table-wrap">
+                <table className="cost-table">
                 <thead>
                 <tr>
                     <th className="l">원재료</th>
@@ -353,7 +356,8 @@ function CostAnalysis({onBack}) {
                     </td>
                 </tr>
                 </tbody>
-            </table>
+                </table>
+            </div>
             <p className="hint" style={{marginTop: 12}}>
                 값을 고치면 칸을 벗어날 때 자동 저장됩니다. 단위당 원가 = 구매가격 ÷ 구매용량.<br/>
                 컵·빨대·뚜껑 같은 <b>포장재</b>는 분류를 <b>‘부자재’</b>, 단위를 <b>‘개’</b>로 등록하면 한 잔 원가에 함께 반영됩니다.
@@ -479,7 +483,8 @@ function CostAnalysis({onBack}) {
                 )}
             </div>
 
-            <table className="cost-table" style={{marginBottom: 24}}>
+            <div className="cost-table-wrap" style={{marginBottom: 24}}>
+                <table className="cost-table">
                 <thead>
                 <tr>
                     <th className="l">메뉴</th>
@@ -504,7 +509,8 @@ function CostAnalysis({onBack}) {
                     </tr>
                 ))}
                 </tbody>
-            </table>
+                </table>
+            </div>
 
             <BarList
                 data={profitRanking}

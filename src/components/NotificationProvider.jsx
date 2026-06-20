@@ -20,6 +20,17 @@ export function NotificationProvider({children}) {
     const [toasts, setToasts] = useState([]);
     const [confirmState, setConfirmState] = useState(null); // { message, title, confirmText, cancelText, danger, resolve }
 
+    // 화면 폭으로 토스트 표현 분기: PC=우측상단 카드 / 모바일=하단 스낵바
+    const [isMobile, setIsMobile] = useState(
+        () => typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches
+    );
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 480px)');
+        const onChange = (e) => setIsMobile(e.matches);
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+
     const removeToast = useCallback((id) => {
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
@@ -166,6 +177,19 @@ export function NotificationProvider({children}) {
         confirm
     }), [notify, update, removeToast, confirm]);
 
+    // 모바일: 아래에서 위로(스낵바) / PC: 오른쪽에서 슬라이드-인
+    const toastAnim = isMobile
+        ? {
+            initial: {opacity: 0, y: 30, scale: 0.98},
+            animate: {opacity: 1, y: 0, scale: 1},
+            exit: {opacity: 0, y: 30, scale: 0.96}
+        }
+        : {
+            initial: {opacity: 0, x: 24, scale: 0.96},
+            animate: {opacity: 1, x: 0, scale: 1},
+            exit: {opacity: 0, x: 24, scale: 0.9}
+        };
+
     return (
         <NotificationContext.Provider value={value}>
             {children}
@@ -207,8 +231,10 @@ export function NotificationProvider({children}) {
                         .ntf-btn-confirm { background-color: var(--accent); color: #fff; }
                         .ntf-btn-danger { background-color: var(--danger); color: #fff; }
 
+                        /* 모바일: 하단 스낵바 (아래에서 위로 올라옴, 풀폭). 메시지는 좌측 정렬 유지.
+                           ※ base의 max-width를 풀어야 left/right가 먹어 박스가 좌우 가운데로 옴 */
                         @media (max-width: 480px) {
-                            .ntf-toast-stack { top: 12px; right: 12px; left: 12px; }
+                            .ntf-toast-stack { top: auto; bottom: 16px; right: 12px; left: 12px; max-width: none; }
                             .ntf-toast { width: 100%; }
                         }
                     `}</style>
@@ -221,9 +247,7 @@ export function NotificationProvider({children}) {
                                     className="ntf-toast"
                                     role="status"
                                     layout
-                                    initial={{opacity: 0, x: 24, scale: 0.96}}
-                                    animate={{opacity: 1, x: 0, scale: 1}}
-                                    exit={{opacity: 0, x: 24, scale: 0.9}}
+                                    {...toastAnim}
                                     transition={{duration: 0.25, ease: [0.16, 1, 0.3, 1]}}
                                 >
                                     {t.loading

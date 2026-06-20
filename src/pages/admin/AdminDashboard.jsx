@@ -59,10 +59,11 @@ function AdminDashboard({onLogout, onEditProfile}) {
                     box-sizing: border-box;
                     position: relative; 
                 }
-                .home-content { 
-                    flex: 1; display: flex; flex-direction: column; 
-                    align-items: center; justify-content: center; 
+                .home-content {
+                    flex: 1; display: flex; flex-direction: column;
+                    align-items: center; justify-content: center;
                 }
+                .admin-title { font-size: 2.2rem; margin-bottom: 30px; color: var(--text-primary, #333); text-align: center; }
 
                 /* 상단 버튼 스타일 */
                 .top-right-header {
@@ -101,11 +102,19 @@ function AdminDashboard({onLogout, onEditProfile}) {
 
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
-                    .top-right-header { top: 10px; right: 10px; gap: 8px; }
+                    /* 헤더를 절대배치 → 흐름 안(상단 바)으로: 콘텐츠가 항상 그 아래로 흘러 버튼을 침범하지 않음 */
+                    .top-right-header { position: static; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
+                    /* 위에서부터 흐르게 하고, 카드 그리드가 남는 세로 공간을 채우도록 → 화면 높이에 유연 대응 */
+                    .home-content { justify-content: flex-start; }
+                    .admin-title { font-size: 1.6rem; margin: 4px 0 18px; }
 
-                    .admin-grid { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
-                    .admin-card { aspect-ratio: 1 / 1; justify-content: center; padding: 10px; }
-                    .card-icon { font-size: 2.5rem; margin-bottom: 8px; }
+                    .admin-grid {
+                        grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 16px;
+                        flex: 1; align-content: stretch; grid-auto-rows: minmax(110px, 1fr);
+                    }
+                    /* 카드가 행 높이(=화면에 따라 가변)에 맞춰 늘어남 */
+                    .admin-card { aspect-ratio: auto; justify-content: center; padding: 16px 10px; }
+                    .card-icon { font-size: 2.4rem; margin-bottom: 8px; }
                     .card-title { font-size: 1.05rem; margin-bottom: 5px; }
                     .card-desc { font-size: 0.75rem; margin: 0; }
                 }
@@ -113,12 +122,7 @@ function AdminDashboard({onLogout, onEditProfile}) {
             </style>
 
             <div className="home-content">
-                <h1 style={{
-                    fontSize: '2.2rem', marginBottom: '30px',
-                    color: 'var(--text-primary, #333)', textAlign: 'center'
-                }}>
-                    🛡️ 관리자 대시보드
-                </h1>
+                <h1 className="admin-title">🛡️ 관리자 대시보드</h1>
 
                 <div className="admin-grid">
                     <button onClick={() => setView('sales')} className="admin-card">

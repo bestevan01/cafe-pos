@@ -67,8 +67,12 @@ function RoleSelection({onSelectRole, isCashierTaken}) {
 
                 /* 모바일 화면 최적화 */
                 @media (max-width: 768px) {
-                    .role-grid { flex-direction: column; gap: 20px; }
-                    .role-card { width: 100%; max-width: 100%; height: auto; padding: 35px 20px; }
+                    /* 위에서부터 흐르게 + 전역 헤더(사용자메뉴) 아래로 내려오게 상단 여백 확보 */
+                    .role-container { justify-content: flex-start; padding: 60px 16px 24px; }
+                    .role-title { margin-bottom: 20px; }
+                    /* 카드 그리드가 남는 세로 공간을 채우도록(화면 높이에 따라 카드가 커짐) */
+                    .role-grid { flex-direction: column; gap: 16px; flex: 1; }
+                    .role-card { width: 100%; max-width: 100%; height: auto; padding: 20px; }
                     .role-icon { font-size: 3.5rem; margin-bottom: 10px; }
                     .role-name { font-size: 1.3rem; }
                 }

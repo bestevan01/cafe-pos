@@ -12,6 +12,7 @@ import ProfileAuth from './pages/auth/ProfileAuth.jsx';
 import EditProfile from './pages/auth/EditProfile.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ThemeToggle from './components/ThemeToggle';
+import {useTheme} from './hooks/useTheme';
 import {useNotification} from './hooks/useNotification';
 
 function App() {
@@ -33,6 +34,14 @@ function App() {
     const [showProfile, setShowProfile] = useState(false);
     const [isProfileVerified, setIsProfileVerified] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const {theme, setTheme} = useTheme(); // 모바일 드롭다운의 테마 선택용
+    const [isThemeSubOpen, setIsThemeSubOpen] = useState(false); // 테마 하위 메뉴(왼쪽 플라이아웃)
+
+    // 역할(화면) 전환 시 사용자 드롭다운/테마 서브메뉴 닫기
+    useEffect(() => {
+        setIsDropdownOpen(false);
+        setIsThemeSubOpen(false);
+    }, [myRole]);
 
     const SESSION_TIMEOUT = 60 * 60 * 1000; // 1시간
     const {notify} = useNotification();
@@ -250,19 +259,26 @@ function App() {
                 
                 .btn-mobile-dropdown { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, #fff); color: var(--text-primary, #333); font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; }
                 
-                .mobile-dropdown-content { position: absolute; top: 110%; right: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; min-width: 110px; z-index: 10000; }
+                .mobile-dropdown-content { position: absolute; top: 110%; right: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: visible; min-width: 120px; z-index: 10000; }
                 
-                .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; }
+                .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
                 .dropdown-item:last-child { border-bottom: none; }
                 .dropdown-item.logout { color: var(--danger); }
                 .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
+                .global-theme-desktop { display: inline-flex; align-items: center; }
+                .dropdown-item.active { color: var(--accent); font-weight: 800; }
+                .dropdown-theme-wrap { position: relative; }
+                .dropdown-theme-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+                .dropdown-sub-arrow { color: var(--text-secondary, #999); font-size: 1.1rem; line-height: 1; }
+                .dropdown-submenu { position: absolute; right: calc(100% + 6px); top: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden; min-width: 150px; z-index: 10001; }
 
                 @media (max-width: 768px) {
                     .global-top-header { top: 10px; right: 10px; gap: 8px; left: 10px; }
                     .btn-global-action { padding: 6px 10px; font-size: 0.85rem; }
-                    
+
                     .desktop-user-menu { display: none; }
                     .mobile-user-menu { display: block; }
+                    .global-theme-desktop { display: none; } /* 모바일: 테마 버튼은 사용자 드롭다운 안으로 이동 */
                 }
                 `}
             </style>
@@ -288,7 +304,7 @@ function App() {
                             점검</button>
                     )}
 
-                    <ThemeToggle/>
+                    <span className="global-theme-desktop"><ThemeToggle/></span>
 
                     {/* 🖥️ 데스크탑 뷰 (모바일에서는 숨김) */}
                     <div className="desktop-user-menu">
@@ -302,7 +318,10 @@ function App() {
                     <div className="mobile-user-menu">
                         <button
                             className="btn-mobile-dropdown"
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            onClick={() => {
+                                setIsDropdownOpen(!isDropdownOpen);
+                                setIsThemeSubOpen(false);
+                            }}
                         >
                             👤 {auth.user.name}님 ▼
                         </button>
@@ -310,6 +329,26 @@ function App() {
                         {/* 드롭다운 열렸을 때 나오는 메뉴들 */}
                         {isDropdownOpen && (
                             <div className="mobile-dropdown-content">
+                                <div className="dropdown-theme-wrap">
+                                    <button className="dropdown-item dropdown-theme-toggle"
+                                            onClick={() => setIsThemeSubOpen(!isThemeSubOpen)}>
+                                        <span>🎨 테마 변경</span>
+                                        <span className="dropdown-sub-arrow">‹</span>
+                                    </button>
+                                    {isThemeSubOpen && (
+                                        <div className="dropdown-submenu">
+                                            <button className={`dropdown-item ${theme === 'light' ? 'active' : ''}`}
+                                                    onClick={() => setTheme('light')}>☀️ 라이트 모드
+                                            </button>
+                                            <button className={`dropdown-item ${theme === 'dark' ? 'active' : ''}`}
+                                                    onClick={() => setTheme('dark')}>🌙 다크 모드
+                                            </button>
+                                            <button className={`dropdown-item ${theme === 'system' ? 'active' : ''}`}
+                                                    onClick={() => setTheme('system')}>💻 시스템 설정
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 <button onClick={() => {
                                     setShowProfile(true);
                                     setIsDropdownOpen(false);
