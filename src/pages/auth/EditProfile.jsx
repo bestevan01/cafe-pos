@@ -1,7 +1,7 @@
 import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
-import {startRegistration} from '@simplewebauthn/browser';
+import {startRegistration, WebAuthnAbortService} from '@simplewebauthn/browser';
 import {useNotification} from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 
@@ -26,6 +26,10 @@ function EditProfile({onBack}) {
     });
 
     useEffect(() => {
+        // 이전 화면(로그인 Conditional UI 등)에서 남은 WebAuthn 의식이 있으면 취소한다.
+        // 안 그러면 "기기 등록" 시 create()를 Safari가 NotAllowedError로 막아 팝업이 안 뜬다.
+        WebAuthnAbortService.cancelCeremony();
+
         const userStr = localStorage.getItem('user');
         if (userStr) {
             const parsedUser = JSON.parse(userStr);
@@ -101,6 +105,7 @@ function EditProfile({onBack}) {
             // ⚠️ 이 호출 앞에 await(네트워크)를 두면 Safari에서 제스처가 만료돼 팝업이 안 뜬다.
             attResp = await startRegistration({optionsJSON: options});
         } catch (error) {
+            console.error('패스키 등록 오류:', error.name, error.message); // 진단용(NotAllowedError 포함)
             void prefetchRegisterOptions(user.id); // 다음 시도용 새 옵션 준비
             if (error.name === 'InvalidStateError') notify('이미 등록된 기기입니다!', {icon: '⚠️'});
             else if (error.name !== 'NotAllowedError') notify('등록 오류: ' + error.message, {icon: '⚠️'});

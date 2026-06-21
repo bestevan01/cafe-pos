@@ -1,6 +1,6 @@
 import {useEffect, useState, useRef} from 'react';
 import axios from 'axios';
-import {startAuthentication, browserSupportsWebAuthnAutofill} from "@simplewebauthn/browser";
+import {startAuthentication, browserSupportsWebAuthnAutofill, WebAuthnAbortService} from "@simplewebauthn/browser";
 import {useSystemTheme} from '../../hooks/useSystemTheme';
 import {useNotification} from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
@@ -35,11 +35,13 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
     };
 
     useEffect(() => {
+        let cancelled = false;
         const initConditionalPasskey = async () => {
             if (!(await browserSupportsWebAuthnAutofill())) return;
 
             try {
                 const resp = await axios.get('/api/passkey/login-options');
+                if (cancelled) return; // 화면을 떠났으면 의식을 시작하지 않음(언마운트 후 input 없음 → "No input" 에러 방지)
                 const asseResp = await startAuthentication({
                     optionsJSON: resp.data,
                     useBrowserAutofill: true
@@ -63,6 +65,14 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
 
         initConditionalPasskey();
         void prefetchAuthOptions();
+
+        // 로그인 화면을 벗어날 때 대기 중인 Conditional UI 의식(navigator.credentials.get)을 반드시 취소한다.
+        // 취소하지 않으면 pending 상태로 남아, 다음 화면(내 정보→기기 등록 등)의 create()/get()을
+        // Safari가 "이미 의식 진행 중"으로 보고 NotAllowedError로 차단 → 생체인증 팝업이 안 뜬다.
+        return () => {
+            cancelled = true;
+            WebAuthnAbortService.cancelCeremony();
+        };
     }, []);
 
     // '패스키로 로그인' 버튼용 옵션을 미리(콜드스타트 서버를 깨우면서) 받아 둔다. 챌린지 유효시간은 15분.
