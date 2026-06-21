@@ -12,6 +12,9 @@ function EditProfile({onBack}) {
     // ---------------------------------------------------------
     const [user, setUser] = useState({id: null, name: '', username: ''});
     const [passkeys, setPasskeys] = useState([]);
+    // Safari 대응: 클릭 핸들러 안에서 옵션을 await로 받아오면 사용자 제스처가 만료돼 생체인증 팝업이 안 뜬다.
+    // → 옵션을 미리 받아 두고, 클릭 시에는 await 없이 곧바로 startRegistration()을 호출한다.
+    const [registerOptions, setRegisterOptions] = useState(null);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({currentPassword: '', newPassword: '', confirmPassword: ''});
 
@@ -27,9 +30,23 @@ function EditProfile({onBack}) {
         if (userStr) {
             const parsedUser = JSON.parse(userStr);
             setUser(parsedUser);
-            if (parsedUser.id) void fetchPasskeys(parsedUser.id);
+            if (parsedUser.id) {
+                void fetchPasskeys(parsedUser.id);
+                void prefetchRegisterOptions(parsedUser.id);
+            }
         }
     }, []);
+
+    // 등록 옵션을 미리(콜드스타트 서버를 깨우면서) 받아 둔다. 챌린지 유효시간은 5분.
+    const prefetchRegisterOptions = async (userId) => {
+        if (!userId) return;
+        try {
+            const resp = await axios.get(`/api/passkey/register-options?userId=${userId}`, getAuthHeader());
+            setRegisterOptions(resp.data);
+        } catch {
+            setRegisterOptions(null);
+        }
+    };
 
     const fetchPasskeys = async (userId) => {
         try {
@@ -66,27 +83,44 @@ function EditProfile({onBack}) {
     // [3] 패스키(WebAuthn) 핸들러
     // ---------------------------------------------------------
     const handleRegisterPasskey = async () => {
-        try {
-            const resp = await axios.get(`/api/passkey/register-options?userId=${user.id}`, getAuthHeader());
-            let attResp;
+        // 미리 받아 둔 옵션을 사용한다(없으면 폴백으로 즉석에서 받아오지만 Safari에선 팝업이 안 뜰 수 있음).
+        let options = registerOptions;
+        if (!options) {
             try {
-                attResp = await startRegistration(resp.data);
-            } catch (error) {
-                if (error.name === 'InvalidStateError') notify('이미 등록된 기기입니다!', {icon: '⚠️'});
-                else if (error.name !== 'NotAllowedError') notify('등록 오류: ' + error.message, {icon: '⚠️'});
+                const resp = await axios.get(`/api/passkey/register-options?userId=${user.id}`, getAuthHeader());
+                options = resp.data;
+            } catch {
+                notify("패스키 등록에 실패했습니다.", {icon: '⚠️'});
                 return;
             }
+        }
+        setRegisterOptions(null); // 1회용 챌린지이므로 소진 처리
 
+        let attResp;
+        try {
+            // ⚠️ 이 호출 앞에 await(네트워크)를 두면 Safari에서 제스처가 만료돼 팝업이 안 뜬다.
+            attResp = await startRegistration({optionsJSON: options});
+        } catch (error) {
+            void prefetchRegisterOptions(user.id); // 다음 시도용 새 옵션 준비
+            if (error.name === 'InvalidStateError') notify('이미 등록된 기기입니다!', {icon: '⚠️'});
+            else if (error.name !== 'NotAllowedError') notify('등록 오류: ' + error.message, {icon: '⚠️'});
+            return;
+        }
+
+        try {
             const verificationResp = await axios.post('/api/passkey/register-verify', {
                 userId: user.id, body: attResp,
             }, getAuthHeader());
 
             if (verificationResp.data.success) {
+                notify("기기가 등록되었습니다.", {icon: '✅'});
                 await fetchPasskeys(user.id);
             }
         } catch (error) {
             console.error(error);
             notify("패스키 등록에 실패했습니다.", {icon: '⚠️'});
+        } finally {
+            void prefetchRegisterOptions(user.id); // 다음 시도용 새 옵션 준비
         }
     };
 

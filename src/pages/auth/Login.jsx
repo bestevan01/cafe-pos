@@ -10,6 +10,9 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
     const [submitting, setSubmitting] = useState(false);
     const formRef = useRef(null);
     const {notify} = useNotification();
+    // Safari 대응: '패스키로 로그인' 버튼 클릭 시 옵션을 await로 받아오면 제스처가 만료돼 팝업이 안 뜬다.
+    // → 옵션을 미리 받아 두고 클릭 시 곧바로 startAuthentication()을 호출한다.
+    const [passkeyAuthOptions, setPasskeyAuthOptions] = useState(null);
 
     // 로그인 화면은 시스템(OS) 테마 설정을 따름
     useSystemTheme();
@@ -59,7 +62,18 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
         };
 
         initConditionalPasskey();
+        void prefetchAuthOptions();
     }, []);
+
+    // '패스키로 로그인' 버튼용 옵션을 미리(콜드스타트 서버를 깨우면서) 받아 둔다. 챌린지 유효시간은 15분.
+    const prefetchAuthOptions = async () => {
+        try {
+            const resp = await axios.get('/api/passkey/login-options');
+            setPasskeyAuthOptions(resp.data);
+        } catch {
+            setPasskeyAuthOptions(null);
+        }
+    };
 
     const handleAutoFill = (e) => {
         if (e.animationName === 'onAutoFillDetected') {
@@ -96,27 +110,48 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
 
     const handlePasskeyLogin = async () => {
         if (submitting) return;
-        setSubmitting(true);
-        try {
-            const resp = await axios.get('/api/passkey/login-options');
-            // 브라우저 생체인증 프롬프트 (서버 통신 아님)
-            const asseResp = await startAuthentication({optionsJSON: resp.data});
-            const verificationResp = await axios.post('/api/passkey/login-verify', {
-                body: asseResp,
-            });
 
-            if (verificationResp.data.success) {
-                handleSuccess(verificationResp.data);
+        // 미리 받아 둔 옵션 사용(없으면 폴백으로 즉석에서 받아오지만 Safari에선 팝업이 안 뜰 수 있음)
+        let options = passkeyAuthOptions;
+        if (!options) {
+            try {
+                const resp = await axios.get('/api/passkey/login-options');
+                options = resp.data;
+            } catch {
+                notify("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.", {icon: '⚠️'});
+                return;
             }
+        }
+        setPasskeyAuthOptions(null); // 1회용 챌린지 소진
+        setSubmitting(true);
+
+        let asseResp;
+        try {
+            // ⚠️ 이 호출 앞에 await(네트워크)를 두면 Safari에서 제스처가 만료돼 생체인증 팝업이 안 뜬다.
+            asseResp = await startAuthentication({optionsJSON: options});
         } catch (error) {
+            setSubmitting(false);
+            void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
             if (error.name === 'NotAllowedError') {
                 console.log("패스키 인증 취소됨");
                 return;
             }
             console.error(error);
             notify("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.", {icon: '⚠️'});
+            return;
+        }
+
+        try {
+            const verificationResp = await axios.post('/api/passkey/login-verify', {body: asseResp});
+            if (verificationResp.data.success) {
+                handleSuccess(verificationResp.data);
+            }
+        } catch (error) {
+            console.error(error);
+            notify("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.", {icon: '⚠️'});
         } finally {
             setSubmitting(false);
+            void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
         }
     };
 
