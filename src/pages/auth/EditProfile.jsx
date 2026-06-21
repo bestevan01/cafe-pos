@@ -118,7 +118,7 @@ function EditProfile({onBack}) {
 
             <style>
                 {`
-                .ep-container { display: flex; justify-content: center; align-items: center; width: 100%; min-height: 100vh; padding: 20px; box-sizing: border-box; background-color: var(--bg-color, #f4f6f8); transition: background-color 0.3s ease; }
+                .ep-container { display: flex; justify-content: center; align-items: center; width: 100%; min-height: 100dvh; padding: 20px; box-sizing: border-box; background-color: var(--bg-color, #f4f6f8); transition: background-color 0.3s ease; }
                 
                 .ep-card { background-color: var(--card-bg, white); padding: 30px 25px; border-radius: var(--radius-lg); box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--border-color, transparent); box-sizing: border-box; }
                 .ep-header { margin: 0; text-align: center; color: var(--text-primary, #333); font-size: 1.6rem; }

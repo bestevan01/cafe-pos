@@ -100,7 +100,7 @@ function MenuDashboard({onBack}) {
             <style>
                 {`
                 /* 전체 레이아웃 */
-                .menu-container { padding: 20px; background-color: var(--bg-color, #f4f6f8); min-height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; transition: background-color 0.3s ease; }
+                .menu-container { padding: 20px; background-color: var(--bg-color, #f4f6f8); min-height: 100dvh; display: flex; flex-direction: column; box-sizing: border-box; transition: background-color 0.3s ease; }
                 
                 /* 헤더 영역 */
                 .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: nowrap; gap: 15px; }

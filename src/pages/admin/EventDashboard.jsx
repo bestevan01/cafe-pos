@@ -144,7 +144,7 @@ function EventDashboard({onBack}) {
         <div className="event-dashboard-container">
             <style>
                 {`
-                .event-dashboard-container { padding: 20px; background-color: var(--bg-color); min-height: 100vh; box-sizing: border-box; transition: background-color 0.3s ease, color 0.3s ease; }
+                .event-dashboard-container { padding: 20px; background-color: var(--bg-color); min-height: 100dvh; box-sizing: border-box; transition: background-color 0.3s ease, color 0.3s ease; }
                 .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .page-title { margin: 0; font-size: 1.8rem; color: var(--text-primary); }

@@ -202,7 +202,7 @@ function SalesDashboard({onBack}) {
         <div className="sales-container">
             <style>
                 {`
-                .sales-container { padding: 20px; background-color: var(--bg-color, #f4f6f8); height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; transition: background-color 0.3s ease; overflow: hidden; }
+                .sales-container { padding: 20px; background-color: var(--bg-color, #f4f6f8); height: 100dvh; display: flex; flex-direction: column; box-sizing: border-box; transition: background-color 0.3s ease; overflow: hidden; }
                 .sales-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; gap: 10px; }
                 .header-left, .header-right { display: flex; align-items: center; gap: 10px; }
                 .sales-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
@@ -245,7 +245,7 @@ function SalesDashboard({onBack}) {
 
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
-                    .sales-container { height: auto; min-height: 100vh; padding: 15px; overflow: visible; }
+                    .sales-container { height: auto; min-height: 100dvh; padding: 15px; overflow: visible; }
                     .sales-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
                     .header-left { width: 100%; }
                     /* 액션 버튼을 3등분 그리드로 → 컨테이너 폭에 갇혀 오른쪽으로 넘치지 않음 */

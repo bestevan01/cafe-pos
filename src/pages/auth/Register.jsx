@@ -48,7 +48,7 @@ function Register({onSwitchToLogin}) {
                 {`
                 .register-container {
                     display: flex; justify-content: center; align-items: center;
-                    width: 100%; min-height: 100vh;
+                    width: 100%; min-height: 100dvh;
                     background-color: var(--bg-color, #f4f6f8);
                     padding: 20px; box-sizing: border-box;
                     transition: background-color 0.3s ease;

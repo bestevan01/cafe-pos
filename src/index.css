@@ -96,7 +96,7 @@
 body {
     margin: 0;
     min-width: 320px;
-    min-height: 100vh;
+    min-height: 100dvh;
     /* 변수를 가져다 씁니다. 나중에 테마가 바뀌면 알아서 색이 변합니다! */
     background-color: var(--bg-color);
     color: var(--text-primary);

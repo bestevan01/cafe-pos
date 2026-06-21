@@ -53,7 +53,7 @@ function AdminDashboard({onLogout, onEditProfile}) {
                 .admin-container {
                     padding: 20px;
                     background-color: var(--bg-color, #f4f6f8);
-                    min-height: 100vh;
+                    min-height: 100dvh;
                     display: flex; flex-direction: column;
                     transition: background-color 0.3s ease;
                     box-sizing: border-box;

@@ -13,7 +13,7 @@ function StatsLayout({title, onBack, actions, children}) {
     return (
         <div className="stats-layout">
             <style>{`
-                .stats-layout { padding: 24px; min-height: 100vh; background: var(--bg-color, #f4f6f8); box-sizing: border-box; transition: background-color .3s ease; }
+                .stats-layout { padding: 24px; min-height: 100dvh; background: var(--bg-color, #f4f6f8); box-sizing: border-box; transition: background-color .3s ease; }
                 .stats-layout-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
                 .stats-layout-left { display: flex; align-items: center; gap: 14px; }
                 .stats-layout-title { margin: 0; font-size: 1.7rem; font-weight: 800; color: var(--text-primary, #222); white-space: nowrap; }

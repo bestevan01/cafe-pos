@@ -26,7 +26,7 @@ function RoleSelection({onSelectRole, isCashierTaken}) {
                 /* 전체 레이아웃 */
                 .role-container {
                     display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    min-height: 100vh; width: 100%;
+                    min-height: 100dvh; width: 100%;
                     background-color: var(--bg-color, #f4f6f8);
                     padding: 40px 20px; box-sizing: border-box;
                     transition: background-color 0.3s ease;
