@@ -1,6 +1,6 @@
 import {useEffect, useState, useRef} from 'react';
 import axios from 'axios';
-import {startAuthentication, browserSupportsWebAuthnAutofill, WebAuthnAbortService} from "@simplewebauthn/browser";
+import {startAuthentication, WebAuthnAbortService} from "@simplewebauthn/browser";
 import {useSystemTheme} from '../../hooks/useSystemTheme';
 import {useNotification} from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
@@ -35,42 +35,13 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
     };
 
     useEffect(() => {
-        let cancelled = false;
-        const initConditionalPasskey = async () => {
-            if (!(await browserSupportsWebAuthnAutofill())) return;
-
-            try {
-                const resp = await axios.get('/api/passkey/login-options');
-                if (cancelled) return; // 화면을 떠났으면 의식을 시작하지 않음(언마운트 후 input 없음 → "No input" 에러 방지)
-                const asseResp = await startAuthentication({
-                    optionsJSON: resp.data,
-                    useBrowserAutofill: true
-                });
-
-                const verificationResp = await axios.post('/api/passkey/login-verify', {
-                    body: asseResp,
-                });
-
-                if (verificationResp.data.success) {
-                    handleSuccess(verificationResp.data);
-                }
-            } catch (error) {
-                // 백그라운드 동작이라 조용히 처리:
-                //  - NotAllowedError: 사용자가 취소
-                //  - AbortError: '패스키로 로그인' 버튼 클릭 등으로 의식이 중단됨(정상)
-                if (error.name === 'NotAllowedError' || error.name === 'AbortError') return;
-                console.error(error);
-            }
-        };
-
-        initConditionalPasskey();
+        // 패스키 로그인은 '패스키로 로그인' 버튼으로만 제공한다.
+        // (아이디칸 자동완성/Conditional UI는 모바일에서 느리고, 의식이 pending으로 남아 다른 화면을 막는 문제가 있어 제거)
+        // 버튼 클릭 시 await 없이 즉시 호출할 수 있도록 옵션만 미리 받아 둔다.
         void prefetchAuthOptions();
 
-        // 로그인 화면을 벗어날 때 대기 중인 Conditional UI 의식(navigator.credentials.get)을 반드시 취소한다.
-        // 취소하지 않으면 pending 상태로 남아, 다음 화면(내 정보→기기 등록 등)의 create()/get()을
-        // Safari가 "이미 의식 진행 중"으로 보고 NotAllowedError로 차단 → 생체인증 팝업이 안 뜬다.
+        // 화면을 벗어날 때 진행 중이던 패스키 의식이 있으면 취소(다음 화면의 create()/get() 차단 방지)
         return () => {
-            cancelled = true;
             WebAuthnAbortService.cancelCeremony();
         };
     }, []);
@@ -239,7 +210,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                         value={formData.username}
                         onChange={handleChange}
                         className="login-input"
-                        autoComplete="username webauthn"
+                        autoComplete="username"
                         required
                     />
                     <input
