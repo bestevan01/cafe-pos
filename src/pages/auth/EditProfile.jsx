@@ -4,6 +4,8 @@ import ThemeToggle from '../../components/ThemeToggle';
 import {startRegistration, WebAuthnAbortService} from '@simplewebauthn/browser';
 import {useNotification} from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
+import PasswordStrength from '../../components/PasswordStrength';
+import {isStrongPassword} from '../../utils/passwordPolicy';
 
 function EditProfile({onBack}) {
     const {notify, confirm} = useNotification();
@@ -16,7 +18,7 @@ function EditProfile({onBack}) {
     // → 옵션을 미리 받아 두고, 클릭 시에는 await 없이 곧바로 startRegistration()을 호출한다.
     const [registerOptions, setRegisterOptions] = useState(null);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
-    const [pwForm, setPwForm] = useState({currentPassword: '', newPassword: '', confirmPassword: ''});
+    const [pwForm, setPwForm] = useState({newPassword: '', confirmPassword: ''});
 
     // ---------------------------------------------------------
     // [2] API 및 데이터 처리
@@ -62,20 +64,19 @@ function EditProfile({onBack}) {
     };
 
     const handleChangePassword = async () => {
-        if (!pwForm.currentPassword || !pwForm.newPassword || !pwForm.confirmPassword) return notify("모든 빈칸을 채워주세요.", {icon: '⚠️'});
+        if (!pwForm.newPassword || !pwForm.confirmPassword) return notify("모든 빈칸을 채워주세요.", {icon: '⚠️'});
         if (pwForm.newPassword !== pwForm.confirmPassword) return notify("새 비밀번호가 일치하지 않습니다.", {icon: '⚠️'});
-        if (pwForm.newPassword.length < 4) return notify("비밀번호는 최소 4자리 이상이어야 합니다.", {icon: '⚠️'});
+        if (!isStrongPassword(pwForm.newPassword)) return notify("비밀번호는 8자 이상이며 영문·숫자·특수문자를 모두 포함해야 합니다.", {icon: '⚠️'});
         if (!(await confirm("비밀번호를 변경하시겠습니까?", {confirmText: "변경"}))) return;
 
         try {
             const res = await axios.patch(`/api/users/${user.id}/password`, {
-                currentPassword: pwForm.currentPassword,
                 newPassword: pwForm.newPassword
             }, getAuthHeader());
 
             if (res.data.success) {
                 notify("비밀번호가 성공적으로 변경되었습니다.", {icon: '✅'});
-                setPwForm({currentPassword: '', newPassword: '', confirmPassword: ''});
+                setPwForm({newPassword: '', confirmPassword: ''});
                 setIsChangingPassword(false);
             }
         } catch (err) {
@@ -183,6 +184,7 @@ function EditProfile({onBack}) {
                 .btn-del { padding: 8px 12px; background-color: var(--danger-bg); color: var(--danger); border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s; }
                 
                 .footer-btns { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; }
+                .ep-pw-form { display: flex; flex-direction: column; gap: 20px; }
 
                 /* 다크모드 오버라이드 */
                 [data-theme='dark'] .btn-link { color: #4facfe; border-color: #4facfe; }
@@ -194,13 +196,26 @@ function EditProfile({onBack}) {
             <div className="ep-card">
                 {isChangingPassword ? (
                     // 1. 비밀번호 변경 화면
-                    <>
+                    <form className="ep-pw-form" onSubmit={(e) => {
+                        e.preventDefault();
+                        void handleChangePassword();
+                    }}>
                         <h2 className="ep-header">🔒 비밀번호 변경</h2>
                         <p className="ep-desc">안전한 계정 사용을 위해<br/>새로운 비밀번호를 입력해주세요.</p>
+                        {/* Safari가 '강력한 암호 자동 생성'을 제안하려면 username 컨텍스트가 필요(화면엔 숨김).
+                            없으면 이 계정의 기존 저장 비밀번호 자동완성을 띄운다. */}
+                        <input type="text" name="username" value={user.username} autoComplete="username"
+                               readOnly tabIndex={-1} aria-hidden="true"
+                               style={{
+                                   position: 'absolute',
+                                   width: 1,
+                                   height: 1,
+                                   padding: 0,
+                                   border: 0,
+                                   opacity: 0,
+                                   pointerEvents: 'none'
+                               }}/>
                         <div className="ep-row" style={{gap: '12px', margin: '15px 0'}}>
-                            <input type="password" placeholder="현재 비밀번호" value={pwForm.currentPassword}
-                                   onChange={(e) => setPwForm({...pwForm, currentPassword: e.target.value})}
-                                   className="ep-input"/>
                             <input type="password" placeholder="새 비밀번호" value={pwForm.newPassword}
                                    onChange={(e) => setPwForm({...pwForm, newPassword: e.target.value})}
                                    className="ep-input" autoComplete="new-password"/>
@@ -208,12 +223,15 @@ function EditProfile({onBack}) {
                                    onChange={(e) => setPwForm({...pwForm, confirmPassword: e.target.value})}
                                    className="ep-input" autoComplete="new-password"/>
                         </div>
+                        <PasswordStrength password={pwForm.newPassword} confirmPassword={pwForm.confirmPassword}/>
                         <div className="footer-btns">
-                            <Button variant="neutral" onClick={() => setIsChangingPassword(false)}
+                            <Button type="button" variant="neutral" onClick={() => setIsChangingPassword(false)}
                                     style={{flex: 1, padding: 14}}>취소</Button>
-                            <Button onClick={handleChangePassword} style={{flex: 1, padding: 14}}>변경 저장</Button>
+                            <Button type="submit" style={{flex: 1, padding: 14}}
+                                    disabled={!isStrongPassword(pwForm.newPassword) || pwForm.newPassword !== pwForm.confirmPassword}>변경
+                                저장</Button>
                         </div>
-                    </>
+                    </form>
                 ) : (
                     // 2. 메인 내 정보 화면
                     <>

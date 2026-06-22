@@ -6,12 +6,16 @@ const pool = require('../config/db');
 const {authenticateToken, requireAdmin} = require("../middlewares/auth");
 const debugInfo = require("../utils/debugInfo");
 const {loginRateLimiter, recordLoginFailure, recordLoginSuccess} = require("../middlewares/loginRateLimit");
+const {isStrongPassword, PASSWORD_POLICY_MESSAGE} = require("../utils/passwordPolicy");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 router.post('/register', async (req, res) => {
     const {username, password, name} = req.body;
     try {
+        if (!isStrongPassword(password)) {
+            return res.status(400).json({success: false, message: PASSWORD_POLICY_MESSAGE});
+        }
         const hashedPassword = await bcrypt.hash(password, 10);
         await pool.query(
             'INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)',
@@ -62,19 +66,14 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 });
 
 router.patch('/users/:id/password', authenticateToken, async (req, res) => {
-    const {id} = req.params;
-    const {currentPassword, newPassword} = req.body;
+    // 본인 비밀번호만 변경 가능. URL의 :id가 아닌 인증된 사용자 ID를 사용해 타인 비번 변경(IDOR)을 차단한다.
+    // 현재 비밀번호 확인은 '내 정보' 진입 시 ProfileAuth(비밀번호/패스키 재인증)로 이미 대체되었다.
+    const id = req.user.id;
+    const {newPassword} = req.body;
 
     try {
-        const [users] = await pool.query('SELECT password FROM users WHERE id = ?', [id]);
-        if (users.length === 0) {
-            return res.status(404).json({success: false, message: '유저를 찾을 수 없습니다.'});
-        }
-
-        const user = users[0];
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
-        if (!isMatch) {
-            return res.status(401).json({success: false, message: '현재 비밀번호가 틀렸습니다.'});
+        if (!isStrongPassword(newPassword)) {
+            return res.status(400).json({success: false, message: PASSWORD_POLICY_MESSAGE});
         }
 
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);

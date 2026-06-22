@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useRef} from 'react';
 import axios from 'axios';
 import {startAuthentication} from "@simplewebauthn/browser";
 import ThemeToggle from "../../components/ThemeToggle.jsx";
@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button';
 function ProfileAuth({currentUser, onSuccess, onCancel}) {
     const {notify} = useNotification();
     const [password, setPassword] = useState('');
+    const formRef = useRef(null);
 
     // ---------------------------------------------------------
     // [1] 비밀번호 인증 핸들러
@@ -15,10 +16,10 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
     const handlePasswordAuth = async (e) => {
         e.preventDefault();
         try {
-            // 기존 로그인 API를 재사용하여 비밀번호 검증
+            // 기존 로그인 API를 재사용하여 비밀번호 검증 (자동완성 대응: 폼 DOM 값을 직접 읽음)
             const res = await axios.post('/api/login', {
                 username: currentUser.username,
-                password: password
+                password: e.target.password.value
             });
 
             if (res.data.success) {
@@ -26,6 +27,16 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
             }
         } catch (err) {
             notify("비밀번호가 일치하지 않습니다.", {icon: '⚠️'});
+        }
+    };
+
+    // 비밀번호 자동완성이 채워지면(:-webkit-autofill 애니메이션 감지) 자동으로 제출 — 로그인 화면과 동일 동작
+    const handleAutoFill = (e) => {
+        if (e.animationName === 'onAutoFillDetected') {
+            // 브라우저가 DOM에 값을 채울 시간을 짧게(50ms) 준 뒤 폼 제출
+            setTimeout(() => {
+                if (formRef.current) formRef.current.requestSubmit();
+            }, 50);
         }
     };
 
@@ -97,6 +108,10 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                     width: 100%; box-sizing: border-box; outline: none; -webkit-appearance: none;
                 }
                 .auth-input:focus { border-color: var(--accent); }
+
+                /* 비밀번호 자동완성 감지용 애니메이션(값이 채워질 때 onAnimationStart 발화) */
+                @keyframes onAutoFillDetected { from { opacity: 1; } to { opacity: 1; } }
+                .auth-input:-webkit-autofill { animation-name: onAutoFillDetected; animation-duration: 0.1s; }
                 
                 /* 버튼 스타일 */
                 .auth-btn {
@@ -115,14 +130,35 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                 <h2 className="auth-title">🔒 보안 인증</h2>
                 <p className="auth-desc">개인정보를 수정하려면<br/>비밀번호 또는 패스키로 인증해주세요.</p>
 
-                <form onSubmit={handlePasswordAuth} className="auth-form">
+                <form ref={formRef} onSubmit={handlePasswordAuth} className="auth-form">
+                    {/* Safari/iCloud 키체인이 저장된 비밀번호를 자동완성하려면 폼 안에 username 필드가 있어야 한다(화면엔 숨김). */}
+                    <input
+                        type="text"
+                        name="username"
+                        value={currentUser.username}
+                        autoComplete="username"
+                        readOnly
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        style={{
+                            position: 'absolute',
+                            width: 1,
+                            height: 1,
+                            padding: 0,
+                            border: 0,
+                            opacity: 0,
+                            pointerEvents: 'none'
+                        }}
+                    />
                     <input
                         type="password"
+                        name="password"
                         placeholder="비밀번호 입력"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="auth-input"
-                        autoComplete="password"
+                        autoComplete="current-password"
+                        onAnimationStart={handleAutoFill}
                         autoFocus
                     />
                     <Button type="submit" size="lg" full>확인</Button>

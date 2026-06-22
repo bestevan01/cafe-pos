@@ -186,27 +186,32 @@ function App() {
 
     // 관리자 대시보드
     if (auth.user.role === 'admin') {
-        if (showProfile) {
-            return isProfileVerified
-                ? <EditProfile onBack={() => {
-                    setShowProfile(false);
-                    setIsProfileVerified(false);
-                }}/>
-                : <ProfileAuth currentUser={auth.user} onSuccess={() => setIsProfileVerified(true)}
-                               onCancel={() => setShowProfile(false)}/>;
-        }
-        return <AdminDashboard onLogout={handleManualLogout} onEditProfile={() => setShowProfile(true)}/>;
-    }
-
-    // 직원 화면 (프로필 수정 모달)
-    if (showProfile) {
-        return isProfileVerified
-            ? <EditProfile onBack={() => {
+        // 본인 확인 통과 후엔 EditProfile 전체 페이지로 전환
+        if (showProfile && isProfileVerified) {
+            return <EditProfile onBack={() => {
                 setShowProfile(false);
                 setIsProfileVerified(false);
-            }}/>
-            : <ProfileAuth currentUser={auth.user} onSuccess={() => setIsProfileVerified(true)}
-                           onCancel={() => setShowProfile(false)}/>;
+            }}/>;
+        }
+        // 대시보드는 그대로 두고, 본인 확인(ProfileAuth)은 그 위에 모달로 띄운다
+        return (
+            <>
+                <AdminDashboard onLogout={handleManualLogout} onEditProfile={() => setShowProfile(true)}/>
+                {showProfile && (
+                    <ProfileAuth currentUser={auth.user}
+                                 onSuccess={() => setIsProfileVerified(true)}
+                                 onCancel={() => setShowProfile(false)}/>
+                )}
+            </>
+        );
+    }
+
+    // 직원: 본인 확인 통과 후엔 EditProfile 전체 페이지로 전환 (그 전 본인확인 모달은 아래 메인 레이아웃 위에 오버레이로 띄움)
+    if (showProfile && isProfileVerified) {
+        return <EditProfile onBack={() => {
+            setShowProfile(false);
+            setIsProfileVerified(false);
+        }}/>;
     }
 
     // 직원 화면 컨텐츠 분기
@@ -370,6 +375,13 @@ function App() {
 
             {/* 메인 화면 렌더링 */}
             {renderContent()}
+
+            {/* 본인 확인 모달: 현재 페이지를 그대로 두고 그 위에 오버레이로 띄움 */}
+            {showProfile && !isProfileVerified && (
+                <ProfileAuth currentUser={auth.user}
+                             onSuccess={() => setIsProfileVerified(true)}
+                             onCancel={() => setShowProfile(false)}/>
+            )}
         </div>
     );
 }

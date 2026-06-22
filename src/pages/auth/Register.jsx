@@ -3,6 +3,8 @@ import axios from 'axios';
 import {useSystemTheme} from "../../hooks/useSystemTheme.js";
 import {useNotification} from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
+import PasswordStrength from '../../components/PasswordStrength';
+import {isStrongPassword} from '../../utils/passwordPolicy';
 
 function Register({onSwitchToLogin}) {
     const {notify} = useNotification();
@@ -23,6 +25,10 @@ function Register({onSwitchToLogin}) {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        if (!isStrongPassword(formData.password)) {
+            notify("비밀번호는 8자 이상이며 영문·숫자·특수문자를 모두 포함해야 합니다.", {icon: '⚠️'});
+            return;
+        }
         if (formData.password !== formData.confirmPassword) {
             notify("비밀번호가 일치하지 않습니다. 다시 확인해주세요.", {icon: '⚠️'});
             return;
@@ -121,6 +127,7 @@ function Register({onSwitchToLogin}) {
                         autoComplete="new-password"
                         required
                     />
+                    <PasswordStrength password={formData.password} confirmPassword={formData.confirmPassword}/>
                     <input
                         id="name"
                         name="name"
@@ -132,7 +139,9 @@ function Register({onSwitchToLogin}) {
                         autoComplete="name"
                         required
                     />
-                    <Button type="submit" variant="dark" size="lg" full style={{marginTop: 5}}>가입 신청</Button>
+                    <Button type="submit" variant="dark" size="lg" full style={{marginTop: 5}}
+                            disabled={!isStrongPassword(formData.password) || formData.password !== formData.confirmPassword}>가입
+                        신청</Button>
                 </form>
 
                 <div className="login-text">
