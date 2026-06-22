@@ -70,7 +70,8 @@ function Register({onSwitchToLogin}) {
                     border: 1px solid var(--border-color, transparent);
                     transition: background-color 0.3s ease;
                 }
-                .register-title { margin: 0 0 25px 0; color: var(--text-primary, #333); font-size: 1.6rem; font-weight: bold; }
+                .register-logo { width: 210px; max-width: 80%; height: auto; margin: 0 0 14px 0; }
+                .register-title { margin: 0 0 22px 0; color: var(--text-secondary, #666); font-size: 1.15rem; font-weight: 500; }
                 
                 .register-form { width: 100%; display: flex; flex-direction: column; gap: 15px; }
                 .register-input {
@@ -91,7 +92,8 @@ function Register({onSwitchToLogin}) {
             </style>
 
             <div className="register-card">
-                <h2 className="register-title">📝 직원 회원가입</h2>
+                <img src="/logo.svg" alt="Baek's Coffee" className="register-logo"/>
+                <h2 className="register-title">직원 회원가입</h2>
 
                 <form onSubmit={handleSubmit} className="register-form">
                     <input

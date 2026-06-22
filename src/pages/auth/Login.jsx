@@ -158,8 +158,8 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                     border: 1px solid var(--border-color, transparent);
                     transition: background-color 0.3s ease;
                 }
-                .login-emoji { font-size: 3.5rem; margin: 0 0 10px 0; }
-                .login-title { margin: 0 0 25px 0; color: var(--text-primary, #333); font-size: 1.6rem; font-weight: bold; }
+                .login-logo { width: 210px; max-width: 80%; height: auto; margin: 0 0 16px 0; }
+                .login-title { margin: 0 0 25px 0; color: var(--text-secondary, #666); font-size: 1.15rem; font-weight: 500; }
                 
                 .login-form { width: 100%; display: flex; flex-direction: column; gap: 15px; }
                 .login-input {
@@ -199,7 +199,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
             </style>
 
             <div className="login-card">
-                <div className="login-emoji">☕</div>
+                <img src="/logo.svg" alt="Baek's Coffee" className="login-logo"/>
                 <h2 className="login-title">직원 로그인</h2>
 
                 <form ref={formRef} onSubmit={handleSubmit} className="login-form">
