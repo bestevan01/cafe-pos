@@ -19,6 +19,8 @@ function EditProfile({onBack}) {
     const [registerOptions, setRegisterOptions] = useState(null);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({newPassword: '', confirmPassword: ''});
+    const [editingId, setEditingId] = useState(null); // 이름 변경 중인 패스키 id
+    const [editName, setEditName] = useState('');
 
     // ---------------------------------------------------------
     // [2] API 및 데이터 처리
@@ -141,6 +143,23 @@ function EditProfile({onBack}) {
         }
     };
 
+    const startRename = (key) => {
+        setEditingId(key.id);
+        setEditName(key['device_name'] || '');
+    };
+
+    const handleRenamePasskey = async (id) => {
+        const name = editName.trim();
+        if (!name) return notify("이름을 입력해주세요.", {icon: '⚠️'});
+        try {
+            await axios.patch(`/api/passkeys/${id}`, {device_name: name}, getAuthHeader());
+            setEditingId(null);
+            await fetchPasskeys(user.id);
+        } catch (err) {
+            notify(err.response?.data?.message || "이름 변경 실패", {icon: '⚠️'});
+        }
+    };
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -182,6 +201,11 @@ function EditProfile({onBack}) {
                 .pk-name { font-weight: bold; color: var(--text-primary, #333); font-size: 1rem; margin-bottom: 4px; }
                 .pk-date { font-size: 0.8rem; color: var(--text-secondary, #888); }
                 .btn-del { padding: 8px 12px; background-color: var(--danger-bg); color: var(--danger); border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; transition: background-color 0.2s; }
+                .pk-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+                .btn-pk-edit { padding: 7px 10px; background-color: transparent; color: var(--accent); border: 1px solid var(--border-color, #ddd); border-radius: var(--radius-sm); cursor: pointer; font-size: 0.9rem; line-height: 1; }
+                .pk-rename-input { flex: 1; min-width: 0; margin-right: 8px; padding: 9px 10px; border-radius: var(--radius-sm); border: 1px solid var(--accent); font-size: 0.95rem; background-color: var(--bg-color, #f9f9f9); color: var(--text-primary, #333); outline: none; }
+                .btn-pk-save { padding: 8px 12px; background-color: var(--accent); color: var(--on-accent, #fff); border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+                .btn-pk-cancel { padding: 8px 10px; background-color: transparent; color: var(--text-secondary, #888); border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: bold; }
                 
                 .footer-btns { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; }
                 .ep-pw-form { display: flex; flex-direction: column; gap: 20px; }
@@ -263,13 +287,41 @@ function EditProfile({onBack}) {
                             ) : (
                                 passkeys.map((key) => (
                                     <div key={key.id} className="passkey-item">
-                                        <div>
-                                            <div className="pk-name">{key['device_name']}</div>
-                                            <div
-                                                className="pk-date">{new Date(key.created_at).toLocaleDateString()}</div>
-                                        </div>
-                                        <button onClick={() => handleDeletePasskey(key.id)} className="btn-del">삭제
-                                        </button>
+                                        {editingId === key.id ? (
+                                            <>
+                                                <input className="pk-rename-input" value={editName} maxLength={50}
+                                                       autoFocus
+                                                       onChange={(e) => setEditName(e.target.value)}
+                                                       onKeyDown={(e) => {
+                                                           if (e.key === 'Enter') void handleRenamePasskey(key.id);
+                                                           else if (e.key === 'Escape') setEditingId(null);
+                                                       }}/>
+                                                <div className="pk-actions">
+                                                    <button onClick={() => handleRenamePasskey(key.id)}
+                                                            className="btn-pk-save">저장
+                                                    </button>
+                                                    <button onClick={() => setEditingId(null)}
+                                                            className="btn-pk-cancel">취소
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div>
+                                                    <div className="pk-name">{key['device_name']}</div>
+                                                    <div
+                                                        className="pk-date">{new Date(key.created_at).toLocaleDateString()}</div>
+                                                </div>
+                                                <div className="pk-actions">
+                                                    <button onClick={() => startRename(key)} className="btn-pk-edit"
+                                                            aria-label="이름 변경">이름 변경{/*✏️*/}
+                                                    </button>
+                                                    <button onClick={() => handleDeletePasskey(key.id)}
+                                                            className="btn-del">삭제
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 ))
                             )}

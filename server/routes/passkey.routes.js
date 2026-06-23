@@ -5,6 +5,7 @@ const pool = require("../config/db");
 const {authenticateToken} = require("../middlewares/auth");
 const debugInfo = require("../utils/debugInfo");
 const {issueToken, consumeToken} = require("../utils/ephemeralTokens");
+const {aaguidToProviderName} = require("../utils/aaguidNames");
 const {
     generateRegistrationOptions,
     verifyRegistrationResponse,
@@ -17,6 +18,23 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'bu-cafe-pos.vercel.app';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
 const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
+
+// 제공자(AAGUID)를 알 수 없는 '기기 전용' 패스키(보안키 등) 폴백용: User-Agent로 기기/브라우저 추정.
+// ⚠️ iOS UA엔 'Mac OS X'가 들어있어 iPhone/iPad를 Mac보다 먼저, Edge/Chrome도 더 구체적인 것부터 검사한다.
+function uaDeviceName(userAgent) {
+    let name = '기타 기기';
+    if (userAgent.includes('iPhone')) name = 'iPhone';
+    else if (userAgent.includes('iPad')) name = 'iPad';
+    else if (userAgent.includes('Android')) name = 'Android';
+    else if (userAgent.includes('Windows')) name = 'Windows PC';
+    else if (userAgent.includes('Mac')) name = 'Mac';
+    else if (userAgent.includes('Linux')) name = 'Linux';
+    if (userAgent.includes('Edg')) name += ' (Edge)';
+    else if (userAgent.includes('Chrome')) name += ' (Chrome)';
+    else if (userAgent.includes('Firefox')) name += ' (Firefox)';
+    else if (userAgent.includes('Safari')) name += ' (Safari)';
+    return name;
+}
 
 router.get('/passkey/register-options', authenticateToken, async (req, res) => {
     const userId = req.user.id; // 인증된 본인 계정에만 등록 옵션 생성 (클라이언트 userId 신뢰 안 함)
@@ -80,20 +98,15 @@ router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
         });
 
         if (verification.verified && verification.registrationInfo) {
-            const {credential} = verification.registrationInfo;
-            // 기기 이름 추정 로직
-            const userAgent = req.get('User-Agent') || '';
-            let deviceName = '기타 기기';
-            if (userAgent.includes('Mac')) deviceName = 'Mac';
-            else if (userAgent.includes('Windows')) deviceName = 'Windows PC';
-            else if (userAgent.includes('iPhone')) deviceName = 'iPhone';
-            else if (userAgent.includes('Android')) deviceName = 'Android';
-            else if (userAgent.includes('Linux')) deviceName = 'Linux';
-
-            if (userAgent.includes('Chrome')) deviceName += ' (Chrome)';
-            else if (userAgent.includes('Safari')) deviceName += ' (Safari)';
-            else if (userAgent.includes('Edg')) deviceName += ' (Edge)';
-            else if (userAgent.includes('Firefox')) deviceName += ' (Firefox)';
+            const {credential, aaguid, credentialDeviceType} = verification.registrationInfo;
+            // 패스키 이름: 제공자(AAGUID) > 동기화 여부 > 등록 기기(UA) 순으로 의미 있는 이름을 정한다.
+            // 패스키는 기기가 아니라 제공자(iCloud 키체인 등)에 저장·동기화되므로 제공자명이 가장 정확하다.
+            let deviceName = aaguidToProviderName(aaguid);
+            if (!deviceName) {
+                deviceName = credentialDeviceType === 'multiDevice'
+                    ? '동기화 패스키'                              // 제공자 미상이지만 여러 기기에 동기화되는 패스키
+                    : uaDeviceName(req.get('User-Agent') || ''); // 보안키 등 기기 전용 → 등록 기기로 표기
+            }
 
             await pool.query(
                 `INSERT INTO passkeys (id, public_key, counter, user_id, transports, device_name)
@@ -205,6 +218,32 @@ router.get('/passkeys', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '패스키 목록 조회에 실패했습니다.',
+            debug_info: debugInfo(err)
+        });
+    }
+});
+
+router.patch('/passkeys/:id', authenticateToken, async (req, res) => {
+    const {id} = req.params;
+    const name = (req.body.device_name || '').trim();
+    if (!name || name.length > 50) {
+        return res.status(400).json({success: false, message: '이름은 1~50자로 입력해주세요.'});
+    }
+    try {
+        // 본인 소유의 패스키만 이름 변경 가능
+        const [result] = await pool.query(
+            'UPDATE passkeys SET device_name = ? WHERE id = ? AND user_id = ?',
+            [name, id, req.user.id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({success: false, message: '패스키를 찾을 수 없습니다.'});
+        }
+        res.json({success: true});
+    } catch (err) {
+        console.error(`[🔥 PATCH /api/passkeys/${id} 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '패스키 이름 변경에 실패했습니다.',
             debug_info: debugInfo(err)
         });
     }
