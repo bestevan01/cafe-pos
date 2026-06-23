@@ -56,7 +56,7 @@ function CostAnalysis({onBack}) {
     }, [auth, notify]);
 
     useEffect(() => {
-        fetchAll();
+        void fetchAll();
     }, [fetchAll]);
 
     // 단위당 원가 맵 (ingredient_id → 원/단위)
@@ -119,11 +119,11 @@ function CostAnalysis({onBack}) {
 
     // 분류별 원가 합계 (편집기 하단에 식재료/부자재 분해 표시)
     const draftCostByCat = useMemo(() => {
-        const out = {식재료: 0, 부자재: 0};
+        const out = {'식재료': 0, '부자재': 0};
         for (const ing of ingredients) {
             out[catOf(ing)] += (Number(draftAmounts[ing.id]) || 0) * unitCostOf(ing);
         }
-        return {식재료: Math.round(out.식재료), 부자재: Math.round(out.부자재)};
+        return {'식재료': Math.round(out['식재료']), '부자재': Math.round(out['부자재'])};
     }, [draftAmounts, ingredients]);
 
     // 분류별로 묶은 원재료 (비어있는 분류는 제외)
@@ -150,7 +150,7 @@ function CostAnalysis({onBack}) {
             }, auth);
             setNewIng({name: '', purchase_price: '', purchase_amount: '', unit: 'g', category: newIng.category});
             notify('원재료를 추가했습니다.', {icon: '✅'});
-            fetchAll();
+            await fetchAll();
         } catch (err) {
             console.error(err);
             notify('원재료 추가에 실패했습니다.', {icon: '⚠️'});
@@ -176,7 +176,7 @@ function CostAnalysis({onBack}) {
                 unit: ing.unit,
                 category: catOf(ing)
             }, auth);
-            fetchAll();
+            await fetchAll();
         } catch (err) {
             console.error(err);
             notify('원재료 저장에 실패했습니다.', {icon: '⚠️'});
@@ -192,7 +192,7 @@ function CostAnalysis({onBack}) {
         try {
             await axios.delete(`/api/admin/ingredients/${ing.id}`, auth);
             notify('삭제했습니다.', {icon: '🗑️'});
-            fetchAll();
+            await fetchAll();
         } catch (err) {
             console.error(err);
             notify('삭제에 실패했습니다.', {icon: '⚠️'});
@@ -211,7 +211,7 @@ function CostAnalysis({onBack}) {
                 cost_override: overrideOn ? Number(overrideValue) || 0 : null
             }, auth);
             notify(`'${selectedMenu.name}' 레시피를 저장했습니다.`, {icon: '✅'});
-            fetchAll();
+            await fetchAll();
         } catch (err) {
             console.error(err);
             notify('레시피 저장에 실패했습니다.', {icon: '⚠️'});
@@ -269,93 +269,93 @@ function CostAnalysis({onBack}) {
                   subtitle={ingredients.length > 0 ? `${ingredients.length}개 품목` : null}>
             <div className="cost-table-wrap">
                 <table className="cost-table">
-                <thead>
-                <tr>
-                    <th className="l">원재료</th>
-                    <th>분류</th>
-                    <th>구매가격(원)</th>
-                    <th>구매용량</th>
-                    <th>단위</th>
-                    <th>단위당 원가</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                {ingredients.map(ing => (
-                    <tr key={ing.id}>
+                    <thead>
+                    <tr>
+                        <th className="l">원재료</th>
+                        <th>분류</th>
+                        <th>구매가격(원)</th>
+                        <th>구매용량</th>
+                        <th>단위</th>
+                        <th>단위당 원가</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {ingredients.map(ing => (
+                        <tr key={ing.id}>
+                            <td className="l">
+                                <input className="cost-input name" value={ing.name}
+                                       onChange={e => editIngredientField(ing.id, 'name', e.target.value)}
+                                       onBlur={() => saveIngredient(ing)}/>
+                            </td>
+                            <td>
+                                <select className="cost-input cat" value={catOf(ing)}
+                                        onChange={e => editIngredientField(ing.id, 'category', e.target.value)}
+                                        onBlur={() => saveIngredient(ing)}>
+                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </td>
+                            <td>
+                                <input className="cost-input" type="number" value={ing.purchase_price}
+                                       onChange={e => editIngredientField(ing.id, 'purchase_price', e.target.value)}
+                                       onBlur={() => saveIngredient(ing)}/>
+                            </td>
+                            <td>
+                                <input className="cost-input" type="number" value={ing.purchase_amount}
+                                       onChange={e => editIngredientField(ing.id, 'purchase_amount', e.target.value)}
+                                       onBlur={() => saveIngredient(ing)}/>
+                            </td>
+                            <td>
+                                <select className="cost-input unit" value={UNITS.includes(ing.unit) ? ing.unit : '개'}
+                                        onChange={e => {
+                                            editIngredientField(ing.id, 'unit', e.target.value);
+                                        }}
+                                        onBlur={() => saveIngredient(ing)}>
+                                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                            </td>
+                            <td className="cost-unitcost">
+                                {unitCostOf(ing).toLocaleString(undefined, {maximumFractionDigits: 2})} 원/{unitLabel(ing.unit)}
+                            </td>
+                            <td>
+                                <Button variant="danger" size="sm" onClick={() => deleteIngredient(ing)}>삭제</Button>
+                            </td>
+                        </tr>
+                    ))}
+                    {/* 추가 행 */}
+                    <tr>
                         <td className="l">
-                            <input className="cost-input name" value={ing.name}
-                                   onChange={e => editIngredientField(ing.id, 'name', e.target.value)}
-                                   onBlur={() => saveIngredient(ing)}/>
+                            <input className="cost-input name" placeholder="예: 원두, 일반컵" value={newIng.name}
+                                   onChange={e => setNewIng({...newIng, name: e.target.value})}/>
                         </td>
                         <td>
-                            <select className="cost-input cat" value={catOf(ing)}
-                                    onChange={e => editIngredientField(ing.id, 'category', e.target.value)}
-                                    onBlur={() => saveIngredient(ing)}>
+                            <select className="cost-input cat" value={newIng.category}
+                                    onChange={e => setNewIng({...newIng, category: e.target.value})}>
                                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </td>
                         <td>
-                            <input className="cost-input" type="number" value={ing.purchase_price}
-                                   onChange={e => editIngredientField(ing.id, 'purchase_price', e.target.value)}
-                                   onBlur={() => saveIngredient(ing)}/>
+                            <input className="cost-input" type="number" placeholder="20000"
+                                   value={newIng.purchase_price}
+                                   onChange={e => setNewIng({...newIng, purchase_price: e.target.value})}/>
                         </td>
                         <td>
-                            <input className="cost-input" type="number" value={ing.purchase_amount}
-                                   onChange={e => editIngredientField(ing.id, 'purchase_amount', e.target.value)}
-                                   onBlur={() => saveIngredient(ing)}/>
+                            <input className="cost-input" type="number" placeholder="1000"
+                                   value={newIng.purchase_amount}
+                                   onChange={e => setNewIng({...newIng, purchase_amount: e.target.value})}/>
                         </td>
                         <td>
-                            <select className="cost-input unit" value={UNITS.includes(ing.unit) ? ing.unit : '개'}
-                                    onChange={e => {
-                                        editIngredientField(ing.id, 'unit', e.target.value);
-                                    }}
-                                    onBlur={() => saveIngredient(ing)}>
+                            <select className="cost-input unit" value={newIng.unit}
+                                    onChange={e => setNewIng({...newIng, unit: e.target.value})}>
                                 {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                             </select>
                         </td>
-                        <td className="cost-unitcost">
-                            {unitCostOf(ing).toLocaleString(undefined, {maximumFractionDigits: 2})} 원/{unitLabel(ing.unit)}
-                        </td>
+                        <td className="cost-unitcost">—</td>
                         <td>
-                            <Button variant="danger" size="sm" onClick={() => deleteIngredient(ing)}>삭제</Button>
+                            <Button size="sm" onClick={addIngredient}>추가</Button>
                         </td>
                     </tr>
-                ))}
-                {/* 추가 행 */}
-                <tr>
-                    <td className="l">
-                        <input className="cost-input name" placeholder="예: 원두, 일반컵" value={newIng.name}
-                               onChange={e => setNewIng({...newIng, name: e.target.value})}/>
-                    </td>
-                    <td>
-                        <select className="cost-input cat" value={newIng.category}
-                                onChange={e => setNewIng({...newIng, category: e.target.value})}>
-                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </td>
-                    <td>
-                        <input className="cost-input" type="number" placeholder="20000"
-                               value={newIng.purchase_price}
-                               onChange={e => setNewIng({...newIng, purchase_price: e.target.value})}/>
-                    </td>
-                    <td>
-                        <input className="cost-input" type="number" placeholder="1000"
-                               value={newIng.purchase_amount}
-                               onChange={e => setNewIng({...newIng, purchase_amount: e.target.value})}/>
-                    </td>
-                    <td>
-                        <select className="cost-input unit" value={newIng.unit}
-                                onChange={e => setNewIng({...newIng, unit: e.target.value})}>
-                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                    </td>
-                    <td className="cost-unitcost">—</td>
-                    <td>
-                        <Button size="sm" onClick={addIngredient}>추가</Button>
-                    </td>
-                </tr>
-                </tbody>
+                    </tbody>
                 </table>
             </div>
             <p className="hint" style={{marginTop: 12}}>
@@ -448,7 +448,7 @@ function CostAnalysis({onBack}) {
                                             </b>
                                             {' '}
                                             <span className="recipe-sub">
-                                                (식재료 {won(draftCostByCat.식재료)} · 부자재 {won(draftCostByCat.부자재)})
+                                                (식재료 {won(draftCostByCat['식재료'])} · 부자재 {won(draftCostByCat['부자재'])})
                                             </span>
                                             {overrideOn &&
                                                 <span className="recipe-sub">· 수동값 사용(레시피 계산: {won(draftCost)}원)</span>}
@@ -485,30 +485,30 @@ function CostAnalysis({onBack}) {
 
             <div className="cost-table-wrap" style={{marginBottom: 24}}>
                 <table className="cost-table">
-                <thead>
-                <tr>
-                    <th className="l">메뉴</th>
-                    <th>판매가</th>
-                    <th>원가</th>
-                    <th>잔당 순익</th>
-                    <th>마진율</th>
-                </tr>
-                </thead>
-                <tbody>
-                {analysis.map(r => (
-                    <tr key={r.menu_id}>
-                        <td className="l">
-                            {r.name}
-                            {r.manual && <span className="badge manual">수동</span>}
-                            {!r.manual && !r.hasRecipe && <span className="badge norecipe">레시피 없음</span>}
-                        </td>
-                        <td>{won(r.price)}</td>
-                        <td>{won(r.cost)}</td>
-                        <td className={r.profit >= 0 ? 'pos' : 'neg'}>{won(r.profit)}</td>
-                        <td className={r.profit >= 0 ? 'pos' : 'neg'}>{(r.margin * 100).toFixed(0)}%</td>
+                    <thead>
+                    <tr>
+                        <th className="l">메뉴</th>
+                        <th>판매가</th>
+                        <th>원가</th>
+                        <th>잔당 순익</th>
+                        <th>마진율</th>
                     </tr>
-                ))}
-                </tbody>
+                    </thead>
+                    <tbody>
+                    {analysis.map(r => (
+                        <tr key={r.menu_id}>
+                            <td className="l">
+                                {r.name}
+                                {r.manual && <span className="badge manual">수동</span>}
+                                {!r.manual && !r.hasRecipe && <span className="badge norecipe">레시피 없음</span>}
+                            </td>
+                            <td>{won(r.price)}</td>
+                            <td>{won(r.cost)}</td>
+                            <td className={r.profit >= 0 ? 'pos' : 'neg'}>{won(r.profit)}</td>
+                            <td className={r.profit >= 0 ? 'pos' : 'neg'}>{(r.margin * 100).toFixed(0)}%</td>
+                        </tr>
+                    ))}
+                    </tbody>
                 </table>
             </div>
 

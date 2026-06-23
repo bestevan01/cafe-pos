@@ -12,7 +12,9 @@ import './Button.css';
  * @param {'sm'|'md'|'lg'} [size]
  * @param {React.ReactNode} [icon]  글자 앞 아이콘(이모지/노드)
  * @param {boolean} [full]          true면 width:100%
- * 나머지 props(onClick, type, disabled 등)는 <button>에 그대로 전달된다.
+ * @param {string} [className]      추가 CSS 클래스
+ * @param {React.ReactNode} [children] 버튼 내용
+ * @param {object} [rest]           나머지 props(onClick, type, disabled 등) → <button>에 전달
  */
 function Button({variant = 'primary', size = 'md', icon, full = false, className = '', children, ...rest}) {
     const cls = ['ui-btn', `ui-btn-${variant}`, `ui-btn-${size}`, full && 'ui-btn-full', className]

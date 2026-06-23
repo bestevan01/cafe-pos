@@ -2,6 +2,7 @@ import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import {useNotification} from '../../hooks/useNotification';
 
 function EventDashboard({onBack}) {
@@ -149,7 +150,7 @@ function EventDashboard({onBack}) {
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .page-title { margin: 0; font-size: 1.8rem; color: var(--text-primary); }
 
-                .add-event-card { background-color: var(--card-bg); padding: 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid var(--border-color); transition: background-color 0.3s ease, border-color 0.3s ease; }
+                .add-event-card { margin-bottom: 30px; } /* 카드 외형은 공용 <Card>가 담당 */
                 .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
                 
                 .form-input { flex: 1; min-width: 200px; padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background-color: var(--bg-color); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; transition: background-color 0.3s ease, border-color 0.3s ease; }
@@ -202,7 +203,7 @@ function EventDashboard({onBack}) {
                 <ThemeToggle/>
             </div>
 
-            <div className="add-event-card">
+            <Card className="add-event-card">
                 <h3 style={{marginTop: 0, marginBottom: '15px', color: 'var(--text-primary)'}}>새로운 이벤트 등록</h3>
                 <div className="form-row">
                     <input type="text" className="form-input" placeholder="이벤트명 (예: 오픈 기념 선착순 무료)" value={newEventName}
@@ -273,7 +274,7 @@ function EventDashboard({onBack}) {
                     </div>
                     <Button onClick={handleAddEvent}>+ 등록</Button>
                 </div>
-            </div>
+            </Card>
 
             <div className="event-list">
                 {events.length === 0 ? (

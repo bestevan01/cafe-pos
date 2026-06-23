@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import AdvancedStats from "./AdvancedStats.jsx";
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import {useNotification} from '../../hooks/useNotification';
 
 function SalesDashboard({onBack}) {
@@ -215,7 +216,7 @@ function SalesDashboard({onBack}) {
                 .stat-val { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #333); }
                 .stat-val.green { color: var(--success); } .stat-val.blue { color: #1565c0; }
 
-                .table-card { background-color: var(--card-bg, white); padding: 25px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); flex: 1; display: flex; flex-direction: column; min-height: 0; }
+                .table-card { flex: 1; display: flex; flex-direction: column; min-height: 0; } /* 카드 외형은 공용 <Card>가 담당 */
                 .filter-area { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; flex-shrink: 0; }
                 .filter-group { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
                 .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -308,7 +309,7 @@ function SalesDashboard({onBack}) {
             </div>
 
             {/* 상세 내역 테이블 및 필터 */}
-            <div className="table-card">
+            <Card className="table-card">
                 <div className="filter-area">
                     <h3 className="filter-title" style={{margin: 0}}>상세 내역 · {periodLabel}{' '}
                         <span style={{fontWeight: 'normal', fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
@@ -486,7 +487,7 @@ function SalesDashboard({onBack}) {
                         ))
                     )}
                 </div>
-            </div>
+            </Card>
         </div>
     );
 }

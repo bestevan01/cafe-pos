@@ -12,6 +12,7 @@
  * @param {boolean} [loading]      true면 스피너 + "불러오는 중"
  * @param {boolean} [empty]        true면 "데이터가 없습니다"
  * @param {boolean} [wide]         true면 그리드 한 줄 전체 차지 (1 / -1)
+ * @param {React.ReactNode} children  카드 본문(차트 등)
  */
 function StatCard({title, icon, subtitle, loading = false, empty = false, wide = false, children}) {
     return (

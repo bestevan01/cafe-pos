@@ -162,7 +162,7 @@ router.post('', authenticateToken, async (req, res) => {
             ON DUPLICATE KEY UPDATE last_number = LAST_INSERT_ID(last_number + 1)
         `);
         const [seqRows] = await conn.query('SELECT LAST_INSERT_ID() AS seq');
-        const nextDailyNum = seqRows[0].seq;
+        const nextDailyNum = seqRows[0]['seq'];
         const formattedID = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(nextDailyNum).padStart(3, "0")}`;
 
         for (const item of computedItems) {

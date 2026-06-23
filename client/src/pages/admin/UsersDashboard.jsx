@@ -2,6 +2,7 @@ import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import {useNotification} from '../../hooks/useNotification';
 
 function UsersDashboard({onBack}) {
@@ -98,7 +99,7 @@ function UsersDashboard({onBack}) {
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (PC 테이블) */
-                .users-container { background-color: var(--card-bg, white); border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid var(--border-color, transparent); }
+                .users-container { overflow: hidden; } /* 카드 외형(배경·테두리·라운드·그림자)은 공용 <Card>가 담당, 표 모서리 클리핑만 유지 */
                 .users-table-view { display: table; width: 100%; border-collapse: collapse; }
                 .users-table-view th { padding: 15px; color: var(--text-secondary, #666); text-align: left; border-bottom: 2px solid var(--border-color, #ddd); background-color: var(--bg-color, #fafafa); white-space: nowrap; font-weight: bold; }
                 .users-table-view td { padding: 15px; color: var(--text-primary, #333); border-bottom: 1px solid var(--border-color, #eee); white-space: nowrap; }
@@ -156,7 +157,7 @@ function UsersDashboard({onBack}) {
                 </div>
             </div>
 
-            <div className="users-container">
+            <Card flush className="users-container">
                 {/* 1. PC 뷰: 테이블 형식 */}
                 <table className="users-table-view">
                     <thead>
@@ -210,7 +211,7 @@ function UsersDashboard({onBack}) {
                         </div>
                     ))}
                 </div>
-            </div>
+            </Card>
         </div>
     );
 }

@@ -21,8 +21,8 @@ const loginRateLimiter = async (req, res, next) => {
                AND reset_at > NOW()`,
             [key]
         );
-        if (rows.length && rows[0].failures >= MAX_FAILURES) {
-            const waitMin = Math.max(1, Math.ceil(rows[0].remaining_sec / 60));
+        if (rows.length && rows[0]['failures'] >= MAX_FAILURES) {
+            const waitMin = Math.max(1, Math.ceil(rows[0]['remaining_sec'] / 60));
             return res.status(429).json({
                 success: false,
                 message: `로그인 시도가 너무 많습니다. 약 ${waitMin}분 후 다시 시도해주세요.`

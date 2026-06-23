@@ -2,6 +2,7 @@ import {useState, useEffect} from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import {useNotification} from '../../hooks/useNotification';
 
 function SettlementDashboard({onBack}) {
@@ -52,7 +53,7 @@ function SettlementDashboard({onBack}) {
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (PC 테이블) */
-                .settle-content { background-color: var(--card-bg, white); padding: 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; width: 100%; border: 1px solid var(--border-color, transparent); }
+                .settle-content { box-sizing: border-box; width: 100%; } /* 카드 외형은 공용 <Card>가 담당 */
                 .settle-table-view { width: 100%; border-collapse: collapse; }
                 .settle-table-view th { padding: 15px 10px; color: var(--text-secondary, #666); text-align: left; border-bottom: 2px solid var(--border-color, #ddd); white-space: nowrap; }
                 .settle-table-view td { padding: 15px 10px; color: var(--text-primary, #333); border-bottom: 1px solid var(--border-color, #eee); white-space: nowrap; }
@@ -109,7 +110,7 @@ function SettlementDashboard({onBack}) {
                 </div>
             </div>
 
-            <div className="settle-content">
+            <Card className="settle-content">
                 <>
                     {/* PC용 테이블 뷰 */}
                     <table className="settle-table-view">
@@ -231,7 +232,7 @@ function SettlementDashboard({onBack}) {
                         )}
                     </div>
                 </>
-            </div>
+            </Card>
         </div>
     );
 }

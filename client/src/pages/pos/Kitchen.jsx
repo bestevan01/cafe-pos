@@ -4,7 +4,7 @@ import axios from 'axios';
 import {socket} from '../../utils/socket';
 import {useNotification} from '../../hooks/useNotification';
 
-function Kitchen({onBack}) {
+function Kitchen() {
     const {notify, confirm} = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)

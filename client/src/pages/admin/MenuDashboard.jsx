@@ -2,6 +2,7 @@ import axios from 'axios';
 import {useState, useEffect} from 'react';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
 import {useNotification} from '../../hooks/useNotification';
 
 function MenuDashboard({onBack}) {
@@ -112,14 +113,14 @@ function MenuDashboard({onBack}) {
                 .menu-content { display: flex; gap: 20px; align-items: flex-start; }
                 
                 /* 입력 폼 섹션 */
-                .form-section { width: 320px; flex-shrink: 0; background-color: var(--card-bg, white); padding: 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; border: 1px solid var(--border-color, transparent); position: sticky; top: 20px; }
+                .form-section { width: 320px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 20px; } /* 카드 외형은 공용 <Card>가 담당 */
                 .form-title { margin-top: 0; margin-bottom: 15px; color: var(--text-primary, #333); }
                 .menu-input { padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color, #ddd); font-size: 1rem; background-color: var(--bg-color, #f4f6f8); color: var(--text-primary, #333); width: 100%; box-sizing: border-box; margin-bottom: 10px; -webkit-appearance: none; }
                 .menu-input:focus { outline: none; border-color: var(--accent); }
                 
 
                 /* 리스트 섹션 */
-                .list-section { flex: 1; background-color: var(--card-bg, white); padding: 20px; border-radius: var(--radius-lg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; width: 100%; box-sizing: border-box; border: 1px solid var(--border-color, transparent); }
+                .list-section { flex: 1; overflow: hidden; width: 100%; box-sizing: border-box; } /* 카드 외형은 공용 <Card>가 담당 */
                 
                 /* PC 테이블 뷰 */
                 .menu-table-view { width: 100%; border-collapse: collapse; }
@@ -179,7 +180,7 @@ function MenuDashboard({onBack}) {
 
             <div className="menu-content">
                 {/* 1. 입력 폼 섹션 (추가/수정) */}
-                <div className="form-section">
+                <Card className="form-section">
                     <h3 className="form-title">{editingId ? "✏️ 메뉴 수정" : "➕ 메뉴 추가"}</h3>
                     <form onSubmit={editingId ? (e) => {
                         e.preventDefault();
@@ -205,10 +206,10 @@ function MenuDashboard({onBack}) {
                             }}>취소</Button>
                         )}
                     </form>
-                </div>
+                </Card>
 
                 {/* 2. 메뉴 리스트 섹션 */}
-                <div className="list-section">
+                <Card className="list-section">
                     {/* PC 테이블 뷰 */}
                     <table className="menu-table-view">
                         <thead>
@@ -269,7 +270,7 @@ function MenuDashboard({onBack}) {
                             </div>
                         ))}
                     </div>
-                </div>
+                </Card>
             </div>
         </div>
     );

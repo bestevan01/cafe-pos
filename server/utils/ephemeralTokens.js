@@ -24,6 +24,7 @@ async function cleanupExpired() {
  * @returns {Promise<string>}    발급된 token
  */
 async function issueToken(purpose, ttlSeconds, {token, payload = null} = {}) {
+    // noinspection JSCheckFunctionSignatures -- Buffer.toString(encoding)인데 WebStorm이 0-인자 toString으로 오인(정상 코드)
     const tok = token || crypto.randomBytes(32).toString('base64url');
     await pool.query(
         `INSERT INTO ephemeral_tokens (token, purpose, payload, expires_at)
@@ -60,4 +61,4 @@ async function consumeToken(token, purpose) {
     return {payload: rows.length ? rows[0].payload : null};
 }
 
-module.exports = {issueToken, consumeToken, cleanupExpired};
+module.exports = {issueToken, consumeToken};

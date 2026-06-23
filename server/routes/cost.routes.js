@@ -24,7 +24,7 @@ router.get('/ingredients', async (req, res) => {
     try {
         // 식재료 → 부자재 순으로 그룹핑되도록 정렬
         const [rows] = await pool.query(
-            "SELECT * FROM ingredients ORDER BY CASE WHEN category = '부자재' THEN 1 ELSE 0 END, name"
+            "SELECT * FROM ingredients ORDER BY IF(category = '부자재', 1, 0), name"
         );
         res.json(rows.map(r => ({...r, unit_cost: unitCostOf(r)})));
     } catch (err) {

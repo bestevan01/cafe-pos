@@ -17,7 +17,7 @@ import {NotificationContext} from '../hooks/useNotification';
 let idCounter = 0;
 
 export function NotificationProvider({children}) {
-    const [toasts, setToasts] = useState([]);
+    const [toasts, setToasts] = useState(/** @type {{id: number, message: React.ReactNode, icon?: *, title?: string, loading?: boolean}[]} */ ([]));
     const [confirmState, setConfirmState] = useState(null); // { message, title, confirmText, cancelText, danger, resolve }
 
     // 화면 폭으로 토스트 표현 분기: PC=우측상단 카드 / 모바일=하단 스낵바
@@ -37,6 +37,11 @@ export function NotificationProvider({children}) {
 
     const dedupeRef = useRef({}); // { [dedupeKey]: 마지막 표시 시각 }
 
+    /**
+     * @param {React.ReactNode} message
+     * @param {{icon?: *, title?: string, duration?: number, loading?: boolean, dedupeKey?: string, dedupeWindow?: number}} [options]
+     * @returns {number|null}
+     */
     const notify = useCallback((message, options = {}) => {
         // 같은 dedupeKey로 짧은 시간 내 재호출되면 무시 (동시 로딩 실패 등을 하나로 묶음)
         if (options.dedupeKey) {
@@ -178,6 +183,7 @@ export function NotificationProvider({children}) {
     }), [notify, update, removeToast, confirm]);
 
     // 모바일: 아래에서 위로(스낵바) / PC: 오른쪽에서 슬라이드-인
+    /** @type {import('framer-motion').MotionProps} */
     const toastAnim = isMobile
         ? {
             initial: {opacity: 0, y: 30, scale: 0.98},
@@ -190,6 +196,7 @@ export function NotificationProvider({children}) {
             exit: {opacity: 0, x: 24, scale: 0.9}
         };
 
+    // noinspection JSValidateTypes -- framer-motion <motion.div>의 복잡한 타입을 WebStorm이 검증하지 못해 생기는 오탐 억제 (코드는 정상, 빌드 통과)
     return (
         <NotificationContext.Provider value={value}>
             {children}

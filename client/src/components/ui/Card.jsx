@@ -13,7 +13,9 @@ import './Card.css';
  * @param {React.ReactNode} [subtitle] 제목 옆 보조 텍스트
  * @param {React.ReactNode} [actions] 머리말 우측 액션(버튼 등)
  * @param {boolean} [flush]           true면 내부 패딩 제거(표/리스트가 가장자리까지)
- * 나머지 props는 최상위 div에 전달.
+ * @param {string} [className]        추가 CSS 클래스
+ * @param {React.ReactNode} [children] 카드 본문
+ * @param {object} [rest]             나머지 props → 최상위 div에 전달
  */
 function Card({title, icon, subtitle, actions, flush = false, className = '', children, ...rest}) {
     const cls = ['ui-card', flush && 'ui-card-flush', className].filter(Boolean).join(' ');
