@@ -1,7 +1,6 @@
 import {useState, useRef} from 'react';
 import axios from 'axios';
 import {startAuthentication} from "@simplewebauthn/browser";
-import ThemeToggle from "../../components/ThemeToggle.jsx";
 import {useNotification} from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 
@@ -77,10 +76,6 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
     // ---------------------------------------------------------
     return (
         <div className="auth-overlay">
-            <div style={{position: 'absolute', top: '20px', right: '20px', zIndex: 1000}}>
-                <ThemeToggle/>
-            </div>
-
             <style>
                 {`
                 /* 모달 오버레이 */
