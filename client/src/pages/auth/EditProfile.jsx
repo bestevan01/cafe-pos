@@ -182,6 +182,10 @@ function EditProfile({onBack}) {
                 .ep-card { background-color: var(--card-bg, white); padding: 30px 25px; border-radius: var(--radius-lg); box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 20px; border: 1px solid var(--border-color, transparent); box-sizing: border-box; }
                 .ep-header { margin: 0; text-align: center; color: var(--text-primary, #333); font-size: 1.6rem; }
                 .ep-desc { text-align: center; color: var(--text-secondary, #666); font-size: 0.95rem; margin-bottom: 10px; line-height: 1.4; }
+
+                .ep-body { display: flex; flex-direction: column; gap: 24px; }
+                .ep-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+                .ep-col-title { margin: 0; font-size: 1.1rem; color: var(--text-primary, #333); font-weight: bold; }
                 
                 .ep-row { display: flex; flex-direction: column; gap: 8px; width: 100%; }
                 .ep-label { font-size: 0.9rem; color: var(--text-secondary, #666); font-weight: bold; }
@@ -214,10 +218,21 @@ function EditProfile({onBack}) {
                 [data-theme='dark'] .btn-link { color: #4facfe; border-color: #4facfe; }
                 [data-theme='dark'] .btn-link:active { background-color: rgba(79, 172, 254, 0.1); }
                 [data-theme='dark'] .btn-del { background-color: rgba(220, 53, 69, 0.2); color: #ff8a80; }
+
+                /* 🖥️ 데스크톱: 카드를 넓혀 2열(계정 정보 | 패스키 관리)로 배치해 좌우 여백을 줄인다. 모바일은 단일 컬럼 유지. */
+                @media (min-width: 769px) {
+                    .ep-card-wide { max-width: 760px; }
+                    .ep-card-wide .ep-body { flex-direction: row; align-items: stretch; gap: 0; }
+                    .ep-card-wide .ep-col { flex: 1; padding: 0 14px; }
+                    .ep-card-wide .ep-col:first-child { padding-left: 0; }
+                    .ep-card-wide .ep-col:last-child { padding-right: 0; border-left: 1px solid var(--border-color, #eee); }
+                    /* 푸터 버튼 간격(28px)을 컬럼 간격(14px×2)과 맞춰, 컬럼 내용과 아래 버튼의 좌·우 가장자리를 정렬 */
+                    .ep-card-wide .footer-btns { gap: 28px; }
+                }
                 `}
             </style>
 
-            <div className="ep-card">
+            <div className={`ep-card${isChangingPassword ? '' : ' ep-card-wide'}`}>
                 {isChangingPassword ? (
                     // 1. 비밀번호 변경 화면
                     <form className="ep-pw-form" onSubmit={(e) => {
@@ -260,23 +275,26 @@ function EditProfile({onBack}) {
                     // 2. 메인 내 정보 화면
                     <>
                         <h2 className="ep-header">⚙️ 내 정보 수정</h2>
-                        <div className="ep-row">
-                            <label className="ep-label">아이디</label>
-                            <input type="text" value={user.username} disabled className="ep-input"/>
-                        </div>
-                        <div className="ep-row">
-                            <label className="ep-label">이름</label>
-                            <input type="text" value={user.name} disabled className="ep-input"/>
-                        </div>
-                        <button onClick={() => setIsChangingPassword(true)} className="btn-link">비밀번호 변경하기 〉</button>
-
-                        <hr className="divider"/>
-
-                        <div className="passkey-header">
-                            <h3 className="passkey-title">🔐 패스키 관리</h3>
-                            <Button size="sm" onClick={handleRegisterPasskey}>+ 기기 등록</Button>
-                        </div>
-                        <div className="passkey-list">
+                        <div className="ep-body">
+                            <section className="ep-col">
+                                <h3 className="ep-col-title">👤 계정 정보</h3>
+                                <div className="ep-row">
+                                    <label className="ep-label">아이디</label>
+                                    <input type="text" value={user.username} disabled className="ep-input"/>
+                                </div>
+                                <div className="ep-row">
+                                    <label className="ep-label">이름</label>
+                                    <input type="text" value={user.name} disabled className="ep-input"/>
+                                </div>
+                                <button onClick={() => setIsChangingPassword(true)} className="btn-link">비밀번호 변경하기 〉
+                                </button>
+                            </section>
+                            <section className="ep-col">
+                                <div className="passkey-header">
+                                    <h3 className="passkey-title">🔐 패스키 관리</h3>
+                                    <Button size="sm" onClick={handleRegisterPasskey}>+ 기기 등록</Button>
+                                </div>
+                                <div className="passkey-list">
                             {passkeys.length === 0 ? (
                                 <p style={{
                                     textAlign: 'center',
@@ -325,6 +343,8 @@ function EditProfile({onBack}) {
                                     </div>
                                 ))
                             )}
+                                </div>
+                            </section>
                         </div>
                         <div className="footer-btns">
                             <Button variant="neutral" onClick={onBack} style={{flex: 1, padding: 14}}>뒤로 가기</Button>
