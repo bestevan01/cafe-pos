@@ -42,7 +42,7 @@ function UsersDashboard({onBack}) {
             notify('변경되었습니다.', {icon: '✅'});
             await fetchUsers();
         } catch (err) {
-            notify('변경 실패', {icon: '⚠️'});
+            notify(err.response?.data?.message || '변경 실패', {icon: '⚠️'});
         }
     };
 
@@ -71,7 +71,7 @@ function UsersDashboard({onBack}) {
             notify('계정이 완전히 삭제되었습니다.', {icon: '✅'});
             await fetchUsers();
         } catch (err) {
-            notify('계정 삭제에 실패했습니다.', {icon: '⚠️'});
+            notify(err.response?.data?.message || '계정 삭제에 실패했습니다.', {icon: '⚠️'});
         }
     };
 

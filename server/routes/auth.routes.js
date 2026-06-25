@@ -9,6 +9,7 @@ const {loginRateLimiter, recordLoginFailure, recordLoginSuccess} = require("../m
 const {isStrongPassword, PASSWORD_POLICY_MESSAGE} = require("../utils/passwordPolicy");
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const VALID_ROLES = ['admin', 'staff', 'pending'];
 
 router.post('/register', async (req, res) => {
     const {username, password, name} = req.body;
@@ -107,7 +108,21 @@ router.get('/admin/users', authenticateToken, requireAdmin, async (req, res) => 
 router.patch('/admin/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
     const {id} = req.params;
     const {role} = req.body;
+    if (!VALID_ROLES.includes(role)) {
+        return res.status(400).json({success: false, message: '유효하지 않은 권한 값입니다.'});
+    }
     try {
+        // 마지막 관리자를 강등하면 관리자 접근이 영구 차단되므로 막는다.
+        if (role !== 'admin') {
+            const [target] = await pool.query('SELECT role FROM users WHERE id = ?', [id]);
+            if (target.length === 0) return res.status(404).json({success: false, message: '유저를 찾을 수 없습니다.'});
+            if (target[0]['role'] === 'admin') {
+                const [adminRows] = await pool.query("SELECT COUNT(*) AS cnt FROM users WHERE role = 'admin'");
+                if (Number(adminRows[0]['cnt']) <= 1) {
+                    return res.status(400).json({success: false, message: '마지막 관리자는 강등할 수 없습니다.'});
+                }
+            }
+        }
         await pool.query('UPDATE users SET role = ? WHERE id = ?', [role, id]);
         res.json({success: true});
     } catch (err) {
@@ -122,7 +137,19 @@ router.patch('/admin/users/:id/role', authenticateToken, requireAdmin, async (re
 
 router.delete('/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
     const {id} = req.params;
+    if (String(id) === String(req.user.id)) {
+        return res.status(400).json({success: false, message: '자기 자신의 계정은 삭제할 수 없습니다.'});
+    }
     try {
+        // 마지막 관리자 삭제로 관리자 접근이 영구 차단되는 것을 막는다.
+        const [target] = await pool.query('SELECT role FROM users WHERE id = ?', [id]);
+        if (target.length === 0) return res.status(404).json({success: false, message: '유저를 찾을 수 없습니다.'});
+        if (target[0]['role'] === 'admin') {
+            const [adminRows] = await pool.query("SELECT COUNT(*) AS cnt FROM users WHERE role = 'admin'");
+            if (Number(adminRows[0]['cnt']) <= 1) {
+                return res.status(400).json({success: false, message: '마지막 관리자는 삭제할 수 없습니다.'});
+            }
+        }
         await pool.query('DELETE FROM users WHERE id = ?', [id]);
         res.json({success: true});
     } catch (err) {

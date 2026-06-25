@@ -109,7 +109,7 @@ function CashSettlement({onClose}) {
             notify("마감 처리되었습니다. 수고하셨습니다!", {icon: '🔒'});
             onClose();
         } catch (err) {
-            notify("마감 처리 실패", {icon: '⚠️'});
+            notify(err.response?.data?.message || "마감 처리 실패", {icon: '⚠️'});
         }
     };
 

@@ -32,6 +32,9 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     const {name, type, discount_amount, daily_limit, target_menus, is_active} = req.body;
+    if (!name || !['free', 'discount'].includes(type)) {
+        return res.status(400).json({success: false, message: '이벤트 이름과 유형(무료/할인)을 올바르게 입력해주세요.'});
+    }
     try {
         const [result] = await pool.query(
             'INSERT INTO events (name, type, discount_amount, daily_limit, target_menus, is_active) VALUES (?, ?, ?, ?, ?, ?)',

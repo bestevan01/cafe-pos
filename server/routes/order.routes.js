@@ -161,9 +161,10 @@ router.post('', authenticateToken, async (req, res) => {
             VALUES (CURDATE(), LAST_INSERT_ID(1))
             ON DUPLICATE KEY UPDATE last_number = LAST_INSERT_ID(last_number + 1)
         `);
-        const [seqRows] = await conn.query('SELECT LAST_INSERT_ID() AS seq');
+        // 주문번호 날짜 접두사도 카운터와 같은 DB 시간대(CURDATE = KST)로 산출 → JS의 UTC 날짜와 어긋남 방지
+        const [seqRows] = await conn.query("SELECT LAST_INSERT_ID() AS seq, DATE_FORMAT(CURDATE(), '%Y%m%d') AS ymd");
         const nextDailyNum = seqRows[0]['seq'];
-        const formattedID = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(nextDailyNum).padStart(3, "0")}`;
+        const formattedID = `${seqRows[0]['ymd']}-${String(nextDailyNum).padStart(3, "0")}`;
 
         for (const item of computedItems) {
             await conn.query(

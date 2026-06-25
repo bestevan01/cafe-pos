@@ -164,6 +164,16 @@ export function NotificationProvider({children}) {
             },
             (error) => {
                 settle(error.config);
+                // 만료·무효 토큰(401): 로그인/회원가입 외의 호출이 401이면 세션 만료로 보고 전역 로그아웃을 유도.
+                // 토큰을 즉시 비워 동일 401 폭주 시 중복 발화를 막는다.
+                const url = error.config?.url || '';
+                const isAuthEndpoint = url.includes('/api/login') || url.includes('/api/register');
+                if (error.response?.status === 401 && !isAuthEndpoint && localStorage.getItem('token')) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('lastActivity');
+                    window.dispatchEvent(new CustomEvent('app:session-expired'));
+                }
                 return Promise.reject(error);
             }
         );

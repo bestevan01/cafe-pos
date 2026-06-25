@@ -25,6 +25,10 @@ router.get('/status', authenticateToken, async (req, res) => {
 });
 
 router.post('/open', authenticateToken, async (req, res) => {
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+        return res.status(400).json({success: false, message: '시재 금액이 올바르지 않습니다.'});
+    }
     try {
         // 1차 방어(앱 레벨): 오늘 이미 오픈했으면 거부 — 중복 레코드 생성 방지
         const [existing] = await pool.query('SELECT 1 FROM cash_settlements WHERE date = CURDATE() LIMIT 1');
@@ -32,7 +36,7 @@ router.post('/open', authenticateToken, async (req, res) => {
             return res.status(409).json({success: false, message: '오늘은 이미 오픈되었습니다.'});
         }
 
-        await pool.query('INSERT INTO cash_settlements (date, opening_amount) VALUES (CURDATE(), ?)', [req.body.amount]);
+        await pool.query('INSERT INTO cash_settlements (date, opening_amount) VALUES (CURDATE(), ?)', [amount]);
         res.json({success: true});
     } catch (err) {
         // 2차 방어(DB 레벨): date에 UNIQUE 제약이 있으면 동시 오픈 경쟁도 여기서 차단됨
@@ -75,15 +79,23 @@ router.get('/calc', authenticateToken, async (req, res) => {
 router.post('/close', authenticateToken, async (req, res) => {
     const {closingAmount, salesCash, diff} = req.body;
     try {
-        await pool.query(
+        // 오픈된(아직 안 닫힌) 당일 행만 마감한다. 0행이면 미오픈/이미마감을 구분해 안내.
+        const [result] = await pool.query(
             `UPDATE cash_settlements
              SET closing_amount = ?,
                  sales_cash     = ?,
                  difference     = ?,
                  is_closed      = 1
-             WHERE date = CURDATE()`,
+             WHERE date = CURDATE() AND is_closed = 0`,
             [closingAmount, salesCash, diff]
         );
+        if (result.affectedRows === 0) {
+            const [rows] = await pool.query('SELECT is_closed FROM cash_settlements WHERE date = CURDATE() LIMIT 1');
+            if (rows.length === 0) {
+                return res.status(400).json({success: false, message: '오늘 오픈 기록이 없습니다. 먼저 오픈해주세요.'});
+            }
+            return res.status(409).json({success: false, message: '오늘은 이미 마감되었습니다.'});
+        }
         res.json({success: true});
     } catch (err) {
         console.error('[🔥 POST /api/settlement/close 에러]', err);

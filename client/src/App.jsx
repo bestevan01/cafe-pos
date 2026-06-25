@@ -126,6 +126,16 @@ function App() {
         };
     }, [auth.isLoggedIn, SESSION_TIMEOUT, handleAutoLogout]);
 
+    // REST 401(만료·무효 토큰) 전역 처리: axios 인터셉터가 보낸 'app:session-expired'를 받아 재로그인 유도
+    useEffect(() => {
+        const onExpired = () => {
+            notify('세션이 만료되었습니다. 다시 로그인해주세요.', {icon: '🔒'});
+            handleLogout();
+        };
+        window.addEventListener('app:session-expired', onExpired);
+        return () => window.removeEventListener('app:session-expired', onExpired);
+    }, [handleLogout, notify]);
+
     // ---------------------------------------------------------
     // [3] 소켓 통신 (Socket.io)
     // ---------------------------------------------------------

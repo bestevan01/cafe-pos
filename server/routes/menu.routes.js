@@ -20,6 +20,9 @@ router.get('', authenticateToken, async (req, res) => {
 
 router.post('', authenticateToken, requireAdmin, async (req, res) => {
     const {name, price, type} = req.body;
+    if (!name || !Number.isFinite(Number(price)) || Number(price) < 0) {
+        return res.status(400).json({success: false, message: '메뉴 이름과 가격(0 이상)을 올바르게 입력해주세요.'});
+    }
     try {
         await pool.query('INSERT INTO menu (name, price, type) VALUES (?, ?, ?)', [name, price, type]);
         res.json({success: true});
