@@ -4,7 +4,7 @@ import axios from 'axios';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
 
-function OnePersonMode({ onlyOrder = false, isCashier = false }) {
+function Cashier({ onlyOrder = false, isCashier = false }) {
     const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
@@ -856,4 +856,4 @@ function OnePersonMode({ onlyOrder = false, isCashier = false }) {
     );
 }
 
-export default OnePersonMode;
+export default Cashier;

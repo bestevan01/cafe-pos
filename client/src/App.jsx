@@ -3,7 +3,7 @@ import { socket } from './utils/socket';
 
 // Pages & Components
 import RoleSelection from './pages/pos/RoleSelection';
-import OnePersonMode from './pages/pos/OnePersonMode';
+import Cashier from './pages/pos/Cashier';
 import Kitchen from './pages/pos/Kitchen';
 import CashSettlement from './pages/pos/CashSettlement.jsx';
 import Login from './pages/auth/Login';
@@ -240,7 +240,7 @@ function App() {
     const renderContent = () => {
         if (myRole === 'cashier') {
             return (
-                <OnePersonMode
+                <Cashier
                     onlyOrder={false}
                     isCashier={isKitchenActive}
                     onBack={() => {
