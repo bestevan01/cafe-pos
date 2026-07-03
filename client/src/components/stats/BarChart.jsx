@@ -12,8 +12,8 @@
  * @param {string} [color]               막대 색
  * @param {number} [height]              PC 세로 차트 높이(px)
  */
-function BarChart({data = [], label, value, color = '#42a5f5', height = 240}) {
-    const maxVal = Math.max(...data.map(d => Number(value(d)) || 0), 1);
+function BarChart({ data = [], label, value, color = '#42a5f5', height = 240 }) {
+    const maxVal = Math.max(...data.map((d) => Number(value(d)) || 0), 1);
     const fmt = (v) => (v >= 10000 ? `${(v / 10000).toFixed(1)}만` : v.toLocaleString());
 
     return (
@@ -52,10 +52,13 @@ function BarChart({data = [], label, value, color = '#42a5f5', height = 240}) {
                             <div key={i} className="barchart-col" title={`${v.toLocaleString()}원`}>
                                 <div className="barchart-val">{fmt(v)}</div>
                                 <div className="barchart-wrap">
-                                    <div className="barchart-bar" style={{
-                                        height: `${(v / maxVal) * 100}%`,
-                                        background: `linear-gradient(180deg, ${color}, ${color}bb)`
-                                    }}/>
+                                    <div
+                                        className="barchart-bar"
+                                        style={{
+                                            height: `${(v / maxVal) * 100}%`,
+                                            background: `linear-gradient(180deg, ${color}, ${color}bb)`,
+                                        }}
+                                    />
                                 </div>
                                 <div className="barchart-label">{label(d)}</div>
                             </div>
@@ -75,10 +78,13 @@ function BarChart({data = [], label, value, color = '#42a5f5', height = 240}) {
                                 <span className="bch-value">{v.toLocaleString()}원</span>
                             </div>
                             <div className="bch-track">
-                                <div className="bch-fill" style={{
-                                    width: `${(v / maxVal) * 100}%`,
-                                    background: `linear-gradient(90deg, ${color}, ${color}bb)`
-                                }}/>
+                                <div
+                                    className="bch-fill"
+                                    style={{
+                                        width: `${(v / maxVal) * 100}%`,
+                                        background: `linear-gradient(90deg, ${color}, ${color}bb)`,
+                                    }}
+                                />
                             </div>
                         </div>
                     );

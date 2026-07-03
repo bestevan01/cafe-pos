@@ -16,8 +16,8 @@
  * @param {number} [highlightTop]          상위 N개를 순위 표시 + 강조색
  * @param {number} [max]                   막대 기준 최대값 (없으면 자동)
  */
-function BarList({data = [], label, value, sublabel, highlightTop = 0, max}) {
-    const maxVal = max ?? Math.max(...data.map(d => Number(value(d)) || 0), 1);
+function BarList({ data = [], label, value, sublabel, highlightTop = 0, max }) {
+    const maxVal = max ?? Math.max(...data.map((d) => Number(value(d)) || 0), 1);
 
     return (
         <div className="barlist">
@@ -42,15 +42,18 @@ function BarList({data = [], label, value, sublabel, highlightTop = 0, max}) {
                                 {highlightTop > 0 && <span className="barlist-rank">{i + 1}</span>}
                                 {label(d)}
                             </span>
-                            <span className="barlist-value">
-                                {sublabel ? sublabel(d) : `${v.toLocaleString()}원`}
-                            </span>
+                            <span className="barlist-value">{sublabel ? sublabel(d) : `${v.toLocaleString()}원`}</span>
                         </div>
                         <div className="barlist-track">
-                            <div className="barlist-fill" style={{
-                                width: `${(v / maxVal) * 100}%`,
-                                background: hot ? 'linear-gradient(90deg, #ffb74d, #ff7043)' : 'linear-gradient(90deg, #64b5f6, #42a5f5)'
-                            }}/>
+                            <div
+                                className="barlist-fill"
+                                style={{
+                                    width: `${(v / maxVal) * 100}%`,
+                                    background: hot
+                                        ? 'linear-gradient(90deg, #ffb74d, #ff7043)'
+                                        : 'linear-gradient(90deg, #64b5f6, #42a5f5)',
+                                }}
+                            />
                         </div>
                     </div>
                 );

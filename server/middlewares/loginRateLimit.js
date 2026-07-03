@@ -5,7 +5,7 @@
 const pool = require('../config/db');
 
 const WINDOW_SEC = 10 * 60; // 10분
-const MAX_FAILURES = 8;     // 윈도우 내 최대 실패 허용치
+const MAX_FAILURES = 8; // 윈도우 내 최대 실패 허용치
 
 const getKey = (req) => req.ip || req.socket?.remoteAddress || 'unknown';
 
@@ -19,13 +19,13 @@ const loginRateLimiter = async (req, res, next) => {
              FROM login_attempts
              WHERE attempt_key = ?
                AND reset_at > NOW()`,
-            [key]
+            [key],
         );
         if (rows.length && rows[0]['failures'] >= MAX_FAILURES) {
             const waitMin = Math.max(1, Math.ceil(rows[0]['remaining_sec'] / 60));
             return res.status(429).json({
                 success: false,
-                message: `로그인 시도가 너무 많습니다. 약 ${waitMin}분 후 다시 시도해주세요.`
+                message: `로그인 시도가 너무 많습니다. 약 ${waitMin}분 후 다시 시도해주세요.`,
             });
         }
     } catch (err) {
@@ -43,7 +43,7 @@ const recordLoginFailure = async (key) => {
              VALUES (?, 1, DATE_ADD(NOW(), INTERVAL ? SECOND))
              ON DUPLICATE KEY UPDATE failures = IF(reset_at <= NOW(), 1, failures + 1),
                                      reset_at = IF(reset_at <= NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND), reset_at)`,
-            [key, WINDOW_SEC, WINDOW_SEC]
+            [key, WINDOW_SEC, WINDOW_SEC],
         );
         // 만료 행 가끔 청소(별도 타이머 불필요)
         if (Math.random() < 0.05) {
@@ -63,4 +63,4 @@ const recordLoginSuccess = async (key) => {
     }
 };
 
-module.exports = {loginRateLimiter, recordLoginFailure, recordLoginSuccess};
+module.exports = { loginRateLimiter, recordLoginFailure, recordLoginSuccess };

@@ -23,7 +23,7 @@ async function cleanupExpired() {
  * @param {{token?: string, payload?: string|null}} [opts]  token 미지정 시 랜덤 생성
  * @returns {Promise<string>}    발급된 token
  */
-async function issueToken(purpose, ttlSeconds, {token, payload = null} = {}) {
+async function issueToken(purpose, ttlSeconds, { token, payload = null } = {}) {
     // noinspection JSCheckFunctionSignatures -- Buffer.toString(encoding)인데 WebStorm이 0-인자 toString으로 오인(정상 코드)
     const tok = token || crypto.randomBytes(32).toString('base64url');
     await pool.query(
@@ -32,7 +32,7 @@ async function issueToken(purpose, ttlSeconds, {token, payload = null} = {}) {
          ON DUPLICATE KEY UPDATE purpose    = VALUES(purpose),
                                  payload    = VALUES(payload),
                                  expires_at = VALUES(expires_at)`,
-        [tok, purpose, payload, ttlSeconds]
+        [tok, purpose, payload, ttlSeconds],
     );
     if (Math.random() < 0.05) void cleanupExpired(); // 가끔 만료분 청소(타이머 불필요)
     return tok;
@@ -50,15 +50,15 @@ async function consumeToken(token, purpose) {
     // payload가 필요한 경우(등록 챌린지 등)를 위해 먼저 읽는다.
     const [rows] = await pool.query(
         'SELECT payload FROM ephemeral_tokens WHERE token = ? AND purpose = ? AND expires_at > NOW()',
-        [token, purpose]
+        [token, purpose],
     );
     // 실제로 '내 DELETE'가 행을 지웠을 때만 성공으로 인정 → 1회용 보장.
     const [del] = await pool.query(
         'DELETE FROM ephemeral_tokens WHERE token = ? AND purpose = ? AND expires_at > NOW()',
-        [token, purpose]
+        [token, purpose],
     );
     if (del.affectedRows !== 1) return null;
-    return {payload: rows.length ? rows[0].payload : null};
+    return { payload: rows.length ? rows[0].payload : null };
 }
 
-module.exports = {issueToken, consumeToken};
+module.exports = { issueToken, consumeToken };

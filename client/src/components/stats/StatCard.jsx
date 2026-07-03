@@ -14,9 +14,9 @@
  * @param {boolean} [wide]         true면 그리드 한 줄 전체 차지 (1 / -1)
  * @param {React.ReactNode} children  카드 본문(차트 등)
  */
-function StatCard({title, icon, subtitle, loading = false, empty = false, wide = false, children}) {
+function StatCard({ title, icon, subtitle, loading = false, empty = false, wide = false, children }) {
     return (
-        <div className="stat-card" style={wide ? {gridColumn: '1 / -1'} : undefined}>
+        <div className="stat-card" style={wide ? { gridColumn: '1 / -1' } : undefined}>
             <style>{`
                 .stat-card { background: var(--card-bg, #fff); border: 1px solid var(--border-color, rgba(0,0,0,.06)); border-radius: 16px; padding: 22px 24px; box-shadow: 0 4px 18px rgba(0,0,0,.05); box-sizing: border-box; width: 100%; display: flex; flex-direction: column; transition: box-shadow .2s ease, background-color .3s ease; }
                 .stat-card:hover { box-shadow: 0 8px 26px rgba(0,0,0,.09); }
@@ -37,19 +37,27 @@ function StatCard({title, icon, subtitle, loading = false, empty = false, wide =
             `}</style>
 
             <div className="stat-card-head">
-                <h2 className="stat-card-title">{icon && <span className="stat-card-icon">{icon}</span>}{title}</h2>
+                <h2 className="stat-card-title">
+                    {icon && <span className="stat-card-icon">{icon}</span>}
+                    {title}
+                </h2>
                 {subtitle != null && <span className="stat-card-sub">{subtitle}</span>}
             </div>
 
             <div className="stat-card-body">
                 {loading ? (
                     <div className="stat-card-state">
-                        <div className="stat-card-spinner"/>
-                        <span>불러오는 중...</span></div>
-                ) : empty ? (
-                    <div className="stat-card-state"><span style={{fontSize: '1.8rem'}}>📭</span><span>데이터가 없습니다</span>
+                        <div className="stat-card-spinner" />
+                        <span>불러오는 중...</span>
                     </div>
-                ) : children}
+                ) : empty ? (
+                    <div className="stat-card-state">
+                        <span style={{ fontSize: '1.8rem' }}>📭</span>
+                        <span>데이터가 없습니다</span>
+                    </div>
+                ) : (
+                    children
+                )}
             </div>
         </div>
     );

@@ -1,8 +1,8 @@
-import {useState, useCallback, useMemo, useEffect, useRef} from 'react';
-import {createPortal} from 'react-dom';
-import {motion, AnimatePresence} from 'framer-motion';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
-import {NotificationContext} from '../hooks/useNotification';
+import { NotificationContext } from '../hooks/useNotification';
 
 /**
  * 전역 알림 시스템.
@@ -16,13 +16,15 @@ import {NotificationContext} from '../hooks/useNotification';
  */
 let idCounter = 0;
 
-export function NotificationProvider({children}) {
-    const [toasts, setToasts] = useState(/** @type {{id: number, message: React.ReactNode, icon?: *, title?: string, loading?: boolean}[]} */ ([]));
+export function NotificationProvider({ children }) {
+    const [toasts, setToasts] = useState(
+        /** @type {{id: number, message: React.ReactNode, icon?: *, title?: string, loading?: boolean}[]} */ ([]),
+    );
     const [confirmState, setConfirmState] = useState(null); // { message, title, confirmText, cancelText, danger, resolve }
 
     // 화면 폭으로 토스트 표현 분기: PC=우측상단 카드 / 모바일=하단 스낵바
     const [isMobile, setIsMobile] = useState(
-        () => typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches
+        () => typeof window !== 'undefined' && window.matchMedia('(max-width: 480px)').matches,
     );
     useEffect(() => {
         const mq = window.matchMedia('(max-width: 480px)');
@@ -32,7 +34,7 @@ export function NotificationProvider({children}) {
     }, []);
 
     const removeToast = useCallback((id) => {
-        setToasts(prev => prev.filter(t => t.id !== id));
+        setToasts((prev) => prev.filter((t) => t.id !== id));
     }, []);
 
     const dedupeRef = useRef({}); // { [dedupeKey]: 마지막 표시 시각 }
@@ -42,24 +44,30 @@ export function NotificationProvider({children}) {
      * @param {{icon?: *, title?: string, duration?: number, loading?: boolean, dedupeKey?: string, dedupeWindow?: number}} [options]
      * @returns {number|null}
      */
-    const notify = useCallback((message, options = {}) => {
-        // 같은 dedupeKey로 짧은 시간 내 재호출되면 무시 (동시 로딩 실패 등을 하나로 묶음)
-        if (options.dedupeKey) {
-            const now = Date.now();
-            const win = options.dedupeWindow ?? 3000;
-            if (now - (dedupeRef.current[options.dedupeKey] || 0) < win) return null;
-            dedupeRef.current[options.dedupeKey] = now;
-        }
-        const id = ++idCounter;
-        const duration = options.duration ?? 3000;
-        setToasts(prev => [...prev, {id, message, icon: options.icon, title: options.title, loading: options.loading}]);
-        if (duration > 0) setTimeout(() => removeToast(id), duration);
-        return id;
-    }, [removeToast]);
+    const notify = useCallback(
+        (message, options = {}) => {
+            // 같은 dedupeKey로 짧은 시간 내 재호출되면 무시 (동시 로딩 실패 등을 하나로 묶음)
+            if (options.dedupeKey) {
+                const now = Date.now();
+                const win = options.dedupeWindow ?? 3000;
+                if (now - (dedupeRef.current[options.dedupeKey] || 0) < win) return null;
+                dedupeRef.current[options.dedupeKey] = now;
+            }
+            const id = ++idCounter;
+            const duration = options.duration ?? 3000;
+            setToasts((prev) => [
+                ...prev,
+                { id, message, icon: options.icon, title: options.title, loading: options.loading },
+            ]);
+            if (duration > 0) setTimeout(() => removeToast(id), duration);
+            return id;
+        },
+        [removeToast],
+    );
 
     // 이미 떠 있는 토스트 내용 갱신 (예: 로딩 중 메시지 변경)
     const update = useCallback((id, patch) => {
-        setToasts(prev => prev.map(t => t.id === id ? {...t, ...patch} : t));
+        setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
     }, []);
 
     const confirm = useCallback((message, options = {}) => {
@@ -76,7 +84,7 @@ export function NotificationProvider({children}) {
     }, []);
 
     const closeConfirm = useCallback((result) => {
-        setConfirmState(prev => {
+        setConfirmState((prev) => {
             if (prev) prev.resolve(result);
             return null;
         });
@@ -101,8 +109,8 @@ export function NotificationProvider({children}) {
     // 전역 로딩 표시: 느린 백엔드 요청(1초+)에 자동으로 로딩 토스트를 띄운다.
     // /ping(예열) 및 { meta: { silent: true } } 요청은 제외.
     useEffect(() => {
-        const SHOW_DELAY = 1000;       // 1초 안에 안 끝나면 토스트 표시
-        const ESCALATE_DELAY = 4000;   // 4초 넘으면 "서버 깨우는 중" 문구로 전환
+        const SHOW_DELAY = 1000; // 1초 안에 안 끝나면 토스트 표시
+        const ESCALATE_DELAY = 4000; // 4초 넘으면 "서버 깨우는 중" 문구로 전환
 
         let pending = 0;
         let toastId = null;
@@ -118,10 +126,15 @@ export function NotificationProvider({children}) {
             if (showTimer || toastId != null) return; // 이미 진행 중이면 중복 시작 안 함
             showTimer = setTimeout(() => {
                 showTimer = null;
-                toastId = notify('서버 응답을 기다리는 중이에요...', {loading: true, title: '잠시만 기다려주세요', duration: 0});
+                toastId = notify('서버 응답을 기다리는 중이에요...', {
+                    loading: true,
+                    title: '잠시만 기다려주세요',
+                    duration: 0,
+                });
                 escalateTimer = setTimeout(() => {
                     escalateTimer = null;
-                    if (toastId != null) update(toastId, {message: '서버를 깨우는 중이에요. 최대 1분 정도 걸릴 수 있어요 ☕'});
+                    if (toastId != null)
+                        update(toastId, { message: '서버를 깨우는 중이에요. 최대 1분 정도 걸릴 수 있어요 ☕' });
                 }, ESCALATE_DELAY - SHOW_DELAY);
             }, SHOW_DELAY);
         };
@@ -150,7 +163,7 @@ export function NotificationProvider({children}) {
 
         const reqId = axios.interceptors.request.use((config) => {
             if (!isSilent(config)) {
-                config.meta = {...(config.meta || {}), _loadingCounted: true};
+                config.meta = { ...(config.meta || {}), _loadingCounted: true };
                 pending += 1;
                 startTimers();
             }
@@ -175,7 +188,7 @@ export function NotificationProvider({children}) {
                     window.dispatchEvent(new CustomEvent('app:session-expired'));
                 }
                 return Promise.reject(error);
-            }
+            },
         );
 
         return () => {
@@ -185,26 +198,29 @@ export function NotificationProvider({children}) {
         };
     }, [notify, update, removeToast]);
 
-    const value = useMemo(() => ({
-        notify,
-        update,
-        dismiss: removeToast,
-        confirm
-    }), [notify, update, removeToast, confirm]);
+    const value = useMemo(
+        () => ({
+            notify,
+            update,
+            dismiss: removeToast,
+            confirm,
+        }),
+        [notify, update, removeToast, confirm],
+    );
 
     // 모바일: 아래에서 위로(스낵바) / PC: 오른쪽에서 슬라이드-인
     /** @type {import('framer-motion').MotionProps} */
     const toastAnim = isMobile
         ? {
-            initial: {opacity: 0, y: 30, scale: 0.98},
-            animate: {opacity: 1, y: 0, scale: 1},
-            exit: {opacity: 0, y: 30, scale: 0.96}
-        }
+              initial: { opacity: 0, y: 30, scale: 0.98 },
+              animate: { opacity: 1, y: 0, scale: 1 },
+              exit: { opacity: 0, y: 30, scale: 0.96 },
+          }
         : {
-            initial: {opacity: 0, x: 24, scale: 0.96},
-            animate: {opacity: 1, x: 0, scale: 1},
-            exit: {opacity: 0, x: 24, scale: 0.9}
-        };
+              initial: { opacity: 0, x: 24, scale: 0.96 },
+              animate: { opacity: 1, x: 0, scale: 1 },
+              exit: { opacity: 0, x: 24, scale: 0.9 },
+          };
 
     // noinspection JSValidateTypes -- framer-motion <motion.div>의 복잡한 타입을 WebStorm이 검증하지 못해 생기는 오탐 억제 (코드는 정상, 빌드 통과)
     return (
@@ -258,24 +274,33 @@ export function NotificationProvider({children}) {
 
                     <div className="ntf-toast-stack">
                         <AnimatePresence initial={true}>
-                            {toasts.map(t => (
+                            {toasts.map((t) => (
                                 <motion.div
                                     key={t.id}
                                     className="ntf-toast"
                                     role="status"
                                     layout
                                     {...toastAnim}
-                                    transition={{duration: 0.25, ease: [0.16, 1, 0.3, 1]}}
+                                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                                 >
-                                    {t.loading
-                                        ? <span className="ntf-toast-spinner"/>
-                                        : (t.icon && <span className="ntf-toast-icon">{t.icon}</span>)}
+                                    {t.loading ? (
+                                        <span className="ntf-toast-spinner" />
+                                    ) : (
+                                        t.icon && <span className="ntf-toast-icon">{t.icon}</span>
+                                    )}
                                     <div className="ntf-toast-text">
                                         {t.title && <p className="ntf-toast-title">{t.title}</p>}
                                         <p className="ntf-toast-msg">{t.message}</p>
                                     </div>
-                                    {!t.loading && <button className="ntf-toast-close" onClick={() => removeToast(t.id)}
-                                                           aria-label="닫기">×</button>}
+                                    {!t.loading && (
+                                        <button
+                                            className="ntf-toast-close"
+                                            onClick={() => removeToast(t.id)}
+                                            aria-label="닫기"
+                                        >
+                                            ×
+                                        </button>
+                                    )}
                                 </motion.div>
                             ))}
                         </AnimatePresence>
@@ -283,8 +308,12 @@ export function NotificationProvider({children}) {
 
                     {confirmState && (
                         <div className="ntf-dialog-overlay" onClick={() => closeConfirm(false)}>
-                            <div className="ntf-dialog" role="dialog" aria-modal="true"
-                                 onClick={(e) => e.stopPropagation()}>
+                            <div
+                                className="ntf-dialog"
+                                role="dialog"
+                                aria-modal="true"
+                                onClick={(e) => e.stopPropagation()}
+                            >
                                 <h2 className="ntf-dialog-title">{confirmState.title}</h2>
                                 <p className="ntf-dialog-msg">{confirmState.message}</p>
                                 <div className="ntf-dialog-actions">
@@ -303,7 +332,7 @@ export function NotificationProvider({children}) {
                         </div>
                     )}
                 </>,
-                document.body
+                document.body,
             )}
         </NotificationContext.Provider>
     );

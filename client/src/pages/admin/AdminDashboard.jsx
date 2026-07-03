@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import { useState } from 'react';
 import SalesDashboard from './SalesDashboard';
 import SettlementDashboard from './SettlementDashboard';
 import MenuDashboard from './MenuDashboard';
@@ -7,44 +7,49 @@ import UsersDashboard from './UsersDashboard';
 import CostAnalysis from './CostAnalysis';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
-import {socket} from '../../utils/socket';
-import {useNotification} from '../../hooks/useNotification';
+import { socket } from '../../utils/socket';
+import { useNotification } from '../../hooks/useNotification';
 
-function AdminDashboard({onLogout, onEditProfile}) {
+function AdminDashboard({ onLogout, onEditProfile }) {
     const [view, setView] = useState('home');
-    const {notify, confirm} = useNotification();
+    const { notify, confirm } = useNotification();
 
     // 데드 스위치: 캐셔 잠금이 꼬여 아무도 접속하지 못할 때 강제 해제
     const handleForceReleaseCashier = async () => {
         const ok = await confirm(
-            "현재 정상적으로 캐셔를 사용 중인 직원이 있다면 충돌할 수 있습니다.\n" +
-            "캐셔 자리가 멈춰서 아무도 접속하지 못할 때만 사용하세요.",
-            {title: "🚨 캐셔 잠금 강제 해제", confirmText: "강제 해제", danger: true}
+            '현재 정상적으로 캐셔를 사용 중인 직원이 있다면 충돌할 수 있습니다.\n' +
+                '캐셔 자리가 멈춰서 아무도 접속하지 못할 때만 사용하세요.',
+            { title: '🚨 캐셔 잠금 강제 해제', confirmText: '강제 해제', danger: true },
         );
         if (!ok) return;
 
         socket.emit('force_release_cashier', (res) => {
-            if (res?.success) notify("캐셔 잠금을 해제했습니다. 이제 직원이 캐셔로 접속할 수 있습니다.", {icon: "✅"});
-            else notify("해제 실패: " + (res?.message || "알 수 없는 오류"), {icon: "⚠️"});
+            if (res?.success)
+                notify('캐셔 잠금을 해제했습니다. 이제 직원이 캐셔로 접속할 수 있습니다.', { icon: '✅' });
+            else notify('해제 실패: ' + (res?.message || '알 수 없는 오류'), { icon: '⚠️' });
         });
     };
 
     // 화면 전환 라우팅
-    if (view === 'sales') return <SalesDashboard onBack={() => setView('home')}/>;
-    if (view === 'settlement') return <SettlementDashboard onBack={() => setView('home')}/>;
-    if (view === 'menu') return <MenuDashboard onBack={() => setView('home')}/>;
-    if (view === 'event') return <EventDashboard onBack={() => setView('home')}/>;
-    if (view === 'users') return <UsersDashboard onBack={() => setView('home')}/>;
-    if (view === 'cost') return <CostAnalysis onBack={() => setView('home')}/>;
+    if (view === 'sales') return <SalesDashboard onBack={() => setView('home')} />;
+    if (view === 'settlement') return <SettlementDashboard onBack={() => setView('home')} />;
+    if (view === 'menu') return <MenuDashboard onBack={() => setView('home')} />;
+    if (view === 'event') return <EventDashboard onBack={() => setView('home')} />;
+    if (view === 'users') return <UsersDashboard onBack={() => setView('home')} />;
+    if (view === 'cost') return <CostAnalysis onBack={() => setView('home')} />;
 
     // 메인(Home) 화면 렌더링
     return (
         <div className="admin-container">
             {/* 상단 우측 헤더 영역 */}
             <div className="top-right-header">
-                <ThemeToggle/>
-                <Button variant="neutral" icon="⚙️" onClick={onEditProfile}>내 정보</Button>
-                <Button variant="danger" onClick={onLogout}>로그아웃</Button>
+                <ThemeToggle />
+                <Button variant="neutral" icon="⚙️" onClick={onEditProfile}>
+                    내 정보
+                </Button>
+                <Button variant="danger" onClick={onLogout}>
+                    로그아웃
+                </Button>
             </div>
 
             <style>

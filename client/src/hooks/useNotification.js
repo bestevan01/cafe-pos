@@ -1,4 +1,4 @@
-import {createContext, useContext} from 'react';
+import { createContext, useContext } from 'react';
 
 /** NotificationProvider가 주입하는 컨텍스트 ({ notify, confirm }) */
 export const NotificationContext = createContext(null);

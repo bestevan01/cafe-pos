@@ -6,7 +6,10 @@
     padding: var(--space-6);
     box-shadow: var(--shadow-md);
     box-sizing: border-box;
-    transition: box-shadow .2s ease, background-color .3s ease, border-color .3s ease;
+    transition:
+        box-shadow 0.2s ease,
+        background-color 0.3s ease,
+        border-color 0.3s ease;
 }
 
 .ui-card-flush {

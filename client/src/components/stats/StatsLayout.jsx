@@ -9,7 +9,7 @@ import Button from '../ui/Button';
  *     <StatCard ...>...</StatCard>
  *   </StatsLayout>
  */
-function StatsLayout({title, onBack, actions, children}) {
+function StatsLayout({ title, onBack, actions, children }) {
     return (
         <div className="stats-layout">
             <style>{`
@@ -26,7 +26,9 @@ function StatsLayout({title, onBack, actions, children}) {
 
             <div className="stats-layout-header">
                 <div className="stats-layout-left">
-                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>
+                        뒤로
+                    </Button>
                     <h1 className="stats-layout-title">{title}</h1>
                 </div>
                 {actions && <div className="stats-layout-actions">{actions}</div>}

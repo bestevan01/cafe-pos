@@ -17,7 +17,7 @@ import './Card.css';
  * @param {React.ReactNode} [children] 카드 본문
  * @param {object} [rest]             나머지 props → 최상위 div에 전달
  */
-function Card({title, icon, subtitle, actions, flush = false, className = '', children, ...rest}) {
+function Card({ title, icon, subtitle, actions, flush = false, className = '', children, ...rest }) {
     const cls = ['ui-card', flush && 'ui-card-flush', className].filter(Boolean).join(' ');
     const hasHead = title != null || actions != null;
     return (

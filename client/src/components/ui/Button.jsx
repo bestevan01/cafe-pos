@@ -16,9 +16,10 @@ import './Button.css';
  * @param {React.ReactNode} [children] 버튼 내용
  * @param {object} [rest]           나머지 props(onClick, type, disabled 등) → <button>에 전달
  */
-function Button({variant = 'primary', size = 'md', icon, full = false, className = '', children, ...rest}) {
+function Button({ variant = 'primary', size = 'md', icon, full = false, className = '', children, ...rest }) {
     const cls = ['ui-btn', `ui-btn-${variant}`, `ui-btn-${size}`, full && 'ui-btn-full', className]
-        .filter(Boolean).join(' ');
+        .filter(Boolean)
+        .join(' ');
     return (
         <button className={cls} {...rest}>
             {icon != null && <span className="ui-btn-icon">{icon}</span>}

@@ -1,4 +1,4 @@
-import {PASSWORD_RULES} from '../utils/passwordPolicy';
+import { PASSWORD_RULES } from '../utils/passwordPolicy';
 
 /**
  * 비밀번호 입력 시 정책 충족 여부를 실시간으로 시각화한다.
@@ -8,7 +8,7 @@ import {PASSWORD_RULES} from '../utils/passwordPolicy';
  * @param {string} password
  * @param {string} [confirmPassword]  주어지고 1자 이상 입력됐을 때만 일치 표시
  */
-function PasswordStrength({password = '', confirmPassword}) {
+function PasswordStrength({ password = '', confirmPassword }) {
     // 규칙 체크리스트는 항상 표시. 재입력 일치 여부는 확인칸에 무언가 입력됐을 때만 표시.
     const showMatch = confirmPassword != null && confirmPassword.length > 0;
     const matched = password.length > 0 && password === confirmPassword;
@@ -33,7 +33,8 @@ function PasswordStrength({password = '', confirmPassword}) {
                     const passed = r.test(password);
                     return (
                         <li key={r.key} className={passed ? 'ok' : ''}>
-                            <span className="pw-mark">{passed ? '✓' : '○'}</span>{r.label}
+                            <span className="pw-mark">{passed ? '✓' : '○'}</span>
+                            {r.label}
                         </li>
                     );
                 })}

@@ -1,33 +1,29 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import react from 'eslint-plugin-react'
-import {defineConfig, globalIgnores} from 'eslint/config'
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import react from 'eslint-plugin-react';
+import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
     globalIgnores(['dist']),
     {
         files: ['**/*.{js,jsx}'],
-        plugins: {react},
-        extends: [
-            js.configs.recommended,
-            reactHooks.configs.flat.recommended,
-            reactRefresh.configs.vite,
-        ],
+        plugins: { react },
+        extends: [js.configs.recommended, reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
         languageOptions: {
             ecmaVersion: 2020,
             globals: globals.browser,
             parserOptions: {
                 ecmaVersion: 'latest',
-                ecmaFeatures: {jsx: true},
+                ecmaFeatures: { jsx: true },
                 sourceType: 'module',
             },
         },
         rules: {
-            'no-unused-vars': ['error', {varsIgnorePattern: '^[A-Z_]'}],
+            'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
             // JSX에서 쓰인 변수(예: <motion.div>의 motion)를 '사용됨'으로 인식시켜 오탐 방지
             'react/jsx-uses-vars': 'error',
         },
     },
-])
+]);

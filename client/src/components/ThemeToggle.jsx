@@ -1,10 +1,10 @@
-import {useState, useEffect, useRef} from 'react';
-import {useTheme} from '../hooks/useTheme';
+import { useState, useEffect, useRef } from 'react';
+import { useTheme } from '../hooks/useTheme';
 
 export default function ThemeToggle() {
-    const {theme, setTheme} = useTheme(); // 전역 공용 스토어
+    const { theme, setTheme } = useTheme(); // 전역 공용 스토어
     const [isOpen, setIsOpen] = useState(false);
-    const [menuStyle, setMenuStyle] = useState({left: '50%', transform: 'translateX(-50%)'});
+    const [menuStyle, setMenuStyle] = useState({ left: '50%', transform: 'translateX(-50%)' });
     const dropdownRef = useRef(null);
 
     // 1. 드롭다운 외부 클릭 감지 (닫기)
@@ -15,8 +15,8 @@ export default function ThemeToggle() {
             }
         }
 
-        document.addEventListener("pointerdown", handleClickOutside);
-        return () => document.removeEventListener("pointerdown", handleClickOutside);
+        document.addEventListener('pointerdown', handleClickOutside);
+        return () => document.removeEventListener('pointerdown', handleClickOutside);
     }, []);
 
     // 2. 드롭다운 위치 자동 보정 (화면 이탈 방지)
@@ -25,19 +25,19 @@ export default function ThemeToggle() {
             const rect = dropdownRef.current.getBoundingClientRect();
             const menuWidth = 160;
             const margin = 15;
-            const buttonCenter = rect.left + (rect.width / 2);
+            const buttonCenter = rect.left + rect.width / 2;
 
             // 화면 오른쪽을 벗어나는 경우
-            if (buttonCenter + (menuWidth / 2) > window.innerWidth - margin) {
-                setMenuStyle({right: '0', left: 'auto', transform: 'none'});
+            if (buttonCenter + menuWidth / 2 > window.innerWidth - margin) {
+                setMenuStyle({ right: '0', left: 'auto', transform: 'none' });
             }
             // 화면 왼쪽을 벗어나는 경우
-            else if (buttonCenter - (menuWidth / 2) < margin) {
-                setMenuStyle({left: '0', right: 'auto', transform: 'none'});
+            else if (buttonCenter - menuWidth / 2 < margin) {
+                setMenuStyle({ left: '0', right: 'auto', transform: 'none' });
             }
             // 공간이 충분하면 중앙 정렬
             else {
-                setMenuStyle({left: '50%', transform: 'translateX(-50%)'});
+                setMenuStyle({ left: '50%', transform: 'translateX(-50%)' });
             }
         }
     }, [isOpen]);
@@ -121,16 +121,22 @@ export default function ThemeToggle() {
 
             {isOpen && (
                 <div className="theme-menu" style={menuStyle}>
-                    <button className={`theme-menu-item ${theme === 'light' ? 'active' : ''}`}
-                            onClick={() => setTheme('light')}>
+                    <button
+                        className={`theme-menu-item ${theme === 'light' ? 'active' : ''}`}
+                        onClick={() => setTheme('light')}
+                    >
                         <span>☀️</span> 라이트 모드
                     </button>
-                    <button className={`theme-menu-item ${theme === 'dark' ? 'active' : ''}`}
-                            onClick={() => setTheme('dark')}>
+                    <button
+                        className={`theme-menu-item ${theme === 'dark' ? 'active' : ''}`}
+                        onClick={() => setTheme('dark')}
+                    >
                         <span>🌙</span> 다크 모드
                     </button>
-                    <button className={`theme-menu-item ${theme === 'system' ? 'active' : ''}`}
-                            onClick={() => setTheme('system')}>
+                    <button
+                        className={`theme-menu-item ${theme === 'system' ? 'active' : ''}`}
+                        onClick={() => setTheme('system')}
+                    >
                         <span>💻</span> 시스템 설정
                     </button>
                 </div>

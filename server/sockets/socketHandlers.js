@@ -20,7 +20,7 @@ module.exports = (io) => {
         // 일시적 네트워크 오류와 구분해 '재로그인'을 유도할 수 있게 한다.
         const authError = (message) => {
             const err = new Error(message);
-            err.data = {type: 'auth'};
+            err.data = { type: 'auth' };
             return err;
         };
 
@@ -40,7 +40,7 @@ module.exports = (io) => {
         socket.on('register_user', () => {
             // 클라이언트가 보낸 값이 아닌, 핸드셰이크에서 검증된 신원만 신뢰합니다.
             const user = socket.data.user;
-            connectedUsers.set(socket.id, {username: user.username, role: user.role});
+            connectedUsers.set(socket.id, { username: user.username, role: user.role });
             console.log(`[👤 유저 등록] ${user.username} (ID: ${socket.id})`);
             broadcastUserCount();
         });
@@ -69,13 +69,13 @@ module.exports = (io) => {
         // 소켓 ID와 무관하게 currentCashierId를 비운다. (관리자 전용)
         socket.on('force_release_cashier', (ack) => {
             if (socket.data.user?.role !== 'admin') {
-                if (typeof ack === 'function') ack({success: false, message: '관리자 권한이 필요합니다.'});
+                if (typeof ack === 'function') ack({ success: false, message: '관리자 권한이 필요합니다.' });
                 return;
             }
             currentCashierId = null;
             console.log(`[🚨 캐셔 강제 해제] 관리자: ${socket.data.user.username}`);
             io.emit('cashier_status', false);
-            if (typeof ack === 'function') ack({success: true});
+            if (typeof ack === 'function') ack({ success: true });
         });
 
         socket.on('request_state', () => {
@@ -125,8 +125,8 @@ module.exports = (io) => {
         });
 
         function broadcastUserCount() {
-            const staffUsers = Array.from(connectedUsers.values()).filter(user => user.role !== 'admin');
-            const uniqueStaffCount = new Set(staffUsers.map(u => u.username)).size;
+            const staffUsers = Array.from(connectedUsers.values()).filter((user) => user.role !== 'admin');
+            const uniqueStaffCount = new Set(staffUsers.map((u) => u.username)).size;
             io.emit('user_count', uniqueStaffCount);
         }
     });

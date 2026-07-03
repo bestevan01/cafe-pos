@@ -10,16 +10,21 @@
     border: 1.5px solid transparent;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background-color .15s ease, border-color .15s ease, color .15s ease,
-    box-shadow .15s ease, transform .1s ease, filter .15s ease;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.1s ease,
+        filter 0.15s ease;
 }
 
 .ui-btn:active {
-    transform: scale(.97);
+    transform: scale(0.97);
 }
 
 .ui-btn:disabled {
-    opacity: .5;
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
@@ -40,7 +45,7 @@
 
 .ui-btn-md {
     padding: 9px 18px;
-    font-size: .95rem;
+    font-size: 0.95rem;
 }
 
 .ui-btn-lg {
@@ -89,7 +94,7 @@
 }
 
 .ui-btn-success:hover:not(:disabled) {
-    filter: brightness(1.10);
+    filter: brightness(1.1);
 }
 
 .ui-btn-warning {
@@ -109,7 +114,7 @@
 }
 
 .ui-btn-dark:hover:not(:disabled) {
-    opacity: .88;
+    opacity: 0.88;
 }
 
 .ui-btn-neutral {
