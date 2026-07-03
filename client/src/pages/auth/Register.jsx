@@ -1,50 +1,50 @@
-import {useState} from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import {useSystemTheme} from "../../hooks/useSystemTheme.js";
-import {useNotification} from '../../hooks/useNotification';
+import { useSystemTheme } from '../../hooks/useSystemTheme.js';
+import { useNotification } from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 import PasswordStrength from '../../components/PasswordStrength';
-import {isStrongPassword} from '../../utils/passwordPolicy';
+import { isStrongPassword } from '../../utils/passwordPolicy';
 
-function Register({onSwitchToLogin}) {
-    const {notify} = useNotification();
+function Register({ onSwitchToLogin }) {
+    const { notify } = useNotification();
     const [formData, setFormData] = useState({
         username: '',
         password: '',
         confirmPassword: '',
-        name: ''
+        name: '',
     });
 
     // 시스템 테마(OS 설정) 강제 적용
     useSystemTheme();
 
     const handleChange = (e) => {
-        setFormData({...formData, [e.target.name]: e.target.value});
+        setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!isStrongPassword(formData.password)) {
-            notify("비밀번호는 8자 이상이며 영문·숫자·특수문자를 모두 포함해야 합니다.", {icon: '⚠️'});
+            notify('비밀번호는 8자 이상이며 영문·숫자·특수문자를 모두 포함해야 합니다.', { icon: '⚠️' });
             return;
         }
         if (formData.password !== formData.confirmPassword) {
-            notify("비밀번호가 일치하지 않습니다. 다시 확인해주세요.", {icon: '⚠️'});
+            notify('비밀번호가 일치하지 않습니다. 다시 확인해주세요.', { icon: '⚠️' });
             return;
         }
 
         try {
             // API 전송 시 비밀번호 확인 필드는 제외
-            const {confirmPassword, ...submitData} = formData;
+            const { confirmPassword: _confirmPassword, ...submitData } = formData;
 
             const res = await axios.post('/api/register', submitData);
             if (res.data.success) {
-                notify(res.data.message, {icon: '✅'});
+                notify(res.data.message, { icon: '✅' });
                 onSwitchToLogin();
             }
         } catch (err) {
-            notify(err.response?.data?.message || "회원가입 실패", {icon: '⚠️'});
+            notify(err.response?.data?.message || '회원가입 실패', { icon: '⚠️' });
         }
     };
 
@@ -92,7 +92,7 @@ function Register({onSwitchToLogin}) {
             </style>
 
             <div className="register-card">
-                <img src="/logo.svg" alt="Baek's Coffee" className="register-logo"/>
+                <img src="/logo.svg" alt="Baek's Coffee" className="register-logo" />
                 <h2 className="register-title">직원 회원가입</h2>
 
                 <form onSubmit={handleSubmit} className="register-form">
@@ -129,7 +129,7 @@ function Register({onSwitchToLogin}) {
                         autoComplete="new-password"
                         required
                     />
-                    <PasswordStrength password={formData.password} confirmPassword={formData.confirmPassword}/>
+                    <PasswordStrength password={formData.password} confirmPassword={formData.confirmPassword} />
                     <input
                         id="name"
                         name="name"
@@ -141,14 +141,25 @@ function Register({onSwitchToLogin}) {
                         autoComplete="name"
                         required
                     />
-                    <Button type="submit" variant="dark" size="lg" full style={{marginTop: 5}}
-                            disabled={!isStrongPassword(formData.password) || formData.password !== formData.confirmPassword}>가입
-                        신청</Button>
+                    <Button
+                        type="submit"
+                        variant="dark"
+                        size="lg"
+                        full
+                        style={{ marginTop: 5 }}
+                        disabled={
+                            !isStrongPassword(formData.password) || formData.password !== formData.confirmPassword
+                        }
+                    >
+                        가입 신청
+                    </Button>
                 </form>
 
                 <div className="login-text">
                     이미 계정이 있으신가요?
-                    <span onClick={onSwitchToLogin} className="login-link">로그인하기</span>
+                    <span onClick={onSwitchToLogin} className="login-link">
+                        로그인하기
+                    </span>
                 </div>
             </div>
         </div>

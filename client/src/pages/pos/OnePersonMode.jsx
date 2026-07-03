@@ -1,11 +1,11 @@
-import {useState, useEffect} from 'react';
-import {motion, AnimatePresence} from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
-import {socket} from '../../utils/socket';
-import {useNotification} from '../../hooks/useNotification';
+import { socket } from '../../utils/socket';
+import { useNotification } from '../../hooks/useNotification';
 
-function OnePersonMode({onlyOrder = false, isCashier = false}) {
-    const {notify, confirm} = useNotification();
+function OnePersonMode({ onlyOrder = false, isCashier = false }) {
+    const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -28,37 +28,110 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
     // [2] 초기화 및 소켓 연결
     // ---------------------------------------------------------
     const getAuthHeader = () => ({
-        headers: {Authorization: `Bearer ${localStorage.getItem('token')}`}
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
+
+    // DB에서 온 평문 데이터를 주문 번호별로 그룹화
+    const groupOrdersById = (flatList) => {
+        const map = {};
+        flatList.forEach((item) => {
+            const id = item.daily_number;
+            if (!map[id])
+                map[id] = {
+                    daily_number: item.daily_number,
+                    display_id: item.display_id,
+                    is_paid: item.is_paid,
+                    is_completed: item.is_completed,
+                    items: [],
+                };
+            map[id].items.push({ menu_name: item.menu_name, quantity: item.quantity, price: item.total_price });
+        });
+        return Object.values(map).sort((a, b) => b.daily_number - a.daily_number);
+    };
+
+    // ---------------------------------------------------------
+    // [3] 데이터 조회 (API)
+    // ---------------------------------------------------------
+    const fetchMenu = useCallback(async () => {
+        try {
+            const res = await axios.get('/api/menu', getAuthHeader());
+            setMenuList(res.data);
+        } catch {
+            notify('주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
+                icon: '⚠️',
+                dedupeKey: 'load-pos',
+            });
+        }
+    }, [notify]);
+
+    const fetchOrders = useCallback(async () => {
+        try {
+            const res = await axios.get('/api/orders', getAuthHeader());
+            setOrderGroups(groupOrdersById(res.data));
+        } catch {
+            notify('주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
+                icon: '⚠️',
+                dedupeKey: 'load-pos',
+            });
+        }
+    }, [notify]);
+
+    // 🌟 이벤트 목록 불러와서 '사용 중(is_active=1)'인 것만 추려내기
+    const fetchActiveEvents = useCallback(async () => {
+        try {
+            const res = await axios.get('/api/events', getAuthHeader());
+            const activeList = res.data.filter((ev) => ev.is_active === 1);
+            setActiveEvents(activeList);
+
+            setSelectedEventId((prevId) => {
+                if (prevId && !activeList.find((ev) => ev.id === prevId)) return null;
+                return prevId;
+            });
+        } catch {
+            notify('주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
+                icon: '⚠️',
+                dedupeKey: 'load-pos',
+            });
+        }
+    }, [notify]);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 768);
         window.addEventListener('resize', handleResize);
 
+        // fetchOrders/fetchMenu/fetchActiveEvents는 useCallback으로 메모이즈된 비동기 함수라 setState가 await 이후에만 일어남(effect 본문에서 동기 호출 아님) — 규칙 오탐.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         void fetchOrders();
         void fetchMenu();
         void fetchActiveEvents();
 
-        socket.on('new_order', (newOrderGroup) => setOrderGroups(prev => [newOrderGroup, ...prev]));
-        socket.on('order_updated', ({display_id, is_paid, is_completed, is_delivered}) => {
-            setOrderGroups(prev => {
-                const target = prev.find(g => g.display_id === display_id);
+        socket.on('new_order', (newOrderGroup) => setOrderGroups((prev) => [newOrderGroup, ...prev]));
+        socket.on('order_updated', ({ display_id, is_paid, is_completed, is_delivered }) => {
+            setOrderGroups((prev) => {
+                const target = prev.find((g) => g.display_id === display_id);
                 if (!target) return prev;
-                const nextPaid = (is_paid !== undefined) ? is_paid : target.is_paid;
-                const nextCompleted = (is_completed !== undefined) ? is_completed : target.is_completed;
-                const nextDelivered = (is_delivered !== undefined) ? is_delivered : 0;
-                if (nextPaid === 1 && nextCompleted === 1 && nextDelivered === 1) return prev.filter(g => g.display_id !== display_id);
-                return prev.map(group => group.display_id === display_id ? {
-                    ...group,
-                    is_paid: nextPaid,
-                    is_completed: nextCompleted
-                } : group);
+                const nextPaid = is_paid !== undefined ? is_paid : target.is_paid;
+                const nextCompleted = is_completed !== undefined ? is_completed : target.is_completed;
+                const nextDelivered = is_delivered !== undefined ? is_delivered : 0;
+                if (nextPaid === 1 && nextCompleted === 1 && nextDelivered === 1)
+                    return prev.filter((g) => g.display_id !== display_id);
+                return prev.map((group) =>
+                    group.display_id === display_id
+                        ? {
+                              ...group,
+                              is_paid: nextPaid,
+                              is_completed: nextCompleted,
+                          }
+                        : group,
+                );
             });
         });
-        socket.on('order_deleted', (deletedId) => setOrderGroups(prev => prev.filter(group => group.display_id !== deletedId)));
+        socket.on('order_deleted', (deletedId) =>
+            setOrderGroups((prev) => prev.filter((group) => group.display_id !== deletedId)),
+        );
         socket.on('events_updated', () => {
             void fetchActiveEvents();
-        })
+        });
 
         return () => {
             window.removeEventListener('resize', handleResize);
@@ -67,60 +140,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
             socket.off('order_deleted');
             socket.off('events_updated');
         };
-    }, []);
-
-    // ---------------------------------------------------------
-    // [3] 데이터 조회 (API)
-    // ---------------------------------------------------------
-    const fetchMenu = async () => {
-        try {
-            const res = await axios.get('/api/menu', getAuthHeader());
-            setMenuList(res.data);
-        } catch (err) {
-            notify("주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-pos'});
-        }
-    };
-
-    const fetchOrders = async () => {
-        try {
-            const res = await axios.get('/api/orders', getAuthHeader());
-            setOrderGroups(groupOrdersById(res.data));
-        } catch (err) {
-            notify("주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-pos'});
-        }
-    };
-
-    // 🌟 이벤트 목록 불러와서 '사용 중(is_active=1)'인 것만 추려내기
-    const fetchActiveEvents = async () => {
-        try {
-            const res = await axios.get('/api/events', getAuthHeader());
-            const activeList = res.data.filter(ev => ev.is_active === 1);
-            setActiveEvents(activeList);
-
-            setSelectedEventId(prevId => {
-                if (prevId && !activeList.find(ev => ev.id === prevId)) return null;
-                return prevId;
-            });
-        } catch (err) {
-            notify("주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-pos'});
-        }
-    };
-
-    const groupOrdersById = (flatList) => {
-        const map = {};
-        flatList.forEach(item => {
-            const id = item.daily_number;
-            if (!map[id]) map[id] = {
-                daily_number: item.daily_number,
-                display_id: item.display_id,
-                is_paid: item.is_paid,
-                is_completed: item.is_completed,
-                items: []
-            };
-            map[id].items.push({menu_name: item.menu_name, quantity: item.quantity, price: item.total_price});
-        });
-        return Object.values(map).sort((a, b) => b.daily_number - a.daily_number);
-    };
+    }, [fetchOrders, fetchMenu, fetchActiveEvents]);
 
     // ---------------------------------------------------------
     // [4] 장바구니 및 🌟 이벤트 할인 로직
@@ -133,37 +153,39 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
     const getMenuCounts = (menu) => {
         if (isCoffee(menu.name)) {
             const slots = shotConfig[menu.name] || [];
-            return {total: slots.length, slots};
+            return { total: slots.length, slots };
         }
-        const qty = cart.find(i => i.name === menu.name)?.quantity || 0;
-        return {total: qty, slots: []};
+        const qty = cart.find((i) => i.name === menu.name)?.quantity || 0;
+        return { total: qty, slots: [] };
     };
 
     // 잔 수 증감. 커피는 잔 슬롯을 추가/제거(새 잔은 0샷), 비커피는 cart 수량 증감.
     const handleTotalChange = (menu, delta) => {
         if (isCoffee(menu.name)) {
-            setShotConfig(prev => {
+            setShotConfig((prev) => {
                 const slots = [...(prev[menu.name] || [])];
-                if (delta > 0) slots.push(0); else slots.pop();
-                const next = {...prev};
-                if (slots.length > 0) next[menu.name] = slots; else delete next[menu.name];
+                if (delta > 0) slots.push(0);
+                else slots.pop();
+                const next = { ...prev };
+                if (slots.length > 0) next[menu.name] = slots;
+                else delete next[menu.name];
                 return next;
             });
             return;
         }
-        setCart(prev => {
-            const idx = prev.findIndex(i => i.name === menu.name);
+        setCart((prev) => {
+            const idx = prev.findIndex((i) => i.name === menu.name);
             if (delta > 0) {
                 if (idx >= 0) {
                     const c = [...prev];
-                    c[idx] = {...c[idx], quantity: c[idx].quantity + 1};
+                    c[idx] = { ...c[idx], quantity: c[idx].quantity + 1 };
                     return c;
                 }
-                return [...prev, {name: menu.name, price: menu.price, quantity: 1}];
+                return [...prev, { name: menu.name, price: menu.price, quantity: 1 }];
             }
             if (idx < 0) return prev;
             const c = [...prev];
-            if (c[idx].quantity > 1) c[idx] = {...c[idx], quantity: c[idx].quantity - 1};
+            if (c[idx].quantity > 1) c[idx] = { ...c[idx], quantity: c[idx].quantity - 1 };
             else c.splice(idx, 1);
             return c;
         });
@@ -171,59 +193,60 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
 
     // 특정 잔(slotIndex)의 샷 수 증감
     const handleSlotShotChange = (menu, slotIndex, delta) => {
-        setShotConfig(prev => {
+        setShotConfig((prev) => {
             const slots = [...(prev[menu.name] || [])];
             if (slotIndex < 0 || slotIndex >= slots.length) return prev;
             slots[slotIndex] = Math.max(0, slots[slotIndex] + delta);
-            return {...prev, [menu.name]: slots};
+            return { ...prev, [menu.name]: slots };
         });
     };
 
     // '샷 추가' 패널 펼치기/접기
     const toggleShotPanel = (menuName) => {
-        setExpandedShots(prev => ({...prev, [menuName]: !prev[menuName]}));
+        setExpandedShots((prev) => ({ ...prev, [menuName]: !prev[menuName] }));
     };
 
     // 비커피(cart) + 커피(shotConfig를 같은 샷끼리 묶어 라인화) → 결제/주문에 쓰는 통합 목록
     const coffeeItems = [];
     Object.entries(shotConfig).forEach(([menuName, slots]) => {
-        const menu = menuList.find(m => m.name === menuName);
+        const menu = menuList.find((m) => m.name === menuName);
         if (!menu || slots.length === 0) return;
         const byShot = {};
-        slots.forEach(s => {
+        slots.forEach((s) => {
             byShot[s] = (byShot[s] || 0) + 1;
         });
         Object.entries(byShot).forEach(([shotStr, qty]) => {
             const shots = parseInt(shotStr, 10);
             const name = shots > 0 ? `${menuName} (샷추가 ${shots}개)` : menuName;
-            coffeeItems.push({name, price: menu.price + SHOT_PRICE * shots, quantity: qty});
+            coffeeItems.push({ name, price: menu.price + SHOT_PRICE * shots, quantity: qty });
         });
     });
     const allItems = [...cart, ...coffeeItems];
 
     // 🌟 원가 및 이벤트 할인가 계산 로직
-    const originalTotalAmount = allItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const originalTotalAmount = allItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     let finalTotalAmount = originalTotalAmount;
     let eventAppliedQty = 0;
 
-    const selectedEvent = activeEvents.find(ev => ev.id === selectedEventId);
+    const selectedEvent = activeEvents.find((ev) => ev.id === selectedEventId);
 
     if (selectedEvent && allItems.length > 0) {
         let totalDiscount = 0;
 
-        let remainingQty = selectedEvent.daily_limit !== null
-            ? (selectedEvent.daily_limit - (selectedEvent['used_count'] || 0))
-            : Infinity;
+        let remainingQty =
+            selectedEvent.daily_limit !== null
+                ? selectedEvent.daily_limit - (selectedEvent['used_count'] || 0)
+                : Infinity;
 
-        allItems.forEach(item => {
+        allItems.forEach((item) => {
             let isEligible = true;
 
             // 1. 특정 메뉴에만 적용되는 이벤트인지 검사
             if (selectedEvent.target_menus && selectedEvent.target_menus !== 'all') {
                 try {
                     const targets = JSON.parse(selectedEvent.target_menus);
-                    isEligible = targets.some(targetName => item.name.includes(targetName));
-                } catch (e) {
+                    isEligible = targets.some((targetName) => item.name.includes(targetName));
+                } catch {
                     isEligible = false;
                 }
             }
@@ -236,11 +259,11 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 remainingQty -= discountableQty;
 
                 if (selectedEvent.type === 'free') {
-                    totalDiscount += (item.price * discountableQty); // 100% 무료
+                    totalDiscount += item.price * discountableQty; // 100% 무료
                 } else if (selectedEvent.type === 'discount') {
                     // 할인액이 아이템 가격을 넘지 못하도록 최대치 설정
                     const discountPerItem = Math.min(item.price, selectedEvent.discount_amount);
-                    totalDiscount += (discountPerItem * discountableQty); // 정액 할인
+                    totalDiscount += discountPerItem * discountableQty; // 정액 할인
                 }
             }
         });
@@ -252,21 +275,22 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
     // [5] 주문 및 상태 관리 핸들러
     // ---------------------------------------------------------
     const submitOrder = async (isForced = false) => {
-        if (allItems.length === 0) return notify("메뉴를 하나 이상 선택해주세요!", {icon: '⚠️'});
+        if (allItems.length === 0) return notify('메뉴를 하나 이상 선택해주세요!', { icon: '⚠️' });
 
         const itemsToSend = [];
 
-        let remainingQty = selectedEvent && selectedEvent.daily_limit !== null
-            ? (selectedEvent.daily_limit - (selectedEvent['used_count'] || 0))
-            : Infinity;
+        let remainingQty =
+            selectedEvent && selectedEvent.daily_limit !== null
+                ? selectedEvent.daily_limit - (selectedEvent['used_count'] || 0)
+                : Infinity;
 
-        allItems.forEach(item => {
+        allItems.forEach((item) => {
             let isEligible = true;
             if (selectedEvent && selectedEvent.target_menus && selectedEvent.target_menus !== 'all') {
                 try {
                     const targets = JSON.parse(selectedEvent.target_menus);
-                    isEligible = targets.some(targetName => item.name.includes(targetName));
-                } catch (e) {
+                    isEligible = targets.some((targetName) => item.name.includes(targetName));
+                } catch {
                     isEligible = false;
                 }
             } else if (!selectedEvent) {
@@ -279,14 +303,15 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
 
                 let discountedPrice = item.price;
                 if (selectedEvent.type === 'free') discountedPrice = 0;
-                else if (selectedEvent.type === 'discount') discountedPrice = Math.max(0, item.price - selectedEvent.discount_amount);
+                else if (selectedEvent.type === 'discount')
+                    discountedPrice = Math.max(0, item.price - selectedEvent.discount_amount);
 
                 // 🌟 1. 이벤트가 적용된 메뉴: 꼬리표(applied_event_id)를 달아줍니다!
                 itemsToSend.push({
                     menu_name: item.name,
                     price: discountedPrice,
                     quantity: discountableQty,
-                    applied_event_id: selectedEventId
+                    applied_event_id: selectedEventId,
                 });
 
                 remainingQty -= discountableQty;
@@ -297,7 +322,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                         menu_name: item.name,
                         price: item.price,
                         quantity: regularQty,
-                        applied_event_id: null
+                        applied_event_id: null,
                     });
                 }
             } else {
@@ -306,7 +331,7 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                     menu_name: item.name,
                     price: item.price,
                     quantity: item.quantity,
-                    applied_event_id: null
+                    applied_event_id: null,
                 });
             }
         });
@@ -314,14 +339,18 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
         const user = JSON.parse(localStorage.getItem('user') || '{"name":"익명"}');
 
         try {
-            const res = await axios.post('/api/orders', {
-                items: itemsToSend,
-                total_price: finalTotalAmount,
-                force: isForced,
-                staff_name: user.name,
-                applied_event_id: selectedEventId,
-                applied_event_qty: eventAppliedQty
-            }, getAuthHeader());
+            const res = await axios.post(
+                '/api/orders',
+                {
+                    items: itemsToSend,
+                    total_price: finalTotalAmount,
+                    force: isForced,
+                    staff_name: user.name,
+                    applied_event_id: selectedEventId,
+                    applied_event_qty: eventAppliedQty,
+                },
+                getAuthHeader(),
+            );
 
             if (res.data.success) {
                 setCart([]);
@@ -329,13 +358,14 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                 setExpandedShots({}); // 주문 후 샷 패널 모두 접힌 상태로 초기화
                 setSelectedEventId(null);
             } else if (res.data.message) {
-                notify(res.data.message, {icon: '⚠️'});
+                notify(res.data.message, { icon: '⚠️' });
                 await fetchActiveEvents();
             } else if (res.data.isDuplicate) {
-                if (await confirm("그래도 등록하시겠습니까?", {title: "⚠️ 중복 주문 감지", confirmText: "등록"})) await submitOrder(true);
+                if (await confirm('그래도 등록하시겠습니까?', { title: '⚠️ 중복 주문 감지', confirmText: '등록' }))
+                    await submitOrder(true);
             }
-        } catch (err) {
-            notify("주문 전송 실패", {icon: '⚠️'});
+        } catch {
+            notify('주문 전송 실패', { icon: '⚠️' });
         }
     };
 
@@ -344,26 +374,27 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
         if (!targetId) return;
         const apiPath = isCashier ? `/api/orders/${targetId}/pay` : `/api/orders/${targetId}/complete`;
         try {
-            await axios.patch(apiPath, {paymentMethod: method}, getAuthHeader());
+            await axios.patch(apiPath, { paymentMethod: method }, getAuthHeader());
             if (!overrideId) setPaymentCheckId(null);
         } catch (err) {
-            notify("처리 실패: " + err.message, {icon: '⚠️'});
+            notify('처리 실패: ' + err.message, { icon: '⚠️' });
         }
     };
 
     const handleDeliver = async (displayId) => {
         try {
             await axios.patch(`/api/orders/${displayId}/deliver`, {}, getAuthHeader());
-        } catch (err) {
-            notify("전달 처리 실패", {icon: '⚠️'});
+        } catch {
+            notify('전달 처리 실패', { icon: '⚠️' });
         }
     };
     const handleDelete = async (displayId) => {
-        if (!(await confirm("정말 삭제하시겠습니까?", {title: "⚠️ 주문 삭제", confirmText: "삭제", danger: true}))) return;
+        if (!(await confirm('정말 삭제하시겠습니까?', { title: '⚠️ 주문 삭제', confirmText: '삭제', danger: true })))
+            return;
         try {
             await axios.delete(`/api/orders/${displayId}`, getAuthHeader());
-        } catch (err) {
-            notify("주문 삭제 실패", {icon: '⚠️'});
+        } catch {
+            notify('주문 삭제 실패', { icon: '⚠️' });
         }
     };
 
@@ -377,19 +408,29 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                     {orderGroups.map((group) => {
                         const groupTotal = group.items.reduce((acc, item) => acc + item.price, 0);
                         return (
-                            <motion.div key={group.daily_number} className="receipt-card"
-                                        initial={{opacity: 0, scale: 0.9}}
-                                        animate={{opacity: 1, scale: 1}}
-                                        exit={{opacity: 0, scale: 0.5, transition: {duration: 0.2}}} layout>
+                            <motion.div
+                                key={group.daily_number}
+                                className="receipt-card"
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
+                                layout
+                            >
                                 <div className="receipt-header">
-                                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
-                                        {group.is_completed === 1 ? <span className="badge badge-done">조리 완료 🍳</span> :
-                                            <span className="badge badge-cooking">조리 중 ⏳</span>}
+                                        {group.is_completed === 1 ? (
+                                            <span className="badge badge-done">조리 완료 🍳</span>
+                                        ) : (
+                                            <span className="badge badge-cooking">조리 중 ⏳</span>
+                                        )}
                                     </div>
-                                    <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-                                        <button onClick={() => handleDelete(group.display_id)}
-                                                className="btn-action btn-cancel">주문 취소
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                        <button
+                                            onClick={() => handleDelete(group.display_id)}
+                                            className="btn-action btn-cancel"
+                                        >
+                                            주문 취소
                                         </button>
                                         {group.is_paid === 0 ? (
                                             <button
@@ -406,42 +447,60 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                                 결제 확인
                                             </button>
                                         ) : (
-                                            <div style={{display: 'flex', gap: '5px', alignItems: 'center'}}>
+                                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                                                 <span className="badge badge-paid">입금 완료 💰</span>
-                                                {group.is_completed === 1 &&
-                                                    <button onClick={() => handleDeliver(group.display_id)}
-                                                            className="btn-action btn-deliver">전달 완료 🤲</button>}
+                                                {group.is_completed === 1 && (
+                                                    <button
+                                                        onClick={() => handleDeliver(group.display_id)}
+                                                        className="btn-action btn-deliver"
+                                                    >
+                                                        전달 완료 🤲
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <div style={{flex: 1, overflowY: 'auto', marginBottom: '10px'}}>
+                                <div style={{ flex: 1, overflowY: 'auto', marginBottom: '10px' }}>
                                     {group.items.map((item, idx) => (
                                         <div key={idx} className="receipt-item">
-                                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                            <span
-                                                style={{color: item.menu_name.includes('(샷') ? 'var(--accent)' : 'inherit'}}>{item.menu_name}</span>
-                                                <span style={{
-                                                    fontSize: '0.85rem',
-                                                    color: 'var(--text-secondary, #888)'
-                                                }}>{(item.price / item.quantity).toLocaleString()}원</span>
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span
+                                                    style={{
+                                                        color: item.menu_name.includes('(샷')
+                                                            ? 'var(--accent)'
+                                                            : 'inherit',
+                                                    }}
+                                                >
+                                                    {item.menu_name}
+                                                </span>
+                                                <span
+                                                    style={{
+                                                        fontSize: '0.85rem',
+                                                        color: 'var(--text-secondary, #888)',
+                                                    }}
+                                                >
+                                                    {(item.price / item.quantity).toLocaleString()}원
+                                                </span>
                                             </div>
-                                            <div style={{fontWeight: 'bold'}}>{item.quantity}</div>
+                                            <div style={{ fontWeight: 'bold' }}>{item.quantity}</div>
                                         </div>
                                     ))}
                                 </div>
                                 <div className="receipt-total">
-                                    <span>합계</span><span
-                                    style={{color: 'var(--danger)'}}>{groupTotal.toLocaleString()}원</span>
+                                    <span>합계</span>
+                                    <span style={{ color: 'var(--danger)' }}>{groupTotal.toLocaleString()}원</span>
                                 </div>
                             </motion.div>
                         );
                     })}
                 </>
             </AnimatePresence>
-            {orderGroups.length === 0 &&
-                <p style={{textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px'}}>진행 중인 주문이
-                    없습니다.</p>}
+            {orderGroups.length === 0 && (
+                <p style={{ textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px' }}>
+                    진행 중인 주문이 없습니다.
+                </p>
+            )}
         </div>
     );
 
@@ -525,39 +584,53 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
             <div className="pos-left">
                 <div className="header-bar">
                     <h2 className="pos-title">🛒 메뉴 선택</h2>
-                    {isMobile && !onlyOrder &&
-                        <button onClick={() => setIsSidebarOpen(true)} className="btn-sidebar-toggle">📋 주문 현황
-                            ({orderGroups.length})</button>}
+                    {isMobile && !onlyOrder && (
+                        <button onClick={() => setIsSidebarOpen(true)} className="btn-sidebar-toggle">
+                            📋 주문 현황 ({orderGroups.length})
+                        </button>
+                    )}
                 </div>
 
                 <div className="menu-list">
-                    {menuList.map(menu => {
-                        const {total, slots} = getMenuCounts(menu);
+                    {menuList.map((menu) => {
+                        const { total, slots } = getMenuCounts(menu);
                         const isSoldOut = menu.is_soldout === 1;
                         return (
-                            <div key={menu.id}
-                                 className={`menu-card ${total > 0 ? 'selected' : ''} ${isSoldOut ? 'soldout' : ''}`}
-                                 onClick={() => !isSoldOut && handleTotalChange(menu, 1)}>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    width: '100%'
-                                }}>
-                                    <div style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
-                                        <div className="menu-name">{menu.name}{isSoldOut &&
-                                            <span style={{color: 'var(--danger)', marginLeft: '5px'}}>(품절)</span>}</div>
+                            <div
+                                key={menu.id}
+                                className={`menu-card ${total > 0 ? 'selected' : ''} ${isSoldOut ? 'soldout' : ''}`}
+                                onClick={() => !isSoldOut && handleTotalChange(menu, 1)}
+                            >
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        width: '100%',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        <div className="menu-name">
+                                            {menu.name}
+                                            {isSoldOut && (
+                                                <span style={{ color: 'var(--danger)', marginLeft: '5px' }}>
+                                                    (품절)
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="menu-price">{menu.price.toLocaleString()}원</div>
                                     </div>
                                     {!isSoldOut && (
-                                        <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}
-                                             onClick={(e) => e.stopPropagation()}>
-                                            <button className="circle-btn"
-                                                    onClick={() => handleTotalChange(menu, -1)}>-
+                                        <div
+                                            style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <button className="circle-btn" onClick={() => handleTotalChange(menu, -1)}>
+                                                -
                                             </button>
                                             <span className="qty-text">{total}</span>
-                                            <button className="circle-btn"
-                                                    onClick={() => handleTotalChange(menu, 1)}>+
+                                            <button className="circle-btn" onClick={() => handleTotalChange(menu, 1)}>
+                                                +
                                             </button>
                                         </div>
                                     )}
@@ -565,7 +638,12 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                 {!isSoldOut && isCoffee(menu.name) && total > 0 && (
                                     <div className="shot-box" onClick={(e) => e.stopPropagation()}>
                                         <button className="shot-toggle" onClick={() => toggleShotPanel(menu.name)}>
-                                            <span>☕ 샷 추가{slots.reduce((a, b) => a + b, 0) > 0 ? ` · 총 ${slots.reduce((a, b) => a + b, 0)}샷` : ''}</span>
+                                            <span>
+                                                ☕ 샷 추가
+                                                {slots.reduce((a, b) => a + b, 0) > 0
+                                                    ? ` · 총 ${slots.reduce((a, b) => a + b, 0)}샷`
+                                                    : ''}
+                                            </span>
                                             <span>{expandedShots[menu.name] ? '▴ 접기' : '▾ 잔별 설정'}</span>
                                         </button>
                                         {expandedShots[menu.name] && (
@@ -574,17 +652,24 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                                     <div key={i} className="shot-slot">
                                                         <span className="shot-slot-label">{i + 1}번 잔</span>
                                                         <div className="shot-slot-stepper">
-                                                            <button className="mini-circle-btn"
-                                                                    onClick={() => handleSlotShotChange(menu, i, -1)}
-                                                                    disabled={s === 0}>-
+                                                            <button
+                                                                className="mini-circle-btn"
+                                                                onClick={() => handleSlotShotChange(menu, i, -1)}
+                                                                disabled={s === 0}
+                                                            >
+                                                                -
                                                             </button>
                                                             <span className="shot-slot-count">{s}</span>
-                                                            <button className="mini-circle-btn"
-                                                                    onClick={() => handleSlotShotChange(menu, i, 1)}>+
+                                                            <button
+                                                                className="mini-circle-btn"
+                                                                onClick={() => handleSlotShotChange(menu, i, 1)}
+                                                            >
+                                                                +
                                                             </button>
                                                         </div>
-                                                        <span
-                                                            className="shot-slot-price">{s > 0 ? `샷추가 ${s}개` : '기본'}</span>
+                                                        <span className="shot-slot-price">
+                                                            {s > 0 ? `샷추가 ${s}개` : '기본'}
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -600,15 +685,18 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                     {/* 🌟 이벤트 선택 칩 UI */}
                     {activeEvents.length > 0 && (
                         <div className="event-selector">
-                            <div style={{
-                                fontSize: '0.85rem',
-                                fontWeight: 'bold',
-                                marginBottom: '8px',
-                                color: 'var(--text-secondary)'
-                            }}>🎁 적용 가능한 이벤트 (터치하여 적용)
+                            <div
+                                style={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: 'bold',
+                                    marginBottom: '8px',
+                                    color: 'var(--text-secondary)',
+                                }}
+                            >
+                                🎁 적용 가능한 이벤트 (터치하여 적용)
                             </div>
                             <div className="event-chip-container">
-                                {activeEvents.map(ev => {
+                                {activeEvents.map((ev) => {
                                     // 🌟 복구됨: 남은 수량을 계산하고, 0개면 마감 처리합니다.
                                     const remaining = ev.daily_limit ? ev.daily_limit - (ev['used_count'] || 0) : null;
                                     const isSoldOut = remaining !== null && remaining <= 0;
@@ -616,7 +704,10 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                                     return (
                                         <button
                                             key={ev.id}
-                                            onClick={() => !isSoldOut && setSelectedEventId(prev => prev === ev.id ? null : ev.id)}
+                                            onClick={() =>
+                                                !isSoldOut &&
+                                                setSelectedEventId((prev) => (prev === ev.id ? null : ev.id))
+                                            }
                                             className={`event-chip ${selectedEventId === ev.id ? 'active' : ''} ${isSoldOut ? 'soldout' : ''}`}
                                             disabled={isSoldOut}
                                         >
@@ -633,30 +724,34 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
 
                     {/* 🌟 총액 및 할인 내역 표시 */}
                     <div className="total-info">
-                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span>총 결제 금액</span>
                             {selectedEvent && (
-                                <span style={{
-                                    fontSize: '0.9rem',
-                                    color: 'var(--danger)',
-                                    fontWeight: 'normal',
-                                    marginTop: '4px'
-                                }}>
+                                <span
+                                    style={{
+                                        fontSize: '0.9rem',
+                                        color: 'var(--danger)',
+                                        fontWeight: 'normal',
+                                        marginTop: '4px',
+                                    }}
+                                >
                                     ✅ {selectedEvent.name} 적용됨
                                 </span>
                             )}
                         </div>
-                        <div style={{textAlign: 'right'}}>
+                        <div style={{ textAlign: 'right' }}>
                             {selectedEvent && (
-                                <div style={{
-                                    textDecoration: 'line-through',
-                                    color: 'var(--text-secondary, #999)',
-                                    fontSize: '1.1rem'
-                                }}>
+                                <div
+                                    style={{
+                                        textDecoration: 'line-through',
+                                        color: 'var(--text-secondary, #999)',
+                                        fontSize: '1.1rem',
+                                    }}
+                                >
                                     {originalTotalAmount.toLocaleString()}원
                                 </div>
                             )}
-                            <span style={{color: 'var(--danger)'}}>{finalTotalAmount.toLocaleString()}원</span>
+                            <span style={{ color: 'var(--danger)' }}>{finalTotalAmount.toLocaleString()}원</span>
                         </div>
                     </div>
                     <button onClick={() => submitOrder(false)} className="btn-submit">
@@ -666,17 +761,30 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
             </div>
 
             {/* 우측 패널 (주문 현황) */}
-            {!onlyOrder && (
-                isMobile ? (
+            {!onlyOrder &&
+                (isMobile ? (
                     <AnimatePresence>
                         {isSidebarOpen && (
                             <>
-                                <motion.div className="sidebar-backdrop" initial={{opacity: 0}} animate={{opacity: 1}}
-                                            exit={{opacity: 0}} onClick={() => setIsSidebarOpen(false)}/>
-                                <motion.div className="sidebar-panel" initial={{x: '100%'}} animate={{x: 0}}
-                                            exit={{x: '100%'}} transition={{type: 'spring', bounce: 0, duration: 0.4}}>
-                                    <div className="header-bar"><h2 className="pos-title">📋 주문 현황</h2>
-                                        <button className="btn-close" onClick={() => setIsSidebarOpen(false)}>×</button>
+                                <motion.div
+                                    className="sidebar-backdrop"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => setIsSidebarOpen(false)}
+                                />
+                                <motion.div
+                                    className="sidebar-panel"
+                                    initial={{ x: '100%' }}
+                                    animate={{ x: 0 }}
+                                    exit={{ x: '100%' }}
+                                    transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                                >
+                                    <div className="header-bar">
+                                        <h2 className="pos-title">📋 주문 현황</h2>
+                                        <button className="btn-close" onClick={() => setIsSidebarOpen(false)}>
+                                            ×
+                                        </button>
                                     </div>
                                     {OrderGridContent}
                                 </motion.div>
@@ -685,46 +793,61 @@ function OnePersonMode({onlyOrder = false, isCashier = false}) {
                     </AnimatePresence>
                 ) : (
                     <div className="pos-right">
-                        <div className="header-bar"><h2 className="pos-title">📋 주문 현황</h2></div>
+                        <div className="header-bar">
+                            <h2 className="pos-title">📋 주문 현황</h2>
+                        </div>
                         {OrderGridContent}
                     </div>
-                )
-            )}
+                ))}
 
             {/* 🌟 결제 확인 모달 (+ 이벤트 버튼 추가) */}
             {paymentCheckId && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h2 style={{marginBottom: '10px', color: 'var(--text-primary, #333)'}}>결제 수단 확인</h2>
-                        <p style={{
-                            marginBottom: '20px',
-                            color: 'var(--text-secondary, #666)'
-                        }}>#{paymentCheckId.split('-')[1]}번 주문을 처리합니다.</p>
+                        <h2 style={{ marginBottom: '10px', color: 'var(--text-primary, #333)' }}>결제 수단 확인</h2>
+                        <p
+                            style={{
+                                marginBottom: '20px',
+                                color: 'var(--text-secondary, #666)',
+                            }}
+                        >
+                            #{paymentCheckId.split('-')[1]}번 주문을 처리합니다.
+                        </p>
 
-                        <div style={{display: 'flex', gap: '10px', marginBottom: '20px'}}>
-                            <button onClick={() => handleConfirmPayment('cash')} className="btn-modal-opt"
-                                    style={{backgroundColor: '#2e7d32'}}>
-                                <div style={{fontSize: '2rem', marginBottom: '5px'}}>💵</div>
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                            <button
+                                onClick={() => handleConfirmPayment('cash')}
+                                className="btn-modal-opt"
+                                style={{ backgroundColor: '#2e7d32' }}
+                            >
+                                <div style={{ fontSize: '2rem', marginBottom: '5px' }}>💵</div>
                                 현금
                             </button>
-                            <button onClick={() => handleConfirmPayment('bank')} className="btn-modal-opt"
-                                    style={{backgroundColor: '#ed6c02'}}>
-                                <div style={{fontSize: '2rem', marginBottom: '5px'}}>🏦</div>
+                            <button
+                                onClick={() => handleConfirmPayment('bank')}
+                                className="btn-modal-opt"
+                                style={{ backgroundColor: '#ed6c02' }}
+                            >
+                                <div style={{ fontSize: '2rem', marginBottom: '5px' }}>🏦</div>
                                 계좌
                             </button>
                         </div>
 
-                        <button onClick={() => setPaymentCheckId(null)} style={{
-                            padding: '12px 30px',
-                            backgroundColor: 'var(--border-color, #eee)',
-                            color: 'var(--text-primary, #333)',
-                            border: 'none',
-                            borderRadius: 'var(--radius-md)',
-                            fontWeight: 'bold',
-                            fontSize: '1rem',
-                            cursor: 'pointer',
-                            width: '100%'
-                        }}>닫기
+                        <button
+                            onClick={() => setPaymentCheckId(null)}
+                            style={{
+                                padding: '12px 30px',
+                                backgroundColor: 'var(--border-color, #eee)',
+                                color: 'var(--text-primary, #333)',
+                                border: 'none',
+                                borderRadius: 'var(--radius-md)',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                cursor: 'pointer',
+                                width: '100%',
+                            }}
+                        >
+                            닫기
                         </button>
                     </div>
                 </div>

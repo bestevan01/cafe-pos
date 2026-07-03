@@ -1,12 +1,12 @@
-import {useState, useEffect} from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import {useNotification} from '../../hooks/useNotification';
+import { useNotification } from '../../hooks/useNotification';
 
-function EventDashboard({onBack}) {
-    const {notify, confirm} = useNotification();
+function EventDashboard({ onBack }) {
+    const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리
     // ---------------------------------------------------------
@@ -26,34 +26,42 @@ function EventDashboard({onBack}) {
     const [selectedMenus, setSelectedMenus] = useState([]);
 
     const getAuthHeader = () => ({
-        headers: {Authorization: `Bearer ${localStorage.getItem('token')}`}
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 
     // ---------------------------------------------------------
     // [2] 초기화 (데이터 불러오기)
     // ---------------------------------------------------------
-    useEffect(() => {
-        void fetchEvents();
-        void fetchMenus();
-    }, []);
-
-    const fetchEvents = async () => {
+    const fetchEvents = useCallback(async () => {
         try {
             const res = await axios.get('/api/events', getAuthHeader());
             setEvents(res.data);
-        } catch (err) {
-            notify("이벤트 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-event'});
+        } catch {
+            notify('이벤트 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
+                icon: '⚠️',
+                dedupeKey: 'load-event',
+            });
         }
-    };
+    }, [notify]);
 
-    const fetchMenus = async () => {
+    const fetchMenus = useCallback(async () => {
         try {
             const res = await axios.get('/api/menu', getAuthHeader());
             setMenuList(res.data);
-        } catch (err) {
-            notify("이벤트 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-event'});
+        } catch {
+            notify('이벤트 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
+                icon: '⚠️',
+                dedupeKey: 'load-event',
+            });
         }
-    };
+    }, [notify]);
+
+    useEffect(() => {
+        // fetchEvents/fetchMenus는 useCallback으로 메모이즈된 비동기 함수라 setState가 await 이후에만 일어남(effect 본문에서 동기 호출 아님) — 규칙 오탐.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void fetchEvents();
+        void fetchMenus();
+    }, [fetchEvents, fetchMenus]);
 
     // ---------------------------------------------------------
     // [3] 핸들러 함수
@@ -62,22 +70,22 @@ function EventDashboard({onBack}) {
     // 🌟 메뉴 버튼 클릭 시 선택/해제 토글
     const handleMenuSelect = (menuName) => {
         if (selectedMenus.includes(menuName)) {
-            setSelectedMenus(selectedMenus.filter(name => name !== menuName));
+            setSelectedMenus(selectedMenus.filter((name) => name !== menuName));
         } else {
             setSelectedMenus([...selectedMenus, menuName]);
         }
     };
 
     const handleAddEvent = async () => {
-        if (!newEventName.trim()) return notify("이벤트 이름을 입력해주세요!", {icon: '⚠️'});
+        if (!newEventName.trim()) return notify('이벤트 이름을 입력해주세요!', { icon: '⚠️' });
         if (newEventType === 'discount' && (!newDiscountAmount || newDiscountAmount <= 0)) {
-            return notify("할인 금액을 올바르게 입력해주세요!", {icon: '⚠️'});
+            return notify('할인 금액을 올바르게 입력해주세요!', { icon: '⚠️' });
         }
         if (hasDailyLimit && (!dailyLimitQty || dailyLimitQty <= 0)) {
-            return notify("제한 수량을 올바르게 입력해주세요!", {icon: '⚠️'});
+            return notify('제한 수량을 올바르게 입력해주세요!', { icon: '⚠️' });
         }
         if (hasTargetMenu && selectedMenus.length === 0) {
-            return notify("적용할 메뉴를 최소 1개 이상 선택해주세요!", {icon: '⚠️'});
+            return notify('적용할 메뉴를 최소 1개 이상 선택해주세요!', { icon: '⚠️' });
         }
 
         const newEventData = {
@@ -86,7 +94,7 @@ function EventDashboard({onBack}) {
             discount_amount: newEventType === 'free' ? 0 : Number(newDiscountAmount),
             daily_limit: hasDailyLimit ? Number(dailyLimitQty) : null,
             target_menus: hasTargetMenu ? JSON.stringify(selectedMenus) : 'all',
-            is_active: false
+            is_active: false,
         };
 
         try {
@@ -100,29 +108,36 @@ function EventDashboard({onBack}) {
                 setHasTargetMenu(false);
                 setSelectedMenus([]); // 폼 초기화
             }
-        } catch (err) {
-            notify("이벤트 등록에 실패했습니다.", {icon: '⚠️'});
+        } catch {
+            notify('이벤트 등록에 실패했습니다.', { icon: '⚠️' });
         }
     };
 
     const toggleEventStatus = async (id) => {
-        const targetEvent = events.find(ev => ev.id === id);
+        const targetEvent = events.find((ev) => ev.id === id);
         if (!targetEvent) return;
         try {
-            await axios.patch(`/api/events/${id}/toggle`, {is_active: !targetEvent.is_active}, getAuthHeader());
+            await axios.patch(`/api/events/${id}/toggle`, { is_active: !targetEvent.is_active }, getAuthHeader());
             await fetchEvents();
-        } catch (err) {
-            notify("상태 변경에 실패했습니다.", {icon: '⚠️'});
+        } catch {
+            notify('상태 변경에 실패했습니다.', { icon: '⚠️' });
         }
     };
 
     const handleDelete = async (id) => {
-        if (!(await confirm("이 이벤트를 정말 삭제하시겠습니까?", {title: "이벤트 삭제", confirmText: "삭제", danger: true}))) return;
+        if (
+            !(await confirm('이 이벤트를 정말 삭제하시겠습니까?', {
+                title: '이벤트 삭제',
+                confirmText: '삭제',
+                danger: true,
+            }))
+        )
+            return;
         try {
             await axios.delete(`/api/events/${id}`, getAuthHeader());
             await fetchEvents();
-        } catch (err) {
-            notify("삭제에 실패했습니다.", {icon: '⚠️'});
+        } catch {
+            notify('삭제에 실패했습니다.', { icon: '⚠️' });
         }
     };
 
@@ -133,7 +148,7 @@ function EventDashboard({onBack}) {
             const parsed = JSON.parse(target_menus);
             if (parsed.length > 2) return `${parsed[0]}, ${parsed[1]} 외 ${parsed.length - 2}개`;
             return parsed.join(', ');
-        } catch (e) {
+        } catch {
             return target_menus;
         }
     };
@@ -197,36 +212,52 @@ function EventDashboard({onBack}) {
 
             <div className="header-bar">
                 <div className="header-left">
-                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>
+                        뒤로
+                    </Button>
                     <h1 className="page-title">🎉 이벤트 관리</h1>
                 </div>
-                <ThemeToggle/>
+                <ThemeToggle />
             </div>
 
             <Card className="add-event-card">
-                <h3 style={{marginTop: 0, marginBottom: '15px', color: 'var(--text-primary)'}}>새로운 이벤트 등록</h3>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: 'var(--text-primary)' }}>새로운 이벤트 등록</h3>
                 <div className="form-row">
-                    <input type="text" className="form-input" placeholder="이벤트명 (예: 오픈 기념 선착순 무료)" value={newEventName}
-                           onChange={(e) => setNewEventName(e.target.value)}/>
-                    <select className="form-select" value={newEventType}
-                            onChange={(e) => setNewEventType(e.target.value)}>
+                    <input
+                        type="text"
+                        className="form-input"
+                        placeholder="이벤트명 (예: 오픈 기념 선착순 무료)"
+                        value={newEventName}
+                        onChange={(e) => setNewEventName(e.target.value)}
+                    />
+                    <select
+                        className="form-select"
+                        value={newEventType}
+                        onChange={(e) => setNewEventType(e.target.value)}
+                    >
                         <option value="free">100% 무료 (0원 처리)</option>
                         <option value="discount">정액 할인 (금액 차감)</option>
                     </select>
                     {newEventType === 'discount' && (
-                        <input type="number" className="form-input" style={{flex: '0 1 120px'}} placeholder="할인액"
-                               value={newDiscountAmount} onChange={(e) => setNewDiscountAmount(e.target.value)}/>
+                        <input
+                            type="number"
+                            className="form-input"
+                            style={{ flex: '0 1 120px' }}
+                            placeholder="할인액"
+                            value={newDiscountAmount}
+                            onChange={(e) => setNewDiscountAmount(e.target.value)}
+                        />
                     )}
                 </div>
 
                 {/* 🌟 특정 메뉴만 적용 체크박스 및 메뉴 선택 창 */}
-                <div className="form-row" style={{marginBottom: hasTargetMenu ? '5px' : '15px'}}>
-                    <label className="checkbox-label" style={{marginBottom: 0}}>
+                <div className="form-row" style={{ marginBottom: hasTargetMenu ? '5px' : '15px' }}>
+                    <label className="checkbox-label" style={{ marginBottom: 0 }}>
                         <input
                             type="checkbox"
                             checked={hasTargetMenu}
                             onChange={(e) => setHasTargetMenu(e.target.checked)}
-                            style={{width: '18px', height: '18px'}}
+                            style={{ width: '18px', height: '18px' }}
                         />
                         일부 메뉴에만 적용 (체크 해제 시 전체 메뉴)
                     </label>
@@ -234,14 +265,19 @@ function EventDashboard({onBack}) {
                 {hasTargetMenu && (
                     <div className="form-row">
                         <div className="menu-pill-box">
-                            {menuList.length === 0 ? <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>메뉴 데이터를 불러오는 중입니다...</span> : null}
-                            {menuList.map(menu => (
+                            {menuList.length === 0 ? (
+                                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                    메뉴 데이터를 불러오는 중입니다...
+                                </span>
+                            ) : null}
+                            {menuList.map((menu) => (
                                 <div
                                     key={menu.id}
                                     className={`menu-pill ${selectedMenus.includes(menu.name) ? 'selected' : ''}`}
                                     onClick={() => handleMenuSelect(menu.name)}
                                 >
-                                    {selectedMenus.includes(menu.name) ? '✓ ' : '+ '}{menu.name}
+                                    {selectedMenus.includes(menu.name) ? '✓ ' : '+ '}
+                                    {menu.name}
                                 </div>
                             ))}
                         </div>
@@ -249,27 +285,35 @@ function EventDashboard({onBack}) {
                 )}
 
                 {/* 수량 제한 체크박스 및 등록 버튼 */}
-                <div className="form-row" style={{
-                    marginBottom: 0,
-                    minHeight: '46px',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginTop: '10px'
-                }}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap'}}>
-                        <label className="checkbox-label" style={{marginBottom: 0}}>
+                <div
+                    className="form-row"
+                    style={{
+                        marginBottom: 0,
+                        minHeight: '46px',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: '10px',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <label className="checkbox-label" style={{ marginBottom: 0 }}>
                             <input
                                 type="checkbox"
                                 checked={hasDailyLimit}
                                 onChange={(e) => setHasDailyLimit(e.target.checked)}
-                                style={{width: '18px', height: '18px'}}
+                                style={{ width: '18px', height: '18px' }}
                             />
                             하루 한정 수량 설정 (선착순)
                         </label>
                         {hasDailyLimit && (
-                            <input type="number" className="form-input" style={{flex: '0 1 150px'}}
-                                   placeholder="예: 20 (잔/명)" value={dailyLimitQty}
-                                   onChange={(e) => setDailyLimitQty(e.target.value)}/>
+                            <input
+                                type="number"
+                                className="form-input"
+                                style={{ flex: '0 1 150px' }}
+                                placeholder="예: 20 (잔/명)"
+                                value={dailyLimitQty}
+                                onChange={(e) => setDailyLimitQty(e.target.value)}
+                            />
                         )}
                     </div>
                     <Button onClick={handleAddEvent}>+ 등록</Button>
@@ -278,9 +322,11 @@ function EventDashboard({onBack}) {
 
             <div className="event-list">
                 {events.length === 0 ? (
-                    <p style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '30px'}}>등록된 이벤트가 없습니다.</p>
+                    <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '30px' }}>
+                        등록된 이벤트가 없습니다.
+                    </p>
                 ) : (
-                    events.map(ev => (
+                    events.map((ev) => (
                         <div key={ev.id} className="event-item">
                             <div className="event-info">
                                 <div className="event-name">
@@ -289,30 +335,35 @@ function EventDashboard({onBack}) {
                                         {ev.type === 'free' ? '전액 무료' : `${ev.discount_amount}원 할인`}
                                     </span>
                                     {ev.daily_limit && (
-                                        <span className="badge" style={{
-                                            backgroundColor: 'var(--danger-bg)',
-                                            color: 'var(--danger)',
-                                            border: '1px solid var(--danger)'
-                                        }}>
+                                        <span
+                                            className="badge"
+                                            style={{
+                                                backgroundColor: 'var(--danger-bg)',
+                                                color: 'var(--danger)',
+                                                border: '1px solid var(--danger)',
+                                            }}
+                                        >
                                             🔥 하루 {ev.daily_limit}잔 한정
                                         </span>
                                     )}
-                                    <span className="badge badge-target">
-                                        🎯 {renderTargetMenus(ev.target_menus)}
-                                    </span>
+                                    <span className="badge badge-target">🎯 {renderTargetMenus(ev.target_menus)}</span>
                                 </div>
                                 <div className="event-desc">
-                                    캐셔 화면에서 이 버튼을 누르면 결제
-                                    금액이 {ev.type === 'free' ? '0원으로' : `${ev.discount_amount}원 차감되어`} 처리됩니다.
+                                    캐셔 화면에서 이 버튼을 누르면 결제 금액이{' '}
+                                    {ev.type === 'free' ? '0원으로' : `${ev.discount_amount}원 차감되어`} 처리됩니다.
                                 </div>
                             </div>
 
                             <div className="action-buttons">
-                                <button onClick={() => toggleEventStatus(ev.id)}
-                                        className={`btn-toggle ${ev.is_active ? 'active' : 'inactive'}`}>
+                                <button
+                                    onClick={() => toggleEventStatus(ev.id)}
+                                    className={`btn-toggle ${ev.is_active ? 'active' : 'inactive'}`}
+                                >
                                     {ev.is_active ? '🟢 POS 노출 중' : '⚫ POS 숨김'}
                                 </button>
-                                <Button variant="danger" size="sm" onClick={() => handleDelete(ev.id)}>삭제</Button>
+                                <Button variant="danger" size="sm" onClick={() => handleDelete(ev.id)}>
+                                    삭제
+                                </Button>
                             </div>
                         </div>
                     ))

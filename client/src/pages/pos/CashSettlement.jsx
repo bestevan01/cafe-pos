@@ -1,12 +1,12 @@
-import {useState, useEffect, useMemo} from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import {useNotification} from '../../hooks/useNotification';
+import { useNotification } from '../../hooks/useNotification';
 
 // 💵 화폐 단위 정의 (5만원 ~ 10원)
 const MONEY_TYPES = [50000, 10000, 5000, 1000, 500, 100, 50, 10];
 
-function CashSettlement({onClose}) {
-    const {notify, confirm} = useNotification();
+function CashSettlement({ onClose }) {
+    const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
@@ -16,7 +16,14 @@ function CashSettlement({onClose}) {
 
     // 화폐별 개수 상태
     const [counts, setCounts] = useState({
-        50000: 0, 10000: 0, 5000: 0, 1000: 0, 500: 0, 100: 0, 50: 0, 10: 0
+        50000: 0,
+        10000: 0,
+        5000: 0,
+        1000: 0,
+        500: 0,
+        100: 0,
+        50: 0,
+        10: 0,
     });
 
     // ---------------------------------------------------------
@@ -24,43 +31,46 @@ function CashSettlement({onClose}) {
     // ---------------------------------------------------------
     // 총액 자동 계산
     const totalAmount = useMemo(() => {
-        return MONEY_TYPES.reduce((acc, type) => acc + (type * (counts[type] || 0)), 0);
+        return MONEY_TYPES.reduce((acc, type) => acc + type * (counts[type] || 0), 0);
     }, [counts]);
 
     // ---------------------------------------------------------
     // [3] API 및 데이터 처리
     // ---------------------------------------------------------
     const getAuthHeader = () => ({
-        headers: {Authorization: `Bearer ${localStorage.getItem('token')}`}
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 
-    useEffect(() => {
-        axios.get('/api/settlements/status', getAuthHeader()).then(res => {
-            if (res.data.status === 'not_opened') {
-                setStep('open');
-                const safeAmount = Number(res.data.prevClosing) || 0;
-                setPrevClosing(safeAmount);
-            } else if (res.data.status === 'opened') {
-                void fetchCalcData();
-            } else {
-                setStep('done');
-            }
-        }).catch(err => {
-            console.error(err);
-            notify("데이터 로딩 중 오류가 발생했습니다.", {icon: '⚠️'});
-        });
-    }, []);
-
-    const fetchCalcData = async () => {
+    const fetchCalcData = useCallback(async () => {
         try {
             const res = await axios.get('/api/settlements/calc', getAuthHeader());
             setCalcData(res.data);
             setStep('close');
-        } catch (err) {
-            notify("오픈 기록이 없습니다.", {icon: '⚠️'});
+        } catch {
+            notify('오픈 기록이 없습니다.', { icon: '⚠️' });
             setStep('open');
         }
-    };
+    }, [notify]);
+
+    useEffect(() => {
+        axios
+            .get('/api/settlements/status', getAuthHeader())
+            .then((res) => {
+                if (res.data.status === 'not_opened') {
+                    setStep('open');
+                    const safeAmount = Number(res.data.prevClosing) || 0;
+                    setPrevClosing(safeAmount);
+                } else if (res.data.status === 'opened') {
+                    void fetchCalcData();
+                } else {
+                    setStep('done');
+                }
+            })
+            .catch((err) => {
+                console.error(err);
+                notify('데이터 로딩 중 오류가 발생했습니다.', { icon: '⚠️' });
+            });
+    }, [fetchCalcData, notify]);
 
     // ---------------------------------------------------------
     // [4] 이벤트 핸들러 (오픈/마감)
@@ -68,24 +78,28 @@ function CashSettlement({onClose}) {
     const handleCountChange = (type, value) => {
         let numValue = parseInt(value) || 0;
         if (numValue < 0) numValue = 0;
-        setCounts(prev => ({...prev, [type]: numValue}));
+        setCounts((prev) => ({ ...prev, [type]: numValue }));
     };
 
     const handleOpen = async () => {
-        if (totalAmount === 0 && !(await confirm("시재금이 0원입니다. 이대로 오픈하시겠습니까?", {confirmText: "오픈"}))) return;
+        if (
+            totalAmount === 0 &&
+            !(await confirm('시재금이 0원입니다. 이대로 오픈하시겠습니까?', { confirmText: '오픈' }))
+        )
+            return;
 
         if (prevClosing !== null && totalAmount !== prevClosing) {
             const diff = totalAmount - prevClosing;
             const msg = `전날 마감 시재와 다릅니다!\n\n📆 전날 마감: ${prevClosing.toLocaleString()}원\n💵 현재 입력: ${totalAmount.toLocaleString()}원\n❌ 차액: ${diff.toLocaleString()}원\n\n돈이 맞지 않습니다. 그래도 강제로 오픈하시겠습니까?`;
-            if (!(await confirm(msg, {title: "⚠️ 시재 불일치", confirmText: "강제 오픈", danger: true}))) return;
+            if (!(await confirm(msg, { title: '⚠️ 시재 불일치', confirmText: '강제 오픈', danger: true }))) return;
         }
 
         try {
-            await axios.post('/api/settlements/open', {amount: totalAmount}, getAuthHeader());
-            notify(`오픈 완료! 시작 시재금: ${totalAmount.toLocaleString()}원`, {icon: '✅'});
+            await axios.post('/api/settlements/open', { amount: totalAmount }, getAuthHeader());
+            notify(`오픈 완료! 시작 시재금: ${totalAmount.toLocaleString()}원`, { icon: '✅' });
             onClose();
         } catch (err) {
-            notify(err.response?.data?.message || "오픈 처리 실패", {icon: '⚠️'});
+            notify(err.response?.data?.message || '오픈 처리 실패', { icon: '⚠️' });
         }
     };
 
@@ -94,22 +108,32 @@ function CashSettlement({onClose}) {
         const diff = totalAmount - expected;
 
         if (diff !== 0) {
-            if (!(await confirm(`전산: ${expected.toLocaleString()}원\n실제: ${totalAmount.toLocaleString()}원\n차액: ${diff.toLocaleString()}원\n\n마감하시겠습니까?`, {
-                title: "⚠️ 금액 불일치",
-                confirmText: "마감"
-            }))) return;
+            if (
+                !(await confirm(
+                    `전산: ${expected.toLocaleString()}원\n실제: ${totalAmount.toLocaleString()}원\n차액: ${diff.toLocaleString()}원\n\n마감하시겠습니까?`,
+                    {
+                        title: '⚠️ 금액 불일치',
+                        confirmText: '마감',
+                    },
+                ))
+            )
+                return;
         }
 
         try {
-            await axios.post('/api/settlements/close', {
-                closingAmount: totalAmount,
-                salesCash: calcData.sales,
-                diff: diff
-            }, getAuthHeader());
-            notify("마감 처리되었습니다. 수고하셨습니다!", {icon: '🔒'});
+            await axios.post(
+                '/api/settlements/close',
+                {
+                    closingAmount: totalAmount,
+                    salesCash: calcData.sales,
+                    diff: diff,
+                },
+                getAuthHeader(),
+            );
+            notify('마감 처리되었습니다. 수고하셨습니다!', { icon: '🔒' });
             onClose();
         } catch (err) {
-            notify(err.response?.data?.message || "마감 처리 실패", {icon: '⚠️'});
+            notify(err.response?.data?.message || '마감 처리 실패', { icon: '⚠️' });
         }
     };
 
@@ -118,10 +142,10 @@ function CashSettlement({onClose}) {
     // ---------------------------------------------------------
     const renderMoneyInputs = () => (
         <div className="cs-grid">
-            {MONEY_TYPES.map(type => (
+            {MONEY_TYPES.map((type) => (
                 <div key={type} className="cs-input-row">
                     <span className="cs-label">{type.toLocaleString()}원</span>
-                    <span style={{margin: '0 5px', color: 'var(--text-secondary)'}}>x</span>
+                    <span style={{ margin: '0 5px', color: 'var(--text-secondary)' }}>x</span>
                     <input
                         type="number"
                         min="0"
@@ -130,7 +154,7 @@ function CashSettlement({onClose}) {
                         placeholder="0"
                         className="cs-mini-input"
                     />
-                    <span style={{margin: '0 5px', color: 'var(--text-secondary)'}}>=</span>
+                    <span style={{ margin: '0 5px', color: 'var(--text-secondary)' }}>=</span>
                     <span className="cs-sub-total">{(type * (counts[type] || 0)).toLocaleString()}</span>
                 </div>
             ))}
@@ -188,20 +212,26 @@ function CashSettlement({onClose}) {
                     <>
                         <p className="cs-desc">오픈 준비금을 권종별로 입력해주세요.</p>
                         {prevClosing !== null && (
-                            <div style={{
-                                fontSize: '0.9rem',
-                                color: 'var(--danger)',
-                                fontWeight: 'bold',
-                                backgroundColor: 'var(--danger-bg)',
-                                padding: '8px',
-                                borderRadius: 'var(--radius-sm)'
-                            }}>
+                            <div
+                                style={{
+                                    fontSize: '0.9rem',
+                                    color: 'var(--danger)',
+                                    fontWeight: 'bold',
+                                    backgroundColor: 'var(--danger-bg)',
+                                    padding: '8px',
+                                    borderRadius: 'var(--radius-sm)',
+                                }}
+                            >
                                 ※ 전날 마감 금액: {prevClosing.toLocaleString()}원
                             </div>
                         )}
                         {renderMoneyInputs()}
-                        <button onClick={handleOpen} className="btn-base btn-open">영업 시작 (오픈)</button>
-                        <button onClick={onClose} className="btn-cancel">취소 / 닫기</button>
+                        <button onClick={handleOpen} className="btn-base btn-open">
+                            영업 시작 (오픈)
+                        </button>
+                        <button onClick={onClose} className="btn-cancel">
+                            취소 / 닫기
+                        </button>
                     </>
                 )}
 
@@ -209,40 +239,57 @@ function CashSettlement({onClose}) {
                 {step === 'close' && calcData && (
                     <>
                         <div className="cs-info-box">
-                            <div className="cs-row"><span>➕ 오픈 시재:</span>
-                                <span>{calcData.opening.toLocaleString()}원</span></div>
-                            <div className="cs-row"><span>➕ 현금 매출:</span>
-                                <span>{calcData.sales.toLocaleString()}원</span></div>
-                            <hr style={{margin: '8px 0', border: 'none', borderTop: '1px solid var(--border-color)'}}/>
-                            <div className="cs-row" style={{fontWeight: 'bold', color: 'var(--accent)'}}>
-                                <span>= 전산상 합계:</span><span>{calcData.expected.toLocaleString()}원</span>
+                            <div className="cs-row">
+                                <span>➕ 오픈 시재:</span>
+                                <span>{calcData.opening.toLocaleString()}원</span>
+                            </div>
+                            <div className="cs-row">
+                                <span>➕ 현금 매출:</span>
+                                <span>{calcData.sales.toLocaleString()}원</span>
+                            </div>
+                            <hr
+                                style={{ margin: '8px 0', border: 'none', borderTop: '1px solid var(--border-color)' }}
+                            />
+                            <div className="cs-row" style={{ fontWeight: 'bold', color: 'var(--accent)' }}>
+                                <span>= 전산상 합계:</span>
+                                <span>{calcData.expected.toLocaleString()}원</span>
                             </div>
                         </div>
                         <p className="cs-desc">금고의 현금을 세어서 입력해주세요.</p>
                         {renderMoneyInputs()}
 
-                        <div style={{
-                            padding: '10px',
-                            borderRadius: 'var(--radius-md)',
-                            backgroundColor: (totalAmount - calcData.expected) === 0 ? 'var(--success-bg)' : 'var(--danger-bg)',
-                            fontWeight: 'bold',
-                            color: (totalAmount - calcData.expected) === 0 ? 'var(--success)' : 'var(--danger)'
-                        }}>
+                        <div
+                            style={{
+                                padding: '10px',
+                                borderRadius: 'var(--radius-md)',
+                                backgroundColor:
+                                    totalAmount - calcData.expected === 0 ? 'var(--success-bg)' : 'var(--danger-bg)',
+                                fontWeight: 'bold',
+                                color: totalAmount - calcData.expected === 0 ? 'var(--success)' : 'var(--danger)',
+                            }}
+                        >
                             차액: {(totalAmount - calcData.expected).toLocaleString()}원
-                            {(totalAmount - calcData.expected) === 0 ? " (정상 ✅)" : " (불일치 ⚠️)"}
+                            {totalAmount - calcData.expected === 0 ? ' (정상 ✅)' : ' (불일치 ⚠️)'}
                         </div>
-                        <button onClick={handleClose} className="btn-base btn-finish">마감 확정 (퇴근)</button>
-                        <button onClick={onClose} className="btn-cancel">취소 / 닫기</button>
+                        <button onClick={handleClose} className="btn-base btn-finish">
+                            마감 확정 (퇴근)
+                        </button>
+                        <button onClick={onClose} className="btn-cancel">
+                            취소 / 닫기
+                        </button>
                     </>
                 )}
 
                 {/* --- [상황 3: 완료] --- */}
                 {step === 'done' && (
                     <>
-                        <div style={{fontSize: '3.5rem', margin: '10px 0'}}>🔒</div>
-                        <p style={{fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)'}}>오늘의 정산이
-                            완료되었습니다.</p>
-                        <button onClick={onClose} className="btn-base btn-open">확인</button>
+                        <div style={{ fontSize: '3.5rem', margin: '10px 0' }}>🔒</div>
+                        <p style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                            오늘의 정산이 완료되었습니다.
+                        </p>
+                        <button onClick={onClose} className="btn-base btn-open">
+                            확인
+                        </button>
                     </>
                 )}
             </div>

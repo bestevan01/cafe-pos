@@ -1,77 +1,99 @@
-import {useState, useEffect} from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import {useNotification} from '../../hooks/useNotification';
+import { useNotification } from '../../hooks/useNotification';
 
-function UsersDashboard({onBack}) {
-    const {notify, confirm} = useNotification();
+function UsersDashboard({ onBack }) {
+    const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
     const [users, setUsers] = useState([]);
-    const [currentUserId, setCurrentUserId] = useState(null);
+    // localStorage는 렌더링 전에도 동기적으로 읽을 수 있으므로 effect 없이 lazy initializer로 초기화
+    const [currentUserId] = useState(() => {
+        const userStr = localStorage.getItem('user');
+        return userStr ? JSON.parse(userStr).id : null;
+    });
 
     // ---------------------------------------------------------
     // [2] API 및 데이터 처리
     // ---------------------------------------------------------
     const getAuthHeader = () => ({
-        headers: {Authorization: `Bearer ${localStorage.getItem('token')}`}
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 
-    useEffect(() => {
-        const userStr = localStorage.getItem('user');
-        if (userStr) setCurrentUserId(JSON.parse(userStr).id);
-        void fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
             const res = await axios.get('/api/admin/users', getAuthHeader());
             setUsers(res.data);
-        } catch (err) {
-            notify("직원 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-users'});
+        } catch {
+            notify('직원 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
+                icon: '⚠️',
+                dedupeKey: 'load-users',
+            });
         }
-    };
+    }, [notify]);
+
+    useEffect(() => {
+        // fetchUsers는 useCallback으로 메모이즈된 비동기 함수라 setState가 await 이후에만 일어남(effect 본문에서 동기 호출 아님) — 규칙 오탐.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void fetchUsers();
+    }, [fetchUsers]);
 
     const handleRoleChange = async (id, newRole) => {
-        if (!(await confirm(`정말 권한을 ${newRole}(으)로 변경하시겠습니까?`, {title: '권한 변경', confirmText: '변경'}))) return;
+        if (
+            !(await confirm(`정말 권한을 ${newRole}(으)로 변경하시겠습니까?`, {
+                title: '권한 변경',
+                confirmText: '변경',
+            }))
+        )
+            return;
         try {
-            await axios.patch(`/api/admin/users/${id}/role`, {role: newRole}, getAuthHeader());
-            notify('변경되었습니다.', {icon: '✅'});
+            await axios.patch(`/api/admin/users/${id}/role`, { role: newRole }, getAuthHeader());
+            notify('변경되었습니다.', { icon: '✅' });
             await fetchUsers();
         } catch (err) {
-            notify(err.response?.data?.message || '변경 실패', {icon: '⚠️'});
+            notify(err.response?.data?.message || '변경 실패', { icon: '⚠️' });
         }
     };
 
     const handleDeleteUser = async (targetUser) => {
         if (targetUser.role === 'pending') {
-            if (!(await confirm(`'${targetUser.name}' 님의 가입 신청을 거절하고 계정을 삭제하시겠습니까?`, {
-                title: '가입 거절',
-                confirmText: '거절·삭제',
-                danger: true
-            }))) return;
+            if (
+                !(await confirm(`'${targetUser.name}' 님의 가입 신청을 거절하고 계정을 삭제하시겠습니까?`, {
+                    title: '가입 거절',
+                    confirmText: '거절·삭제',
+                    danger: true,
+                }))
+            )
+                return;
         } else if (targetUser.role === 'staff') {
-            if (!(await confirm(`정말 직원 '${targetUser.name}' 님의 계정을 삭제하시겠습니까?`, {
-                title: '직원 계정 삭제',
-                confirmText: '삭제',
-                danger: true
-            }))) return;
-            if (!(await confirm('직원의 계정 및 관련 데이터가 영구적으로 삭제됩니다.\n그래도 삭제하시겠습니까?', {
-                title: '⚠️ 최종 경고',
-                confirmText: '영구 삭제',
-                danger: true
-            }))) return;
+            if (
+                !(await confirm(`정말 직원 '${targetUser.name}' 님의 계정을 삭제하시겠습니까?`, {
+                    title: '직원 계정 삭제',
+                    confirmText: '삭제',
+                    danger: true,
+                }))
+            )
+                return;
+            if (
+                !(await confirm('직원의 계정 및 관련 데이터가 영구적으로 삭제됩니다.\n그래도 삭제하시겠습니까?', {
+                    title: '⚠️ 최종 경고',
+                    confirmText: '영구 삭제',
+                    danger: true,
+                }))
+            )
+                return;
         }
 
         try {
             await axios.delete(`/api/admin/users/${targetUser.id}`, getAuthHeader());
-            notify('계정이 완전히 삭제되었습니다.', {icon: '✅'});
+            notify('계정이 완전히 삭제되었습니다.', { icon: '✅' });
             await fetchUsers();
         } catch (err) {
-            notify(err.response?.data?.message || '계정 삭제에 실패했습니다.', {icon: '⚠️'});
+            notify(err.response?.data?.message || '계정 삭제에 실패했습니다.', { icon: '⚠️' });
         }
     };
 
@@ -149,11 +171,13 @@ function UsersDashboard({onBack}) {
 
             <div className="users-header">
                 <div className="header-left">
-                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>
+                        뒤로
+                    </Button>
                     <h1 className="users-title">👥 직원 관리</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle/>
+                    <ThemeToggle />
                 </div>
             </div>
 
@@ -161,52 +185,65 @@ function UsersDashboard({onBack}) {
                 {/* 1. PC 뷰: 테이블 형식 */}
                 <table className="users-table-view">
                     <thead>
-                    <tr>
-                        <th>이름</th>
-                        <th>아이디</th>
-                        <th>가입일</th>
-                        <th>현재 권한</th>
-                        <th>권한 변경</th>
-                    </tr>
+                        <tr>
+                            <th>이름</th>
+                            <th>아이디</th>
+                            <th>가입일</th>
+                            <th>현재 권한</th>
+                            <th>권한 변경</th>
+                        </tr>
                     </thead>
                     <tbody>
-                    {displayUsers.map(user => (
-                        <tr key={user.id}>
-                            <td><strong>{user.name}</strong></td>
-                            <td>{user.username}</td>
-                            <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                            <td><span
-                                className={`role-badge ${getRoleClass(user.role)}`}>{getRoleName(user.role)}</span></td>
-                            <td>
-                                <div style={{display: 'flex', gap: '5px'}}>
-                                    <RenderActionButtons user={user} handleRoleChange={handleRoleChange}
-                                                         handleDeleteUser={handleDeleteUser}
-                                                         currentUserId={currentUserId}/>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
+                        {displayUsers.map((user) => (
+                            <tr key={user.id}>
+                                <td>
+                                    <strong>{user.name}</strong>
+                                </td>
+                                <td>{user.username}</td>
+                                <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                                <td>
+                                    <span className={`role-badge ${getRoleClass(user.role)}`}>
+                                        {getRoleName(user.role)}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                        <RenderActionButtons
+                                            user={user}
+                                            handleRoleChange={handleRoleChange}
+                                            handleDeleteUser={handleDeleteUser}
+                                            currentUserId={currentUserId}
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
 
                 {/* 2. 모바일 뷰: 카드 형식 */}
                 <div className="users-card-view">
-                    {displayUsers.map(user => (
+                    {displayUsers.map((user) => (
                         <div key={user.id} className="user-card">
                             <div className="user-card-header">
                                 <div>
                                     <div className="user-name">{user.name}</div>
                                     <div className="user-id">@{user.username}</div>
                                 </div>
-                                <span
-                                    className={`role-badge ${getRoleClass(user.role)}`}>{getRoleName(user.role)}</span>
+                                <span className={`role-badge ${getRoleClass(user.role)}`}>
+                                    {getRoleName(user.role)}
+                                </span>
                             </div>
                             <div className="user-card-body">
                                 <div>📅 가입일: {new Date(user.created_at).toLocaleDateString()}</div>
                             </div>
                             <div className="user-card-actions">
-                                <RenderActionButtons user={user} handleRoleChange={handleRoleChange}
-                                                     handleDeleteUser={handleDeleteUser} currentUserId={currentUserId}/>
+                                <RenderActionButtons
+                                    user={user}
+                                    handleRoleChange={handleRoleChange}
+                                    handleDeleteUser={handleDeleteUser}
+                                    currentUserId={currentUserId}
+                                />
                             </div>
                         </div>
                     ))}
@@ -219,25 +256,36 @@ function UsersDashboard({onBack}) {
 // ---------------------------------------------------------
 // [4] 헬퍼 컴포넌트 및 함수
 // ---------------------------------------------------------
-function RenderActionButtons({user, handleRoleChange, handleDeleteUser, currentUserId}) {
+function RenderActionButtons({ user, handleRoleChange, handleDeleteUser, currentUserId }) {
     if (user.id === currentUserId) return <div className="my-account-label">👤 내 계정</div>;
 
     return (
         <>
-            {user.role === 'pending' &&
-                <button className="btn-action-base btn-approve" onClick={() => handleRoleChange(user.id, 'staff')}>✅
-                    승인</button>}
-            {user.role !== 'staff' && user.role !== 'pending' &&
-                <button className="btn-action-base btn-demote" onClick={() => handleRoleChange(user.id, 'staff')}>⬇ 직원
-                    강등</button>}
-            {user.role !== 'admin' &&
-                <button className="btn-action-base btn-promote" onClick={() => handleRoleChange(user.id, 'admin')}>⬆ 관리자
-                    승급</button>}
-            {user.role !== 'pending' &&
-                <button className="btn-action-base btn-wait" onClick={() => handleRoleChange(user.id, 'pending')}>⏸
-                    대기로</button>}
-            {user.role !== 'admin' &&
-                <button className="btn-action-base btn-delete" onClick={() => handleDeleteUser(user)}>🗑️ 삭제</button>}
+            {user.role === 'pending' && (
+                <button className="btn-action-base btn-approve" onClick={() => handleRoleChange(user.id, 'staff')}>
+                    ✅ 승인
+                </button>
+            )}
+            {user.role !== 'staff' && user.role !== 'pending' && (
+                <button className="btn-action-base btn-demote" onClick={() => handleRoleChange(user.id, 'staff')}>
+                    ⬇ 직원 강등
+                </button>
+            )}
+            {user.role !== 'admin' && (
+                <button className="btn-action-base btn-promote" onClick={() => handleRoleChange(user.id, 'admin')}>
+                    ⬆ 관리자 승급
+                </button>
+            )}
+            {user.role !== 'pending' && (
+                <button className="btn-action-base btn-wait" onClick={() => handleRoleChange(user.id, 'pending')}>
+                    ⏸ 대기로
+                </button>
+            )}
+            {user.role !== 'admin' && (
+                <button className="btn-action-base btn-delete" onClick={() => handleDeleteUser(user)}>
+                    🗑️ 삭제
+                </button>
+            )}
         </>
     );
 }

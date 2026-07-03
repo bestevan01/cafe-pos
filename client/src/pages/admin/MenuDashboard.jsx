@@ -1,81 +1,90 @@
 import axios from 'axios';
-import {useState, useEffect} from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
-import {useNotification} from '../../hooks/useNotification';
+import { useNotification } from '../../hooks/useNotification';
 
-function MenuDashboard({onBack}) {
-    const {notify, confirm} = useNotification();
+function MenuDashboard({ onBack }) {
+    const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
     const [menuList, setMenuList] = useState([]);
     const [editingId, setEditingId] = useState(null);
-    const [formData, setFormData] = useState({name: '', price: '', type: 'coffee'});
+    const [formData, setFormData] = useState({ name: '', price: '', type: 'coffee' });
 
     // API 권한 토큰
     const getAuthHeader = () => ({
-        headers: {Authorization: `Bearer ${localStorage.getItem('token')}`}
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 
     // ---------------------------------------------------------
     // [2] API 통신 로직
     // ---------------------------------------------------------
-    useEffect(() => {
-        void fetchMenu();
-    }, []);
-
-    const fetchMenu = async () => {
+    const fetchMenu = useCallback(async () => {
         try {
             const res = await axios.get('/api/menu', getAuthHeader());
             setMenuList(res.data);
-        } catch (err) {
-            notify("메뉴 불러오기 실패", {icon: '⚠️'});
+        } catch {
+            notify('메뉴 불러오기 실패', { icon: '⚠️' });
         }
-    };
+    }, [notify]);
+
+    useEffect(() => {
+        // fetchMenu는 useCallback으로 메모이즈된 비동기 함수라 setState가 await 이후에만 일어남(effect 본문에서 동기 호출 아님) — 규칙 오탐.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void fetchMenu();
+    }, [fetchMenu]);
 
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
             await axios.post('/api/menu', formData, getAuthHeader());
-            notify("메뉴가 추가되었습니다.", {icon: '✅'});
-            setFormData({name: '', price: '', type: 'coffee'});
+            notify('메뉴가 추가되었습니다.', { icon: '✅' });
+            setFormData({ name: '', price: '', type: 'coffee' });
             await fetchMenu();
-        } catch (err) {
-            notify("추가 실패", {icon: '⚠️'});
+        } catch {
+            notify('추가 실패', { icon: '⚠️' });
         }
     };
 
     const handleDelete = async (id) => {
-        if (!(await confirm("정말 이 메뉴를 삭제하시겠습니까?", {title: "메뉴 삭제", confirmText: "삭제", danger: true}))) return;
+        if (
+            !(await confirm('정말 이 메뉴를 삭제하시겠습니까?', {
+                title: '메뉴 삭제',
+                confirmText: '삭제',
+                danger: true,
+            }))
+        )
+            return;
         try {
             await axios.delete(`/api/menu/${id}`, getAuthHeader());
             await fetchMenu();
-        } catch (err) {
-            notify("삭제 실패", {icon: '⚠️'});
+        } catch {
+            notify('삭제 실패', { icon: '⚠️' });
         }
     };
 
     const handleUpdate = async () => {
         try {
             await axios.patch(`/api/menu/${editingId}`, formData, getAuthHeader());
-            notify("수정되었습니다.", {icon: '✅'});
+            notify('수정되었습니다.', { icon: '✅' });
             setEditingId(null);
-            setFormData({name: '', price: '', type: 'coffee'});
+            setFormData({ name: '', price: '', type: 'coffee' });
             await fetchMenu();
-        } catch (err) {
-            notify("수정 실패", {icon: '⚠️'});
+        } catch {
+            notify('수정 실패', { icon: '⚠️' });
         }
     };
 
     const toggleSoldOut = async (menu) => {
         try {
             const newVal = menu.is_soldout ? 0 : 1;
-            await axios.patch(`/api/menu/${menu.id}`, {is_soldout: newVal}, getAuthHeader());
+            await axios.patch(`/api/menu/${menu.id}`, { is_soldout: newVal }, getAuthHeader());
             await fetchMenu();
-        } catch (err) {
-            notify("상태 변경 실패", {icon: '⚠️'});
+        } catch {
+            notify('상태 변경 실패', { icon: '⚠️' });
         }
     };
 
@@ -83,14 +92,14 @@ function MenuDashboard({onBack}) {
     // [3] 이벤트 핸들러 및 헬퍼
     // ---------------------------------------------------------
     const handleInputChange = (e) => {
-        setFormData({...formData, [e.target.name]: e.target.value});
+        setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const startEdit = (menu) => {
         setEditingId(menu.id);
-        setFormData({name: menu.name, price: menu.price, type: menu.type});
+        setFormData({ name: menu.name, price: menu.price, type: menu.type });
         // 모바일 환경 UX: 수정 버튼 클릭 시 폼 위치로 스크롤 이동
-        window.scrollTo({top: 0, behavior: 'smooth'});
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     // ---------------------------------------------------------
@@ -170,26 +179,47 @@ function MenuDashboard({onBack}) {
             {/* 헤더 */}
             <div className="menu-header">
                 <div className="header-left">
-                    <Button variant="neutral" icon="⬅" onClick={onBack}>뒤로</Button>
+                    <Button variant="neutral" icon="⬅" onClick={onBack}>
+                        뒤로
+                    </Button>
                     <h1 className="menu-title">📋 메뉴 관리</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle/>
+                    <ThemeToggle />
                 </div>
             </div>
 
             <div className="menu-content">
                 {/* 1. 입력 폼 섹션 (추가/수정) */}
                 <Card className="form-section">
-                    <h3 className="form-title">{editingId ? "✏️ 메뉴 수정" : "➕ 메뉴 추가"}</h3>
-                    <form onSubmit={editingId ? (e) => {
-                        e.preventDefault();
-                        void handleUpdate();
-                    } : handleAdd}>
-                        <input name="name" placeholder="메뉴 이름 (예: 카페라떼)" value={formData.name}
-                               onChange={handleInputChange} className="menu-input" required/>
-                        <input name="price" type="number" placeholder="가격 (예: 3000)" value={formData.price}
-                               onChange={handleInputChange} className="menu-input" required/>
+                    <h3 className="form-title">{editingId ? '✏️ 메뉴 수정' : '➕ 메뉴 추가'}</h3>
+                    <form
+                        onSubmit={
+                            editingId
+                                ? (e) => {
+                                      e.preventDefault();
+                                      void handleUpdate();
+                                  }
+                                : handleAdd
+                        }
+                    >
+                        <input
+                            name="name"
+                            placeholder="메뉴 이름 (예: 카페라떼)"
+                            value={formData.name}
+                            onChange={handleInputChange}
+                            className="menu-input"
+                            required
+                        />
+                        <input
+                            name="price"
+                            type="number"
+                            placeholder="가격 (예: 3000)"
+                            value={formData.price}
+                            onChange={handleInputChange}
+                            className="menu-input"
+                            required
+                        />
                         <select name="type" value={formData.type} onChange={handleInputChange} className="menu-input">
                             <option value="coffee">커피</option>
                             <option value="tea">티/에이드</option>
@@ -197,13 +227,21 @@ function MenuDashboard({onBack}) {
                         </select>
 
                         <Button type="submit" full variant={editingId ? 'warning' : 'primary'}>
-                            {editingId ? "수정 완료" : "추가하기"}
+                            {editingId ? '수정 완료' : '추가하기'}
                         </Button>
                         {editingId && (
-                            <Button type="button" variant="neutral" full style={{marginTop: 8}} onClick={() => {
-                                setEditingId(null);
-                                setFormData({name: '', price: '', type: 'coffee'});
-                            }}>취소</Button>
+                            <Button
+                                type="button"
+                                variant="neutral"
+                                full
+                                style={{ marginTop: 8 }}
+                                onClick={() => {
+                                    setEditingId(null);
+                                    setFormData({ name: '', price: '', type: 'coffee' });
+                                }}
+                            >
+                                취소
+                            </Button>
                         )}
                     </form>
                 </Card>
@@ -213,39 +251,48 @@ function MenuDashboard({onBack}) {
                     {/* PC 테이블 뷰 */}
                     <table className="menu-table-view">
                         <thead>
-                        <tr>
-                            <th>이름</th>
-                            <th>가격</th>
-                            <th>분류</th>
-                            <th>상태 변경</th>
-                            <th>관리</th>
-                        </tr>
+                            <tr>
+                                <th>이름</th>
+                                <th>가격</th>
+                                <th>분류</th>
+                                <th>상태 변경</th>
+                                <th>관리</th>
+                            </tr>
                         </thead>
                         <tbody>
-                        {menuList.map(menu => (
-                            <tr key={menu.id}>
-                                <td><strong>{menu.name}</strong></td>
-                                <td>{menu.price.toLocaleString()}원</td>
-                                <td><span className="badge-type">{menu.type}</span></td>
-                                <td>
-                                    <button onClick={() => toggleSoldOut(menu)}
-                                            className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
-                                        {menu.is_soldout ? "🚫 품절" : "🟢 판매중"}
-                                    </button>
-                                </td>
-                                <td>
-                                    <button onClick={() => startEdit(menu)} className="btn-action btn-edit">수정</button>
-                                    <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">삭제
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
+                            {menuList.map((menu) => (
+                                <tr key={menu.id}>
+                                    <td>
+                                        <strong>{menu.name}</strong>
+                                    </td>
+                                    <td>{menu.price.toLocaleString()}원</td>
+                                    <td>
+                                        <span className="badge-type">{menu.type}</span>
+                                    </td>
+                                    <td>
+                                        <button
+                                            onClick={() => toggleSoldOut(menu)}
+                                            className={menu.is_soldout ? 'btn-soldout' : 'btn-sale'}
+                                        >
+                                            {menu.is_soldout ? '🚫 품절' : '🟢 판매중'}
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <button onClick={() => startEdit(menu)} className="btn-action btn-edit">
+                                            수정
+                                        </button>
+                                        <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">
+                                            삭제
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
 
                     {/* 모바일 카드 뷰 */}
                     <div className="menu-card-view">
-                        {menuList.map(menu => (
+                        {menuList.map((menu) => (
                             <div key={menu.id} className="menu-card">
                                 <div>
                                     <div className="menu-card-header">
@@ -255,15 +302,18 @@ function MenuDashboard({onBack}) {
                                     <div className="menu-card-price">{menu.price.toLocaleString()}원</div>
                                 </div>
                                 <div className="menu-card-actions">
-                                    <button onClick={() => toggleSoldOut(menu)}
-                                            className={menu.is_soldout ? "btn-soldout" : "btn-sale"}>
-                                        {menu.is_soldout ? "🚫 품절중" : "🟢 판매중"}
+                                    <button
+                                        onClick={() => toggleSoldOut(menu)}
+                                        className={menu.is_soldout ? 'btn-soldout' : 'btn-sale'}
+                                    >
+                                        {menu.is_soldout ? '🚫 품절중' : '🟢 판매중'}
                                     </button>
                                     <div>
-                                        <button onClick={() => startEdit(menu)} className="btn-action btn-edit">수정
+                                        <button onClick={() => startEdit(menu)} className="btn-action btn-edit">
+                                            수정
                                         </button>
-                                        <button onClick={() => handleDelete(menu.id)}
-                                                className="btn-action btn-del">삭제
+                                        <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">
+                                            삭제
                                         </button>
                                     </div>
                                 </div>
