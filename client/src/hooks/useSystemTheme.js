@@ -1,4 +1,5 @@
-import {useEffect} from 'react';
+import { useEffect } from 'react';
+import { applyStoredTheme } from './useTheme';
 
 /**
  * 시스템의 다크/라이트 모드 설정을 감지하여
@@ -17,6 +18,10 @@ export const useSystemTheme = () => {
         applySystemTheme(mediaQuery);
         mediaQuery.addEventListener('change', applySystemTheme);
 
-        return () => mediaQuery.removeEventListener('change', applySystemTheme);
+        return () => {
+            mediaQuery.removeEventListener('change', applySystemTheme);
+            // 화면을 벗어나면 사용자가 저장해둔 테마 설정으로 되돌린다.
+            applyStoredTheme();
+        };
     }, []);
 };

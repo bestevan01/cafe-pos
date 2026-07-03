@@ -1,15 +1,15 @@
-import {useEffect, useState, useRef} from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
-import {startAuthentication, WebAuthnAbortService} from "@simplewebauthn/browser";
-import {useSystemTheme} from '../../hooks/useSystemTheme';
-import {useNotification} from '../../hooks/useNotification';
+import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
+import { useSystemTheme } from '../../hooks/useSystemTheme';
+import { useNotification } from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 
-function Login({onLoginSuccess, onSwitchToRegister}) {
-    const [formData, setFormData] = useState({username: '', password: ''});
+function Login({ onLoginSuccess, onSwitchToRegister }) {
+    const [formData, setFormData] = useState({ username: '', password: '' });
     const [submitting, setSubmitting] = useState(false);
     const formRef = useRef(null);
-    const {notify} = useNotification();
+    const { notify } = useNotification();
     // Safari 대응: '패스키로 로그인' 버튼 클릭 시 옵션을 await로 받아오면 제스처가 만료돼 팝업이 안 뜬다.
     // → 옵션을 미리 받아 두고 클릭 시 곧바로 startAuthentication()을 호출한다.
     const [passkeyAuthOptions, setPasskeyAuthOptions] = useState(null);
@@ -18,43 +18,48 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
     useSystemTheme();
 
     const handleChange = (e) => {
-        setFormData({...formData, [e.target.name]: e.target.value});
+        setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     // 로그인 성공 시 공통 처리
     const handleSuccess = (data) => {
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify({
-            name: data.name,
-            role: data.role,
-            username: data.username,
-            id: data.id
-        }));
-        notify(`${data.name}님, 환영합니다!`, {icon: '✅'});
+        localStorage.setItem(
+            'user',
+            JSON.stringify({
+                name: data.name,
+                role: data.role,
+                username: data.username,
+                id: data.id,
+            }),
+        );
+        notify(`${data.name}님, 환영합니다!`, { icon: '✅' });
         onLoginSuccess(data);
     };
 
-    useEffect(() => {
-        // 패스키 로그인은 '패스키로 로그인' 버튼으로만 제공한다.
-        // (아이디칸 자동완성/Conditional UI는 모바일에서 느리고, 의식이 pending으로 남아 다른 화면을 막는 문제가 있어 제거)
-        // 버튼 클릭 시 await 없이 즉시 호출할 수 있도록 옵션만 미리 받아 둔다.
-        void prefetchAuthOptions();
-
-        // 화면을 벗어날 때 진행 중이던 패스키 의식이 있으면 취소(다음 화면의 create()/get() 차단 방지)
-        return () => {
-            WebAuthnAbortService.cancelCeremony();
-        };
-    }, []);
-
     // '패스키로 로그인' 버튼용 옵션을 미리(콜드스타트 서버를 깨우면서) 받아 둔다. 챌린지 유효시간은 15분.
-    const prefetchAuthOptions = async () => {
+    const prefetchAuthOptions = useCallback(async () => {
         try {
             const resp = await axios.get('/api/passkey/login-options');
             setPasskeyAuthOptions(resp.data);
         } catch {
             setPasskeyAuthOptions(null);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        // 패스키 로그인은 '패스키로 로그인' 버튼으로만 제공한다.
+        // (아이디칸 자동완성/Conditional UI는 모바일에서 느리고, 의식이 pending으로 남아 다른 화면을 막는 문제가 있어 제거)
+        // 버튼 클릭 시 await 없이 즉시 호출할 수 있도록 옵션만 미리 받아 둔다.
+        // prefetchAuthOptions는 useCallback으로 메모이즈된 비동기 함수라 setState가 await 이후에만 일어남(effect 본문에서 동기 호출 아님) — 규칙 오탐.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void prefetchAuthOptions();
+
+        // 화면을 벗어날 때 진행 중이던 패스키 의식이 있으면 취소(다음 화면의 create()/get() 차단 방지)
+        return () => {
+            WebAuthnAbortService.cancelCeremony();
+        };
+    }, [prefetchAuthOptions]);
 
     const handleAutoFill = (e) => {
         if (e.animationName === 'onAutoFillDetected') {
@@ -72,7 +77,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
 
         const payload = {
             username: e.target.username.value,
-            password: e.target.password.value
+            password: e.target.password.value,
         };
 
         try {
@@ -82,8 +87,9 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                 handleSuccess(res.data);
             }
         } catch (err) {
-            if (err.code === 'ECONNABORTED') notify("서버 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.", {icon: '⏳'});
-            else notify(err.response?.data?.message || "로그인 실패", {icon: '⚠️'});
+            if (err.code === 'ECONNABORTED')
+                notify('서버 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.', { icon: '⏳' });
+            else notify(err.response?.data?.message || '로그인 실패', { icon: '⚠️' });
         } finally {
             setSubmitting(false);
         }
@@ -99,7 +105,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                 const resp = await axios.get('/api/passkey/login-options');
                 options = resp.data;
             } catch {
-                notify("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.", {icon: '⚠️'});
+                notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
                 return;
             }
         }
@@ -109,27 +115,27 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
         let asseResp;
         try {
             // ⚠️ 이 호출 앞에 await(네트워크)를 두면 Safari에서 제스처가 만료돼 생체인증 팝업이 안 뜬다.
-            asseResp = await startAuthentication({optionsJSON: options});
+            asseResp = await startAuthentication({ optionsJSON: options });
         } catch (error) {
             setSubmitting(false);
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
             if (error.name === 'NotAllowedError') {
-                console.log("패스키 인증 취소됨");
+                console.log('패스키 인증 취소됨');
                 return;
             }
             console.error(error);
-            notify("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.", {icon: '⚠️'});
+            notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
             return;
         }
 
         try {
-            const verificationResp = await axios.post('/api/passkey/login-verify', {body: asseResp});
+            const verificationResp = await axios.post('/api/passkey/login-verify', { body: asseResp });
             if (verificationResp.data.success) {
                 handleSuccess(verificationResp.data);
             }
         } catch (error) {
             console.error(error);
-            notify("패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.", {icon: '⚠️'});
+            notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
         } finally {
             setSubmitting(false);
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
@@ -199,7 +205,7 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
             </style>
 
             <div className="login-card">
-                <img src="/logo.svg" alt="Baek's Coffee" className="login-logo"/>
+                <img src="/logo.svg" alt="Baek's Coffee" className="login-logo" />
                 <h2 className="login-title">직원 로그인</h2>
 
                 <form ref={formRef} onSubmit={handleSubmit} className="login-form">
@@ -236,14 +242,23 @@ function Login({onLoginSuccess, onSwitchToRegister}) {
                     <div className="divider-line"></div>
                 </div>
 
-                <Button onClick={handlePasskeyLogin} variant="secondary" size="lg" full icon="🔑"
-                        className="login-passkey" disabled={submitting}>
+                <Button
+                    onClick={handlePasskeyLogin}
+                    variant="secondary"
+                    size="lg"
+                    full
+                    icon="🔑"
+                    className="login-passkey"
+                    disabled={submitting}
+                >
                     패스키(지문/FaceID)로 로그인
                 </Button>
 
                 <div className="register-text">
                     계정이 없으신가요?
-                    <span onClick={onSwitchToRegister} className="register-link">회원가입</span>
+                    <span onClick={onSwitchToRegister} className="register-link">
+                        회원가입
+                    </span>
                 </div>
             </div>
         </div>

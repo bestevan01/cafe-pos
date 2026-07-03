@@ -1,13 +1,24 @@
-import {useState, useRef} from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import {startAuthentication} from "@simplewebauthn/browser";
-import {useNotification} from '../../hooks/useNotification';
+import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
+import { useNotification } from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 
-function ProfileAuth({currentUser, onSuccess, onCancel}) {
-    const {notify} = useNotification();
+function ProfileAuth({ currentUser, onSuccess, onCancel }) {
+    const { notify } = useNotification();
     const [password, setPassword] = useState('');
     const formRef = useRef(null);
+
+    useEffect(() => {
+        // 이전 화면에서 남은 WebAuthn 의식이 있으면 취소한다.
+        WebAuthnAbortService.cancelCeremony();
+
+        // 인증 도중 사용자가 모달을 취소하거나 강제 언마운트되면 진행 중인 의식을 취소한다.
+        // (Safari는 남은 의식을 "진행 중"으로 보고 다음 create()/get()을 NotAllowedError로 조용히 막는다.)
+        return () => {
+            WebAuthnAbortService.cancelCeremony();
+        };
+    }, []);
 
     // ---------------------------------------------------------
     // [1] 비밀번호 인증 핸들러
@@ -18,14 +29,14 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
             // 기존 로그인 API를 재사용하여 비밀번호 검증 (자동완성 대응: 폼 DOM 값을 직접 읽음)
             const res = await axios.post('/api/login', {
                 username: currentUser.username,
-                password: e.target.password.value
+                password: e.target.password.value,
             });
 
             if (res.data.success) {
                 onSuccess();
             }
-        } catch (err) {
-            notify("비밀번호가 일치하지 않습니다.", {icon: '⚠️'});
+        } catch {
+            notify('비밀번호가 일치하지 않습니다.', { icon: '⚠️' });
         }
     };
 
@@ -47,7 +58,7 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
             const resp = await axios.get('/api/passkey/login-options');
             let asseResp;
             try {
-                asseResp = await startAuthentication({optionsJSON: resp.data});
+                asseResp = await startAuthentication({ optionsJSON: resp.data });
             } catch (error) {
                 if (error.name === 'NotAllowedError') return;
                 return;
@@ -62,12 +73,12 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                 if (verificationResp.data.username === currentUser.username) {
                     onSuccess();
                 } else {
-                    notify("현재 로그인된 계정의 패스키가 아닙니다.", {icon: '⚠️'});
+                    notify('현재 로그인된 계정의 패스키가 아닙니다.', { icon: '⚠️' });
                 }
             }
         } catch (err) {
             console.error(err);
-            notify("패스키 인증 실패", {icon: '⚠️'});
+            notify('패스키 인증 실패', { icon: '⚠️' });
         }
     };
 
@@ -123,7 +134,11 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
 
             <div className="auth-modal">
                 <h2 className="auth-title">🔒 보안 인증</h2>
-                <p className="auth-desc">개인정보를 수정하려면<br/>비밀번호 또는 패스키로 인증해주세요.</p>
+                <p className="auth-desc">
+                    개인정보를 수정하려면
+                    <br />
+                    비밀번호 또는 패스키로 인증해주세요.
+                </p>
 
                 <form ref={formRef} onSubmit={handlePasswordAuth} className="auth-form">
                     {/* Safari/iCloud 키체인이 저장된 비밀번호를 자동완성하려면 폼 안에 username 필드가 있어야 한다(화면엔 숨김). */}
@@ -142,7 +157,7 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                             padding: 0,
                             border: 0,
                             opacity: 0,
-                            pointerEvents: 'none'
+                            pointerEvents: 'none',
                         }}
                     />
                     <input
@@ -156,13 +171,19 @@ function ProfileAuth({currentUser, onSuccess, onCancel}) {
                         onAnimationStart={handleAutoFill}
                         autoFocus
                     />
-                    <Button type="submit" size="lg" full>확인</Button>
+                    <Button type="submit" size="lg" full>
+                        확인
+                    </Button>
                 </form>
 
                 <div className="divider">또는</div>
 
-                <button onClick={handlePasskeyAuth} className="auth-btn btn-passkey">🔑 패스키로 인증</button>
-                <Button onClick={onCancel} variant="secondary" size="lg" full>취소</Button>
+                <button onClick={handlePasskeyAuth} className="auth-btn btn-passkey">
+                    🔑 패스키로 인증
+                </button>
+                <Button onClick={onCancel} variant="secondary" size="lg" full>
+                    취소
+                </Button>
             </div>
         </div>
     );

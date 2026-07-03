@@ -1,4 +1,4 @@
-import {useSyncExternalStore} from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
  * 테마(light/dark/system) 전역 단일 소스.
@@ -12,6 +12,11 @@ let theme = localStorage.getItem('theme') || 'system';
 function apply() {
     const dark = theme === 'dark' || (theme === 'system' && mql.matches);
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+}
+
+/** 저장된 사용자 테마를 다시 적용한다(다른 곳에서 data-theme을 임시로 덮어썼다가 되돌릴 때 사용). */
+export function applyStoredTheme() {
+    apply();
 }
 
 apply(); // import 시점에 곧바로 적용
@@ -34,5 +39,5 @@ function subscribe(fn) {
 /** const { theme, setTheme } = useTheme(); */
 export function useTheme() {
     const current = useSyncExternalStore(subscribe, () => theme);
-    return {theme: current, setTheme};
+    return { theme: current, setTheme };
 }

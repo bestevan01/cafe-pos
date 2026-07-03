@@ -1,24 +1,28 @@
-import {useState, useEffect} from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
-import {startRegistration, WebAuthnAbortService} from '@simplewebauthn/browser';
-import {useNotification} from '../../hooks/useNotification';
+import { startRegistration, WebAuthnAbortService } from '@simplewebauthn/browser';
+import { useNotification } from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 import PasswordStrength from '../../components/PasswordStrength';
-import {isStrongPassword} from '../../utils/passwordPolicy';
+import { isStrongPassword } from '../../utils/passwordPolicy';
 
-function EditProfile({onBack}) {
-    const {notify, confirm} = useNotification();
+function EditProfile({ onBack, onLogout }) {
+    const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
-    const [user, setUser] = useState({id: null, name: '', username: ''});
+    // localStorage는 렌더링 전에도 동기적으로 읽을 수 있으므로 effect 없이 lazy initializer로 초기화
+    const [user] = useState(() => {
+        const userStr = localStorage.getItem('user');
+        return userStr ? JSON.parse(userStr) : { id: null, name: '', username: '' };
+    });
     const [passkeys, setPasskeys] = useState([]);
     // Safari 대응: 클릭 핸들러 안에서 옵션을 await로 받아오면 사용자 제스처가 만료돼 생체인증 팝업이 안 뜬다.
     // → 옵션을 미리 받아 두고, 클릭 시에는 await 없이 곧바로 startRegistration()을 호출한다.
     const [registerOptions, setRegisterOptions] = useState(null);
     const [isChangingPassword, setIsChangingPassword] = useState(false);
-    const [pwForm, setPwForm] = useState({newPassword: '', confirmPassword: ''});
+    const [pwForm, setPwForm] = useState({ newPassword: '', confirmPassword: '' });
     const [editingId, setEditingId] = useState(null); // 이름 변경 중인 패스키 id
     const [editName, setEditName] = useState('');
 
@@ -26,27 +30,11 @@ function EditProfile({onBack}) {
     // [2] API 및 데이터 처리
     // ---------------------------------------------------------
     const getAuthHeader = () => ({
-        headers: {Authorization: `Bearer ${localStorage.getItem('token')}`}
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 
-    useEffect(() => {
-        // 이전 화면(로그인 Conditional UI 등)에서 남은 WebAuthn 의식이 있으면 취소한다.
-        // 안 그러면 "기기 등록" 시 create()를 Safari가 NotAllowedError로 막아 팝업이 안 뜬다.
-        WebAuthnAbortService.cancelCeremony();
-
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-            const parsedUser = JSON.parse(userStr);
-            setUser(parsedUser);
-            if (parsedUser.id) {
-                void fetchPasskeys(parsedUser.id);
-                void prefetchRegisterOptions(parsedUser.id);
-            }
-        }
-    }, []);
-
     // 등록 옵션을 미리(콜드스타트 서버를 깨우면서) 받아 둔다. 챌린지 유효시간은 5분.
-    const prefetchRegisterOptions = async (userId) => {
+    const prefetchRegisterOptions = useCallback(async (userId) => {
         if (!userId) return;
         try {
             const resp = await axios.get(`/api/passkey/register-options?userId=${userId}`, getAuthHeader());
@@ -54,35 +42,60 @@ function EditProfile({onBack}) {
         } catch {
             setRegisterOptions(null);
         }
-    };
+    }, []);
 
-    const fetchPasskeys = async (userId) => {
-        try {
-            const res = await axios.get(`/api/passkeys?userId=${userId}`, getAuthHeader());
-            setPasskeys(res.data);
-        } catch (err) {
-            notify("패스키 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", {icon: '⚠️', dedupeKey: 'load-passkey'});
+    const fetchPasskeys = useCallback(
+        async (userId) => {
+            try {
+                const res = await axios.get(`/api/passkeys?userId=${userId}`, getAuthHeader());
+                setPasskeys(res.data);
+            } catch {
+                notify('패스키 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
+                    icon: '⚠️',
+                    dedupeKey: 'load-passkey',
+                });
+            }
+        },
+        [notify],
+    );
+
+    useEffect(() => {
+        // 이전 화면(로그인 Conditional UI 등)에서 남은 WebAuthn 의식이 있으면 취소한다.
+        // 안 그러면 "기기 등록" 시 create()를 Safari가 NotAllowedError로 막아 팝업이 안 뜬다.
+        WebAuthnAbortService.cancelCeremony();
+
+        if (user.id) {
+            // fetchPasskeys/prefetchRegisterOptions는 useCallback으로 메모이즈된 비동기 함수라 setState가 await 이후에만 일어남(effect 본문에서 동기 호출 아님) — 규칙 오탐.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            void fetchPasskeys(user.id);
+            void prefetchRegisterOptions(user.id);
         }
-    };
+    }, [user.id, fetchPasskeys, prefetchRegisterOptions]);
 
     const handleChangePassword = async () => {
-        if (!pwForm.newPassword || !pwForm.confirmPassword) return notify("모든 빈칸을 채워주세요.", {icon: '⚠️'});
-        if (pwForm.newPassword !== pwForm.confirmPassword) return notify("새 비밀번호가 일치하지 않습니다.", {icon: '⚠️'});
-        if (!isStrongPassword(pwForm.newPassword)) return notify("비밀번호는 8자 이상이며 영문·숫자·특수문자를 모두 포함해야 합니다.", {icon: '⚠️'});
-        if (!(await confirm("비밀번호를 변경하시겠습니까?", {confirmText: "변경"}))) return;
+        if (!pwForm.newPassword || !pwForm.confirmPassword) return notify('모든 빈칸을 채워주세요.', { icon: '⚠️' });
+        if (pwForm.newPassword !== pwForm.confirmPassword)
+            return notify('새 비밀번호가 일치하지 않습니다.', { icon: '⚠️' });
+        if (!isStrongPassword(pwForm.newPassword))
+            return notify('비밀번호는 8자 이상이며 영문·숫자·특수문자를 모두 포함해야 합니다.', { icon: '⚠️' });
+        if (!(await confirm('비밀번호를 변경하시겠습니까?', { confirmText: '변경' }))) return;
 
         try {
-            const res = await axios.patch(`/api/users/${user.id}/password`, {
-                newPassword: pwForm.newPassword
-            }, getAuthHeader());
+            const res = await axios.patch(
+                `/api/users/${user.id}/password`,
+                {
+                    newPassword: pwForm.newPassword,
+                },
+                getAuthHeader(),
+            );
 
             if (res.data.success) {
-                notify("비밀번호가 성공적으로 변경되었습니다.", {icon: '✅'});
-                setPwForm({newPassword: '', confirmPassword: ''});
+                notify('비밀번호가 성공적으로 변경되었습니다.', { icon: '✅' });
+                setPwForm({ newPassword: '', confirmPassword: '' });
                 setIsChangingPassword(false);
             }
         } catch (err) {
-            notify(err.response?.data?.message || "비밀번호 변경 실패", {icon: '⚠️'});
+            notify(err.response?.data?.message || '비밀번호 변경 실패', { icon: '⚠️' });
         }
     };
 
@@ -97,7 +110,7 @@ function EditProfile({onBack}) {
                 const resp = await axios.get(`/api/passkey/register-options?userId=${user.id}`, getAuthHeader());
                 options = resp.data;
             } catch {
-                notify("패스키 등록에 실패했습니다.", {icon: '⚠️'});
+                notify('패스키 등록에 실패했습니다.', { icon: '⚠️' });
                 return;
             }
         }
@@ -106,40 +119,52 @@ function EditProfile({onBack}) {
         let attResp;
         try {
             // ⚠️ 이 호출 앞에 await(네트워크)를 두면 Safari에서 제스처가 만료돼 팝업이 안 뜬다.
-            attResp = await startRegistration({optionsJSON: options});
+            attResp = await startRegistration({ optionsJSON: options });
         } catch (error) {
             console.error('패스키 등록 오류:', error.name, error.message); // 진단용(NotAllowedError 포함)
             void prefetchRegisterOptions(user.id); // 다음 시도용 새 옵션 준비
-            if (error.name === 'InvalidStateError') notify('이미 등록된 기기입니다!', {icon: '⚠️'});
-            else if (error.name !== 'NotAllowedError') notify('등록 오류: ' + error.message, {icon: '⚠️'});
+            if (error.name === 'InvalidStateError') notify('이미 등록된 기기입니다!', { icon: '⚠️' });
+            else if (error.name !== 'NotAllowedError') notify('등록 오류: ' + error.message, { icon: '⚠️' });
             return;
         }
 
         try {
-            const verificationResp = await axios.post('/api/passkey/register-verify', {
-                userId: user.id, body: attResp,
-            }, getAuthHeader());
+            const verificationResp = await axios.post(
+                '/api/passkey/register-verify',
+                {
+                    userId: user.id,
+                    body: attResp,
+                },
+                getAuthHeader(),
+            );
 
             if (verificationResp.data.success) {
-                notify("기기가 등록되었습니다.", {icon: '✅'});
+                notify('기기가 등록되었습니다.', { icon: '✅' });
                 await fetchPasskeys(user.id);
             }
         } catch (error) {
             console.error(error);
-            notify("패스키 등록에 실패했습니다.", {icon: '⚠️'});
+            notify('패스키 등록에 실패했습니다.', { icon: '⚠️' });
         } finally {
             void prefetchRegisterOptions(user.id); // 다음 시도용 새 옵션 준비
         }
     };
 
     const handleDeletePasskey = async (credentialId) => {
-        if (!(await confirm("정말 이 기기를 삭제하시겠습니까?", {title: "기기 삭제", confirmText: "삭제", danger: true}))) return;
+        if (
+            !(await confirm('정말 이 기기를 삭제하시겠습니까?', {
+                title: '기기 삭제',
+                confirmText: '삭제',
+                danger: true,
+            }))
+        )
+            return;
         try {
             await axios.delete(`/api/passkeys/${credentialId}`, getAuthHeader());
-            notify("삭제되었습니다.", {icon: '✅'});
+            notify('삭제되었습니다.', { icon: '✅' });
             await fetchPasskeys(user.id);
         } catch (err) {
-            notify("삭제 실패: " + err.message, {icon: '⚠️'});
+            notify('삭제 실패: ' + err.message, { icon: '⚠️' });
         }
     };
 
@@ -150,29 +175,23 @@ function EditProfile({onBack}) {
 
     const handleRenamePasskey = async (id) => {
         const name = editName.trim();
-        if (!name) return notify("이름을 입력해주세요.", {icon: '⚠️'});
+        if (!name) return notify('이름을 입력해주세요.', { icon: '⚠️' });
         try {
-            await axios.patch(`/api/passkeys/${id}`, {device_name: name}, getAuthHeader());
+            await axios.patch(`/api/passkeys/${id}`, { device_name: name }, getAuthHeader());
             setEditingId(null);
             await fetchPasskeys(user.id);
         } catch (err) {
-            notify(err.response?.data?.message || "이름 변경 실패", {icon: '⚠️'});
+            notify(err.response?.data?.message || '이름 변경 실패', { icon: '⚠️' });
         }
-    };
-
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.reload();
     };
 
     // ---------------------------------------------------------
     // [4] 렌더링 (Render)
     // ---------------------------------------------------------
     return (
-        <div className="ep-container" style={{position: 'relative'}}>
-            <div style={{position: 'absolute', top: '20px', right: '20px', zIndex: 1000}}>
-                <ThemeToggle/>
+        <div className="ep-container" style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
+                <ThemeToggle />
             </div>
 
             <style>
@@ -235,40 +254,77 @@ function EditProfile({onBack}) {
             <div className={`ep-card${isChangingPassword ? '' : ' ep-card-wide'}`}>
                 {isChangingPassword ? (
                     // 1. 비밀번호 변경 화면
-                    <form className="ep-pw-form" onSubmit={(e) => {
-                        e.preventDefault();
-                        void handleChangePassword();
-                    }}>
+                    <form
+                        className="ep-pw-form"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            void handleChangePassword();
+                        }}
+                    >
                         <h2 className="ep-header">🔒 비밀번호 변경</h2>
-                        <p className="ep-desc">안전한 계정 사용을 위해<br/>새로운 비밀번호를 입력해주세요.</p>
+                        <p className="ep-desc">
+                            안전한 계정 사용을 위해
+                            <br />
+                            새로운 비밀번호를 입력해주세요.
+                        </p>
                         {/* Safari가 '강력한 암호 자동 생성'을 제안하려면 username 컨텍스트가 필요(화면엔 숨김).
                             없으면 이 계정의 기존 저장 비밀번호 자동완성을 띄운다. */}
-                        <input type="text" name="username" value={user.username} autoComplete="username"
-                               readOnly tabIndex={-1} aria-hidden="true"
-                               style={{
-                                   position: 'absolute',
-                                   width: 1,
-                                   height: 1,
-                                   padding: 0,
-                                   border: 0,
-                                   opacity: 0,
-                                   pointerEvents: 'none'
-                               }}/>
-                        <div className="ep-row" style={{gap: '12px', margin: '15px 0'}}>
-                            <input type="password" placeholder="새 비밀번호" value={pwForm.newPassword}
-                                   onChange={(e) => setPwForm({...pwForm, newPassword: e.target.value})}
-                                   className="ep-input" autoComplete="new-password"/>
-                            <input type="password" placeholder="새 비밀번호 확인" value={pwForm.confirmPassword}
-                                   onChange={(e) => setPwForm({...pwForm, confirmPassword: e.target.value})}
-                                   className="ep-input" autoComplete="new-password"/>
+                        <input
+                            type="text"
+                            name="username"
+                            value={user.username}
+                            autoComplete="username"
+                            readOnly
+                            tabIndex={-1}
+                            aria-hidden="true"
+                            style={{
+                                position: 'absolute',
+                                width: 1,
+                                height: 1,
+                                padding: 0,
+                                border: 0,
+                                opacity: 0,
+                                pointerEvents: 'none',
+                            }}
+                        />
+                        <div className="ep-row" style={{ gap: '12px', margin: '15px 0' }}>
+                            <input
+                                type="password"
+                                placeholder="새 비밀번호"
+                                value={pwForm.newPassword}
+                                onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
+                                className="ep-input"
+                                autoComplete="new-password"
+                            />
+                            <input
+                                type="password"
+                                placeholder="새 비밀번호 확인"
+                                value={pwForm.confirmPassword}
+                                onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
+                                className="ep-input"
+                                autoComplete="new-password"
+                            />
                         </div>
-                        <PasswordStrength password={pwForm.newPassword} confirmPassword={pwForm.confirmPassword}/>
+                        <PasswordStrength password={pwForm.newPassword} confirmPassword={pwForm.confirmPassword} />
                         <div className="footer-btns">
-                            <Button type="button" variant="neutral" onClick={() => setIsChangingPassword(false)}
-                                    style={{flex: 1, padding: 14}}>취소</Button>
-                            <Button type="submit" style={{flex: 1, padding: 14}}
-                                    disabled={!isStrongPassword(pwForm.newPassword) || pwForm.newPassword !== pwForm.confirmPassword}>변경
-                                저장</Button>
+                            <Button
+                                type="button"
+                                variant="neutral"
+                                onClick={() => setIsChangingPassword(false)}
+                                style={{ flex: 1, padding: 14 }}
+                            >
+                                취소
+                            </Button>
+                            <Button
+                                type="submit"
+                                style={{ flex: 1, padding: 14 }}
+                                disabled={
+                                    !isStrongPassword(pwForm.newPassword) ||
+                                    pwForm.newPassword !== pwForm.confirmPassword
+                                }
+                            >
+                                변경 저장
+                            </Button>
                         </div>
                     </form>
                 ) : (
@@ -280,75 +336,104 @@ function EditProfile({onBack}) {
                                 <h3 className="ep-col-title">👤 계정 정보</h3>
                                 <div className="ep-row">
                                     <label className="ep-label">아이디</label>
-                                    <input type="text" value={user.username} disabled className="ep-input"/>
+                                    <input type="text" value={user.username} disabled className="ep-input" />
                                 </div>
                                 <div className="ep-row">
                                     <label className="ep-label">이름</label>
-                                    <input type="text" value={user.name} disabled className="ep-input"/>
+                                    <input type="text" value={user.name} disabled className="ep-input" />
                                 </div>
-                                <button onClick={() => setIsChangingPassword(true)} className="btn-link">비밀번호 변경하기 〉
+                                <button onClick={() => setIsChangingPassword(true)} className="btn-link">
+                                    비밀번호 변경하기 〉
                                 </button>
                             </section>
                             <section className="ep-col">
                                 <div className="passkey-header">
                                     <h3 className="passkey-title">🔐 패스키 관리</h3>
-                                    <Button size="sm" onClick={handleRegisterPasskey}>+ 기기 등록</Button>
+                                    <Button size="sm" onClick={handleRegisterPasskey}>
+                                        + 기기 등록
+                                    </Button>
                                 </div>
                                 <div className="passkey-list">
-                            {passkeys.length === 0 ? (
-                                <p style={{
-                                    textAlign: 'center',
-                                    color: 'var(--text-secondary)',
-                                    padding: '20px 0',
-                                    margin: 0
-                                }}>등록된 기기가 없습니다.</p>
-                            ) : (
-                                passkeys.map((key) => (
-                                    <div key={key.id} className="passkey-item">
-                                        {editingId === key.id ? (
-                                            <>
-                                                <input className="pk-rename-input" value={editName} maxLength={50}
-                                                       autoFocus
-                                                       onChange={(e) => setEditName(e.target.value)}
-                                                       onKeyDown={(e) => {
-                                                           if (e.key === 'Enter') void handleRenamePasskey(key.id);
-                                                           else if (e.key === 'Escape') setEditingId(null);
-                                                       }}/>
-                                                <div className="pk-actions">
-                                                    <button onClick={() => handleRenamePasskey(key.id)}
-                                                            className="btn-pk-save">저장
-                                                    </button>
-                                                    <button onClick={() => setEditingId(null)}
-                                                            className="btn-pk-cancel">취소
-                                                    </button>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div>
-                                                    <div className="pk-name">{key['device_name']}</div>
-                                                    <div
-                                                        className="pk-date">{new Date(key.created_at).toLocaleDateString()}</div>
-                                                </div>
-                                                <div className="pk-actions">
-                                                    <button onClick={() => startRename(key)} className="btn-pk-edit"
-                                                            aria-label="이름 변경">이름 변경{/*✏️*/}
-                                                    </button>
-                                                    <button onClick={() => handleDeletePasskey(key.id)}
-                                                            className="btn-del">삭제
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                ))
-                            )}
+                                    {passkeys.length === 0 ? (
+                                        <p
+                                            style={{
+                                                textAlign: 'center',
+                                                color: 'var(--text-secondary)',
+                                                padding: '20px 0',
+                                                margin: 0,
+                                            }}
+                                        >
+                                            등록된 기기가 없습니다.
+                                        </p>
+                                    ) : (
+                                        passkeys.map((key) => (
+                                            <div key={key.id} className="passkey-item">
+                                                {editingId === key.id ? (
+                                                    <>
+                                                        <input
+                                                            className="pk-rename-input"
+                                                            value={editName}
+                                                            maxLength={50}
+                                                            autoFocus
+                                                            onChange={(e) => setEditName(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') void handleRenamePasskey(key.id);
+                                                                else if (e.key === 'Escape') setEditingId(null);
+                                                            }}
+                                                        />
+                                                        <div className="pk-actions">
+                                                            <button
+                                                                onClick={() => handleRenamePasskey(key.id)}
+                                                                className="btn-pk-save"
+                                                            >
+                                                                저장
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingId(null)}
+                                                                className="btn-pk-cancel"
+                                                            >
+                                                                취소
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div>
+                                                            <div className="pk-name">{key['device_name']}</div>
+                                                            <div className="pk-date">
+                                                                {new Date(key.created_at).toLocaleDateString()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="pk-actions">
+                                                            <button
+                                                                onClick={() => startRename(key)}
+                                                                className="btn-pk-edit"
+                                                                aria-label="이름 변경"
+                                                            >
+                                                                이름 변경{/*✏️*/}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeletePasskey(key.id)}
+                                                                className="btn-del"
+                                                            >
+                                                                삭제
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </section>
                         </div>
                         <div className="footer-btns">
-                            <Button variant="neutral" onClick={onBack} style={{flex: 1, padding: 14}}>뒤로 가기</Button>
-                            <Button variant="danger" onClick={handleLogout} style={{flex: 1, padding: 14}}>로그아웃</Button>
+                            <Button variant="neutral" onClick={onBack} style={{ flex: 1, padding: 14 }}>
+                                뒤로 가기
+                            </Button>
+                            <Button variant="danger" onClick={onLogout} style={{ flex: 1, padding: 14 }}>
+                                로그아웃
+                            </Button>
                         </div>
                     </>
                 )}

@@ -1,8 +1,19 @@
-import {socket} from '../../utils/socket';
-import {useNotification} from '../../hooks/useNotification';
+import { useEffect, useRef } from 'react';
+import { socket } from '../../utils/socket';
+import { useNotification } from '../../hooks/useNotification';
 
-function RoleSelection({onSelectRole, isCashierTaken}) {
-    const {notify} = useNotification();
+function RoleSelection({ onSelectRole, isCashierTaken }) {
+    const { notify } = useNotification();
+    const cashierClaimedHandlerRef = useRef(null);
+
+    // 언마운트 시 응답을 아직 못 받은 리스너가 남아있으면 해제(사라진 컴포넌트를 참조하는 클로저 호출 방지)
+    useEffect(() => {
+        return () => {
+            if (cashierClaimedHandlerRef.current) {
+                socket.off('cashier_claimed', cashierClaimedHandlerRef.current);
+            }
+        };
+    }, []);
 
     // ---------------------------------------------------------
     // [1] 이벤트 핸들러
@@ -10,10 +21,12 @@ function RoleSelection({onSelectRole, isCashierTaken}) {
     const handleCashierClick = () => {
         // 소켓을 통해 캐셔 역할 선점 시도 (중복 방지)
         socket.emit('claim_cashier');
-        socket.once('cashier_claimed', (success) => {
+        const handleCashierClaimed = (success) => {
             if (success) onSelectRole('cashier');
-            else notify("이미 다른 사람이 캐셔를 보고 있습니다!", {icon: '⚠️'});
-        });
+            else notify('이미 다른 사람이 캐셔를 보고 있습니다!', { icon: '⚠️' });
+        };
+        cashierClaimedHandlerRef.current = handleCashierClaimed;
+        socket.once('cashier_claimed', handleCashierClaimed);
     };
 
     // ---------------------------------------------------------
@@ -87,10 +100,11 @@ function RoleSelection({onSelectRole, isCashierTaken}) {
                     <div className="role-content-wrapper">
                         <div className="role-icon">🛒</div>
                         <h2 className="role-name">캐셔 (주문)</h2>
-                        {isCashierTaken
-                            ? <p className="role-status status-red">사용 중...</p>
-                            : <p className="role-status status-green">선택 가능</p>
-                        }
+                        {isCashierTaken ? (
+                            <p className="role-status status-red">사용 중...</p>
+                        ) : (
+                            <p className="role-status status-green">선택 가능</p>
+                        )}
                     </div>
                 </button>
 
