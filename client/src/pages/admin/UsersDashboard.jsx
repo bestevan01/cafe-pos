@@ -14,7 +14,7 @@ function UsersDashboard({ onBack }) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
-    const [users, setUsers] = useState([]);
+    const [users, setUsers] = useState(/** @type {import('../../types').User[]} */ ([]));
     // localStorage는 렌더링 전에도 동기적으로 읽을 수 있으므로 effect 없이 lazy initializer로 초기화
     const [currentUserId] = useState(() => {
         const userStr = localStorage.getItem('user');

@@ -273,26 +273,10 @@ function App() {
     // 직원 화면 컨텐츠 분기
     const renderContent = () => {
         if (myRole === 'cashier') {
-            return (
-                <Cashier
-                    onlyOrder={false}
-                    isCashier={isKitchenActive}
-                    onBack={() => {
-                        socket.emit('release_cashier');
-                        setMyRole(null);
-                    }}
-                />
-            );
+            return <Cashier onlyOrder={false} isCashier={isKitchenActive} />;
         }
         if (myRole === 'kitchen') {
-            return (
-                <Kitchen
-                    onBack={() => {
-                        socket.emit('leave_kitchen');
-                        setMyRole(null);
-                    }}
-                />
-            );
+            return <Kitchen />;
         }
 
         return (

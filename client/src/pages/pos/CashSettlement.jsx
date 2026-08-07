@@ -15,8 +15,10 @@ function CashSettlement({ onClose }) {
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
     const [step, setStep] = useState('loading'); // loading, open, close, done
-    const [calcData, setCalcData] = useState(null); // 전산상 데이터 (오픈 시재 + 매출)
-    const [prevClosing, setPrevClosing] = useState(null); // 전날 마감 금액
+    // 전산상 데이터 (오픈 시재 + 매출)
+    const [calcData, setCalcData] = useState(/** @type {import('../../types').SettlementCalc|null} */ (null));
+    // 전날 마감 금액
+    const [prevClosing, setPrevClosing] = useState(/** @type {number|null} */ (null));
 
     // 화폐별 개수 상태
     const [counts, setCounts] = useState({

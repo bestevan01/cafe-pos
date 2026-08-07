@@ -9,7 +9,7 @@ function Kitchen() {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
-    const [orderGroups, setOrderGroups] = useState([]);
+    const [orderGroups, setOrderGroups] = useState(/** @type {import('../../types').OrderGroup[]} */ ([]));
 
     // ---------------------------------------------------------
     // [2] API 및 소켓 통신

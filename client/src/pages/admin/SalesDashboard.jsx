@@ -17,7 +17,7 @@ function SalesDashboard({ onBack }) {
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
     const now = new Date();
-    const [salesData, setSalesData] = useState([]);
+    const [salesData, setSalesData] = useState(/** @type {import('../../types').OrderRow[]} */ ([]));
     const [loading, setLoading] = useState(true);
     const [summary, setSummary] = useState({ today: 0, month: 0, total: 0, totalCount: 0, periods: [] });
     const monthCacheRef = useRef({}); // { 'year-month': rows } — 받은 달 캐싱

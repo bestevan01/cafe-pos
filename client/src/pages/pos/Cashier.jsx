@@ -9,16 +9,18 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
-    const [cart, setCart] = useState([]);
-    const [orderGroups, setOrderGroups] = useState([]);
-    const [menuList, setMenuList] = useState([]);
-    const [paymentCheckId, setPaymentCheckId] = useState(null);
+    const [cart, setCart] = useState(/** @type {import('../../types').CartItem[]} */ ([]));
+    const [orderGroups, setOrderGroups] = useState(/** @type {import('../../types').OrderGroup[]} */ ([]));
+    const [menuList, setMenuList] = useState(/** @type {import('../../types').Menu[]} */ ([]));
+    const [paymentCheckId, setPaymentCheckId] = useState(/** @type {string|null} */ (null));
 
     // 🌟 이벤트 관련 상태 추가
-    const [activeEvents, setActiveEvents] = useState([]);
-    const [selectedEventId, setSelectedEventId] = useState(null);
-    const [shotConfig, setShotConfig] = useState({}); // 커피 잔별 샷: { [메뉴명]: [0번잔 샷, 1번잔 샷, ...] }
-    const [expandedShots, setExpandedShots] = useState({}); // 메뉴별 '샷 추가' 패널 펼침 여부
+    const [activeEvents, setActiveEvents] = useState(/** @type {import('../../types').CafeEvent[]} */ ([]));
+    const [selectedEventId, setSelectedEventId] = useState(/** @type {string|null} */ (null));
+    // 커피 잔별 샷: { [메뉴명]: [0번잔 샷, 1번잔 샷, ...] }
+    const [shotConfig, setShotConfig] = useState(/** @type {Record<string, number[]>} */ ({}));
+    // 메뉴별 '샷 추가' 패널 펼침 여부
+    const [expandedShots, setExpandedShots] = useState(/** @type {Record<string, boolean>} */ ({}));
 
     // UI 상태 (모바일 반응형)
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -32,7 +34,9 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     });
 
     // DB에서 온 평문 데이터를 주문 번호별로 그룹화
+    /** @param {import('../../types').OrderRow[]} flatList */
     const groupOrdersById = (flatList) => {
+        /** @type {Record<string, import('../../types').OrderGroup>} */
         const map = {};
         flatList.forEach((item) => {
             const id = item.daily_number;
@@ -80,7 +84,9 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     const fetchActiveEvents = useCallback(async () => {
         try {
             const res = await axios.get('/api/events', getAuthHeader());
-            const activeList = res.data.filter((ev) => ev.is_active === 1);
+            /** @type {import('../../types').CafeEvent[]} */
+            const all = res.data;
+            const activeList = all.filter((ev) => ev.is_active === 1);
             setActiveEvents(activeList);
 
             setSelectedEventId((prevId) => {
@@ -146,10 +152,12 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // [4] 장바구니 및 🌟 이벤트 할인 로직
     // ---------------------------------------------------------
     const SHOT_PRICE = 500;
+    /** @param {string} name */
     const isCoffee = (name) => name.includes('아메리카노') || name.includes('라떼') || name.includes('아샷추');
 
     // 메뉴의 잔 수(total)와 잔별 샷 배열(slots) 반환.
     // 커피는 잔마다 샷을 따로 두므로 shotConfig에서, 비커피는 cart 수량에서 읽는다.
+    /** @param {import('../../types').Menu} menu */
     const getMenuCounts = (menu) => {
         if (isCoffee(menu.name)) {
             const slots = shotConfig[menu.name] || [];
@@ -160,6 +168,10 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     };
 
     // 잔 수 증감. 커피는 잔 슬롯을 추가/제거(새 잔은 0샷), 비커피는 cart 수량 증감.
+    /**
+     * @param {import('../../types').Menu} menu
+     * @param {number} delta
+     */
     const handleTotalChange = (menu, delta) => {
         if (isCoffee(menu.name)) {
             setShotConfig((prev) => {
@@ -192,6 +204,11 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     };
 
     // 특정 잔(slotIndex)의 샷 수 증감
+    /**
+     * @param {import('../../types').Menu} menu
+     * @param {number} slotIndex
+     * @param {number} delta
+     */
     const handleSlotShotChange = (menu, slotIndex, delta) => {
         setShotConfig((prev) => {
             const slots = [...(prev[menu.name] || [])];
@@ -202,15 +219,18 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     };
 
     // '샷 추가' 패널 펼치기/접기
+    /** @param {string} menuName */
     const toggleShotPanel = (menuName) => {
         setExpandedShots((prev) => ({ ...prev, [menuName]: !prev[menuName] }));
     };
 
     // 비커피(cart) + 커피(shotConfig를 같은 샷끼리 묶어 라인화) → 결제/주문에 쓰는 통합 목록
+    /** @type {import('../../types').CartItem[]} */
     const coffeeItems = [];
     Object.entries(shotConfig).forEach(([menuName, slots]) => {
         const menu = menuList.find((m) => m.name === menuName);
         if (!menu || slots.length === 0) return;
+        /** @type {Record<number, number>} */
         const byShot = {};
         slots.forEach((s) => {
             byShot[s] = (byShot[s] || 0) + 1;
@@ -244,6 +264,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
             // 1. 특정 메뉴에만 적용되는 이벤트인지 검사
             if (selectedEvent.target_menus && selectedEvent.target_menus !== 'all') {
                 try {
+                    /** @type {string[]} */
                     const targets = JSON.parse(selectedEvent.target_menus);
                     isEligible = targets.some((targetName) => item.name.includes(targetName));
                 } catch {
@@ -277,6 +298,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     const submitOrder = async (isForced = false) => {
         if (allItems.length === 0) return notify('메뉴를 하나 이상 선택해주세요!', { icon: '⚠️' });
 
+        /** @type {any[]} */
         const itemsToSend = [];
 
         let remainingQty =
@@ -288,6 +310,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
             let isEligible = true;
             if (selectedEvent && selectedEvent.target_menus && selectedEvent.target_menus !== 'all') {
                 try {
+                    /** @type {string[]} */
                     const targets = JSON.parse(selectedEvent.target_menus);
                     isEligible = targets.some((targetName) => item.name.includes(targetName));
                 } catch {
@@ -297,7 +320,8 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                 isEligible = false;
             }
 
-            if (isEligible && remainingQty > 0) {
+            // selectedEvent 조건은 isEligible에 이미 포함돼 있지만(위 else-if), 타입 좁히기를 위해 명시한다.
+            if (selectedEvent && isEligible && remainingQty > 0) {
                 const discountableQty = Math.min(item.quantity, remainingQty);
                 const regularQty = item.quantity - discountableQty;
 
@@ -369,6 +393,10 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         }
     };
 
+    /**
+     * @param {string} method  'cash' | 'card' | 'event'
+     * @param {string|null} [overrideId]
+     */
     const handleConfirmPayment = async (method, overrideId = null) => {
         const targetId = overrideId || paymentCheckId;
         if (!targetId) return;
@@ -381,6 +409,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         }
     };
 
+    /** @param {string} displayId */
     const handleDeliver = async (displayId) => {
         try {
             await axios.patch(`/api/orders/${displayId}/deliver`, {}, getAuthHeader());
@@ -388,6 +417,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
             notify('전달 처리 실패', { icon: '⚠️' });
         }
     };
+    /** @param {string} displayId */
     const handleDelete = async (displayId) => {
         if (!(await confirm('정말 삭제하시겠습니까?', { title: '⚠️ 주문 삭제', confirmText: '삭제', danger: true })))
             return;

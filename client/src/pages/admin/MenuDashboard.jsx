@@ -14,8 +14,8 @@ function MenuDashboard({ onBack }) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
-    const [menuList, setMenuList] = useState([]);
-    const [editingId, setEditingId] = useState(null);
+    const [menuList, setMenuList] = useState(/** @type {import('../../types').Menu[]} */ ([]));
+    const [editingId, setEditingId] = useState(/** @type {string|null} */ (null));
     const [formData, setFormData] = useState({ name: '', price: '', type: 'coffee' });
 
     // API 권한 토큰

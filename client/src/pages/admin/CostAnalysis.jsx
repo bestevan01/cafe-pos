@@ -24,13 +24,14 @@ const unitCostOf = (ing) => {
  */
 function CostAnalysis({ onBack }) {
     const { notify, confirm } = useNotification();
-    const [ingredients, setIngredients] = useState([]);
-    const [menus, setMenus] = useState([]); // [{menu_id, name, price, cost_override, items:[{ingredient_id, amount}]}]
+    const [ingredients, setIngredients] = useState(/** @type {import('../../types').Ingredient[]} */ ([]));
+    const [menus, setMenus] = useState(/** @type {import('../../types').MenuWithRecipe[]} */ ([]));
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('analysis'); // 'analysis'(기본) | 'ingredients' | 'recipes'
 
-    const [selectedMenuId, setSelectedMenuId] = useState(null);
-    const [draftAmounts, setDraftAmounts] = useState({}); // {ingredient_id: '값'}
+    const [selectedMenuId, setSelectedMenuId] = useState(/** @type {string|null} */ (null));
+    // {ingredient_id: '값'} — 입력칸 값이라 문자열
+    const [draftAmounts, setDraftAmounts] = useState(/** @type {Record<string, string>} */ ({}));
     const [overrideOn, setOverrideOn] = useState(false);
     const [overrideValue, setOverrideValue] = useState('');
     const [newIng, setNewIng] = useState({

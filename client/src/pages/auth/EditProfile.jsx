@@ -22,13 +22,14 @@ function EditProfile({ onBack, onLogout }) {
         const userStr = localStorage.getItem('user');
         return userStr ? JSON.parse(userStr) : { id: null, name: '', username: '' };
     });
-    const [passkeys, setPasskeys] = useState([]);
+    const [passkeys, setPasskeys] = useState(/** @type {import('../../types').Passkey[]} */ ([]));
     // Safari 대응: 클릭 핸들러 안에서 옵션을 await로 받아오면 사용자 제스처가 만료돼 생체인증 팝업이 안 뜬다.
     // → 옵션을 미리 받아 두고, 클릭 시에는 await 없이 곧바로 startRegistration()을 호출한다.
-    const [registerOptions, setRegisterOptions] = useState(null);
+    const [registerOptions, setRegisterOptions] = useState(/** @type {any} */ (null));
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({ newPassword: '', confirmPassword: '' });
-    const [editingId, setEditingId] = useState(null); // 이름 변경 중인 패스키 id
+    // 이름 변경 중인 패스키 id
+    const [editingId, setEditingId] = useState(/** @type {string|null} */ (null));
     const [editName, setEditName] = useState('');
 
     // ---------------------------------------------------------

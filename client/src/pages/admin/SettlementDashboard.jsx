@@ -14,7 +14,7 @@ function SettlementDashboard({ onBack }) {
     // ---------------------------------------------------------
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
-    const [settlements, setSettlements] = useState([]);
+    const [settlements, setSettlements] = useState(/** @type {import('../../types').Settlement[]} */ ([]));
     const [loading, setLoading] = useState(true);
 
     // API 권한 토큰

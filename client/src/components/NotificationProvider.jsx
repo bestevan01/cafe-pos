@@ -22,9 +22,10 @@ let idCounter = 0;
  */
 export function NotificationProvider({ children }) {
     const [toasts, setToasts] = useState(
-        /** @type {{id: number, message: React.ReactNode, icon?: *, title?: string, loading?: boolean}[]} */ ([]),
+        /** @type {{id: number, message: import('react').ReactNode, icon?: *, title?: string, loading?: boolean}[]} */ ([]),
     );
-    const [confirmState, setConfirmState] = useState(null); // { message, title, confirmText, cancelText, danger, resolve }
+    /** @typedef {{message: import('react').ReactNode, title: string, confirmText: string, cancelText: string, danger: boolean, resolve: (v: boolean) => void}} ConfirmState */
+    const [confirmState, setConfirmState] = useState(/** @type {ConfirmState|null} */ (null));
 
     // 화면 폭으로 토스트 표현 분기: PC=우측상단 카드 / 모바일=하단 스낵바
     const [isMobile, setIsMobile] = useState(
@@ -32,23 +33,28 @@ export function NotificationProvider({ children }) {
     );
     useEffect(() => {
         const mq = window.matchMedia('(max-width: 480px)');
+        /** @param {MediaQueryListEvent} e */
         const onChange = (e) => setIsMobile(e.matches);
         mq.addEventListener('change', onChange);
         return () => mq.removeEventListener('change', onChange);
     }, []);
 
-    const removeToast = useCallback((id) => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, []);
+    const removeToast = useCallback(
+        /** @param {number} id */ (id) => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        },
+        [],
+    );
 
-    const dedupeRef = useRef({}); // { [dedupeKey]: 마지막 표시 시각 }
+    // { [dedupeKey]: 마지막 표시 시각 }
+    const dedupeRef = useRef(/** @type {Record<string, number>} */ ({}));
 
-    /**
-     * @param {React.ReactNode} message
-     * @param {{icon?: *, title?: string, duration?: number, loading?: boolean, dedupeKey?: string, dedupeWindow?: number}} [options]
-     * @returns {number|null}
-     */
     const notify = useCallback(
+        /**
+         * @param {import('react').ReactNode} message
+         * @param {import('../hooks/useNotification').NotifyOptions} [options]
+         * @returns {number|null}
+         */
         (message, options = {}) => {
             // 같은 dedupeKey로 짧은 시간 내 재호출되면 무시 (동시 로딩 실패 등을 하나로 묶음)
             if (options.dedupeKey) {
@@ -70,33 +76,51 @@ export function NotificationProvider({ children }) {
     );
 
     // 이미 떠 있는 토스트 내용 갱신 (예: 로딩 중 메시지 변경)
-    const update = useCallback((id, patch) => {
-        setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
-    }, []);
+    const update = useCallback(
+        /**
+         * @param {number} id
+         * @param {object} patch
+         */
+        (id, patch) => {
+            setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+        },
+        [],
+    );
 
-    const confirm = useCallback((message, options = {}) => {
-        return new Promise((resolve) => {
-            setConfirmState({
-                message,
-                title: options.title ?? '확인',
-                confirmText: options.confirmText ?? '확인',
-                cancelText: options.cancelText ?? '취소',
-                danger: options.danger ?? false,
-                resolve,
+    const confirm = useCallback(
+        /**
+         * @param {import('react').ReactNode} message
+         * @param {import('../hooks/useNotification').ConfirmOptions} [options]
+         * @returns {Promise<boolean>}
+         */
+        (message, options = {}) =>
+            new Promise((resolve) => {
+                setConfirmState({
+                    message,
+                    title: options.title ?? '확인',
+                    confirmText: options.confirmText ?? '확인',
+                    cancelText: options.cancelText ?? '취소',
+                    danger: options.danger ?? false,
+                    resolve,
+                });
+            }),
+        [],
+    );
+
+    const closeConfirm = useCallback(
+        /** @param {boolean} result */ (result) => {
+            setConfirmState((prev) => {
+                if (prev) prev.resolve(result);
+                return null;
             });
-        });
-    }, []);
-
-    const closeConfirm = useCallback((result) => {
-        setConfirmState((prev) => {
-            if (prev) prev.resolve(result);
-            return null;
-        });
-    }, []);
+        },
+        [],
+    );
 
     // 다이얼로그 열렸을 때: Enter=확인 / Esc=취소, 배경 스크롤 잠금
     useEffect(() => {
         if (!confirmState) return;
+        /** @param {KeyboardEvent} e */
         const onKey = (e) => {
             if (e.key === 'Enter') closeConfirm(true);
             else if (e.key === 'Escape') closeConfirm(false);
@@ -117,10 +141,16 @@ export function NotificationProvider({ children }) {
         const ESCALATE_DELAY = 4000; // 4초 넘으면 "서버 깨우는 중" 문구로 전환
 
         let pending = 0;
+        // axios 요청에 커스텀 meta를 붙여 로딩 카운트를 추적한다(라이브러리 타입에 없는 필드).
+        /** @typedef {import('axios').InternalAxiosRequestConfig & {meta?: {silent?: boolean, _loadingCounted?: boolean}}} ReqConfig */
+        /** @type {number|null} */
         let toastId = null;
+        /** @type {ReturnType<typeof setTimeout>|null} */
         let showTimer = null;
+        /** @type {ReturnType<typeof setTimeout>|null} */
         let escalateTimer = null;
 
+        /** @param {ReqConfig} [config] */
         const isSilent = (config) => {
             const url = (config && config.url) || '';
             return url.includes('/ping') || !!(config && config.meta && config.meta.silent);
@@ -158,6 +188,7 @@ export function NotificationProvider({ children }) {
             }
         };
 
+        /** @param {ReqConfig} [config] */
         const settle = (config) => {
             if (config && config.meta && config.meta._loadingCounted) {
                 pending = Math.max(0, pending - 1);
@@ -165,14 +196,16 @@ export function NotificationProvider({ children }) {
             }
         };
 
-        const reqId = axios.interceptors.request.use((config) => {
-            if (!isSilent(config)) {
-                config.meta = { ...(config.meta || {}), _loadingCounted: true };
-                pending += 1;
-                startTimers();
-            }
-            return config;
-        });
+        const reqId = axios.interceptors.request.use(
+            /** @param {ReqConfig} config */ (config) => {
+                if (!isSilent(config)) {
+                    config.meta = { ...(config.meta || {}), _loadingCounted: true };
+                    pending += 1;
+                    startTimers();
+                }
+                return config;
+            },
+        );
 
         const resId = axios.interceptors.response.use(
             (response) => {

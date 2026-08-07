@@ -14,8 +14,9 @@ function EventDashboard({ onBack }) {
     // ---------------------------------------------------------
     // [1] 상태 관리
     // ---------------------------------------------------------
-    const [events, setEvents] = useState([]);
-    const [menuList, setMenuList] = useState([]); // 🌟 판매 중인 메뉴 목록 저장
+    const [events, setEvents] = useState(/** @type {import('../../types').CafeEvent[]} */ ([]));
+    // 🌟 판매 중인 메뉴 목록 저장
+    const [menuList, setMenuList] = useState(/** @type {import('../../types').Menu[]} */ ([]));
 
     const [newEventName, setNewEventName] = useState('');
     const [newEventType, setNewEventType] = useState('free');
@@ -27,7 +28,7 @@ function EventDashboard({ onBack }) {
 
     // 🌟 특정 메뉴 적용 상태
     const [hasTargetMenu, setHasTargetMenu] = useState(false);
-    const [selectedMenus, setSelectedMenus] = useState([]);
+    const [selectedMenus, setSelectedMenus] = useState(/** @type {string[]} */ ([]));
 
     const getAuthHeader = () => ({
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
