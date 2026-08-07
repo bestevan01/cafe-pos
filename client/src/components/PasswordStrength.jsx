@@ -5,8 +5,9 @@ import { PASSWORD_RULES } from '../utils/passwordPolicy';
  * - 각 규칙(길이/영문/숫자/특수문자)을 ✓/○ 로 표시
  * - confirmPassword가 주어지면 위 비밀번호와 일치 여부도 실시간 표시
  *
- * @param {string} password
- * @param {string} [confirmPassword]  주어지고 1자 이상 입력됐을 때만 일치 표시
+ * @param {object} props
+ * @param {string} [props.password]
+ * @param {string} [props.confirmPassword]  주어지고 1자 이상 입력됐을 때만 일치 표시
  */
 function PasswordStrength({ password = '', confirmPassword }) {
     // 규칙 체크리스트는 항상 표시. 재입력 일치 여부는 확인칸에 무언가 입력됐을 때만 표시.

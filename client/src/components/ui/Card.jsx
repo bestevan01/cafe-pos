@@ -8,14 +8,15 @@ import './Card.css';
  *     ...
  *   </Card>
  *
- * @param {string} [title]            머리말 제목 (없으면 head 자체를 렌더 안 함)
- * @param {React.ReactNode} [icon]    제목 앞 아이콘
- * @param {React.ReactNode} [subtitle] 제목 옆 보조 텍스트
- * @param {React.ReactNode} [actions] 머리말 우측 액션(버튼 등)
- * @param {boolean} [flush]           true면 내부 패딩 제거(표/리스트가 가장자리까지)
- * @param {string} [className]        추가 CSS 클래스
- * @param {React.ReactNode} [children] 카드 본문
- * @param {object} [rest]             나머지 props → 최상위 div에 전달
+ * @param {object} props
+ * @param {string} [props.title]                        머리말 제목 (없으면 head 자체를 렌더 안 함)
+ * @param {import('react').ReactNode} [props.icon]      제목 앞 아이콘
+ * @param {import('react').ReactNode} [props.subtitle]  제목 옆 보조 텍스트
+ * @param {import('react').ReactNode} [props.actions]   머리말 우측 액션(버튼 등)
+ * @param {boolean} [props.flush]                       true면 내부 패딩 제거(표/리스트가 가장자리까지)
+ * @param {string} [props.className]                    추가 CSS 클래스
+ * @param {import('react').ReactNode} [props.children]  카드 본문
+ * @remarks 나머지 props는 최상위 div에 그대로 전달된다.
  */
 function Card({ title, icon, subtitle, actions, flush = false, className = '', children, ...rest }) {
     const cls = ['ui-card', flush && 'ui-card-flush', className].filter(Boolean).join(' ');

@@ -5,6 +5,10 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onBack
+ */
 function UsersDashboard({ onBack }) {
     const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
@@ -54,7 +58,7 @@ function UsersDashboard({ onBack }) {
             await axios.patch(`/api/admin/users/${id}/role`, { role: newRole }, getAuthHeader());
             notify('변경되었습니다.', { icon: '✅' });
             await fetchUsers();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify(err.response?.data?.message || '변경 실패', { icon: '⚠️' });
         }
     };
@@ -92,7 +96,7 @@ function UsersDashboard({ onBack }) {
             await axios.delete(`/api/admin/users/${targetUser.id}`, getAuthHeader());
             notify('계정이 완전히 삭제되었습니다.', { icon: '✅' });
             await fetchUsers();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify(err.response?.data?.message || '계정 삭제에 실패했습니다.', { icon: '⚠️' });
         }
     };
@@ -256,6 +260,13 @@ function UsersDashboard({ onBack }) {
 // ---------------------------------------------------------
 // [4] 헬퍼 컴포넌트 및 함수
 // ---------------------------------------------------------
+/**
+ * @param {object} props
+ * @param {any} props.user  직원 레코드 (id/username/name/role)
+ * @param {(id: any, newRole: 'admin'|'staff') => void} props.handleRoleChange
+ * @param {(id: any) => void} props.handleDeleteUser
+ * @param {any} props.currentUserId  본인 계정은 버튼 대신 '내 계정' 표시
+ */
 function RenderActionButtons({ user, handleRoleChange, handleDeleteUser, currentUserId }) {
     if (user.id === currentUserId) return <div className="my-account-label">👤 내 계정</div>;
 

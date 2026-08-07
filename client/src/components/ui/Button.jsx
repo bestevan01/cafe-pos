@@ -8,13 +8,14 @@ import './Button.css';
  *   <Button variant="danger" size="sm">삭제</Button>
  *   <Button variant="ghost">⬅ 뒤로</Button>
  *
- * @param {'primary'|'secondary'|'danger'|'success'|'warning'|'neutral'|'dark'|'ghost'} [variant]
- * @param {'sm'|'md'|'lg'} [size]
- * @param {React.ReactNode} [icon]  글자 앞 아이콘(이모지/노드)
- * @param {boolean} [full]          true면 width:100%
- * @param {string} [className]      추가 CSS 클래스
- * @param {React.ReactNode} [children] 버튼 내용
- * @param {object} [rest]           나머지 props(onClick, type, disabled 등) → <button>에 전달
+ * @param {object} props
+ * @param {'primary'|'secondary'|'danger'|'success'|'warning'|'neutral'|'dark'|'ghost'} [props.variant]
+ * @param {'sm'|'md'|'lg'} [props.size]
+ * @param {import('react').ReactNode} [props.icon]      글자 앞 아이콘(이모지/노드)
+ * @param {boolean} [props.full]                        true면 width:100%
+ * @param {string} [props.className]                    추가 CSS 클래스
+ * @param {import('react').ReactNode} [props.children]  버튼 내용
+ * @remarks 나머지 props(onClick, type, disabled 등)는 <button>에 그대로 전달된다.
  */
 function Button({ variant = 'primary', size = 'md', icon, full = false, className = '', children, ...rest }) {
     const cls = ['ui-btn', `ui-btn-${variant}`, `ui-btn-${size}`, full && 'ui-btn-full', className]

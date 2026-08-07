@@ -5,6 +5,11 @@ import { useSystemTheme } from '../../hooks/useSystemTheme';
 import { useNotification } from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 
+/**
+ * @param {object} props
+ * @param {(data: any) => void} props.onLoginSuccess  로그인 성공 시 서버 응답 전달
+ * @param {() => void} props.onSwitchToRegister
+ */
 function Login({ onLoginSuccess, onSwitchToRegister }) {
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [submitting, setSubmitting] = useState(false);
@@ -86,7 +91,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             if (res.data.success) {
                 handleSuccess(res.data);
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             if (err.code === 'ECONNABORTED')
                 notify('서버 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.', { icon: '⏳' });
             else notify(err.response?.data?.message || '로그인 실패', { icon: '⚠️' });
@@ -116,7 +121,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         try {
             // ⚠️ 이 호출 앞에 await(네트워크)를 두면 Safari에서 제스처가 만료돼 생체인증 팝업이 안 뜬다.
             asseResp = await startAuthentication({ optionsJSON: options });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             setSubmitting(false);
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
             if (error.name === 'NotAllowedError') {
@@ -133,7 +138,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             if (verificationResp.data.success) {
                 handleSuccess(verificationResp.data);
             }
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error(error);
             notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
         } finally {

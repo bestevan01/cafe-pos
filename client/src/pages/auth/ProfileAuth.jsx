@@ -4,6 +4,12 @@ import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/brows
 import { useNotification } from '../../hooks/useNotification';
 import Button from '../../components/ui/Button';
 
+/**
+ * @param {object} props
+ * @param {any} props.currentUser  현재 로그인 사용자
+ * @param {() => void} props.onSuccess
+ * @param {() => void} props.onCancel
+ */
 function ProfileAuth({ currentUser, onSuccess, onCancel }) {
     const { notify } = useNotification();
     const [password, setPassword] = useState('');
@@ -59,7 +65,7 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
             let asseResp;
             try {
                 asseResp = await startAuthentication({ optionsJSON: resp.data });
-            } catch (error) {
+            } catch (/** @type {any} */ error) {
                 if (error.name === 'NotAllowedError') return;
                 return;
             }
@@ -76,7 +82,7 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
                     notify('현재 로그인된 계정의 패스키가 아닙니다.', { icon: '⚠️' });
                 }
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             console.error(err);
             notify('패스키 인증 실패', { icon: '⚠️' });
         }

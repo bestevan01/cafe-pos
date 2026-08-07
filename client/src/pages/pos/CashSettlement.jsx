@@ -5,6 +5,10 @@ import { useNotification } from '../../hooks/useNotification';
 // 💵 화폐 단위 정의 (5만원 ~ 10원)
 const MONEY_TYPES = [50000, 10000, 5000, 1000, 500, 100, 50, 10];
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onClose
+ */
 function CashSettlement({ onClose }) {
     const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
@@ -98,7 +102,7 @@ function CashSettlement({ onClose }) {
             await axios.post('/api/settlements/open', { amount: totalAmount }, getAuthHeader());
             notify(`오픈 완료! 시작 시재금: ${totalAmount.toLocaleString()}원`, { icon: '✅' });
             onClose();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify(err.response?.data?.message || '오픈 처리 실패', { icon: '⚠️' });
         }
     };
@@ -132,7 +136,7 @@ function CashSettlement({ onClose }) {
             );
             notify('마감 처리되었습니다. 수고하셨습니다!', { icon: '🔒' });
             onClose();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify(err.response?.data?.message || '마감 처리 실패', { icon: '⚠️' });
         }
     };

@@ -7,6 +7,10 @@ import StatCard from '../../components/stats/StatCard';
 import BarList from '../../components/stats/BarList';
 import BarChart from '../../components/stats/BarChart';
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onBack
+ */
 function AdvancedStats({ onBack }) {
     const { notify } = useNotification();
     const [stats, setStats] = useState({ itemStats: [], timeStats: [] });

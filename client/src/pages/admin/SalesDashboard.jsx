@@ -7,6 +7,10 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onBack
+ */
 function SalesDashboard({ onBack }) {
     const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
@@ -59,7 +63,7 @@ function SalesDashboard({ onBack }) {
                 const res = await axios.get(`/api/admin/sales?year=${year}&month=${month}`, getAuthHeader());
                 monthCacheRef.current[key] = res.data;
                 setSalesData(res.data);
-            } catch (err) {
+            } catch (/** @type {any} */ err) {
                 if (err.response && err.response.status === 401)
                     notify('로그인 세션이 만료되었습니다.', { icon: '🔒' });
                 else notify('매출 데이터를 불러오지 못했습니다.', { icon: '⚠️', dedupeKey: 'load-sales' });

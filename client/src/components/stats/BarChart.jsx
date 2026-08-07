@@ -6,11 +6,12 @@
  *
  *   <BarChart data={timeStats} label={t => `${t.hour}시`} value={t => t.total_sales} color="#4caf50" />
  *
- * @param {Array} data
- * @param {(d)=>React.ReactNode} label   라벨 (구간명)
- * @param {(d)=>number} value            막대 크기 기준값
- * @param {string} [color]               막대 색
- * @param {number} [height]              PC 세로 차트 높이(px)
+ * @param {object} props
+ * @param {any[]} [props.data]
+ * @param {(d:any)=>import('react').ReactNode} props.label   라벨 (구간명)
+ * @param {(d:any)=>number} props.value                      막대 크기 기준값
+ * @param {string} [props.color]                             막대 색
+ * @param {number} [props.height]                            PC 세로 차트 높이(px)
  */
 function BarChart({ data = [], label, value, color = '#42a5f5', height = 240 }) {
     const maxVal = Math.max(...data.map((d) => Number(value(d)) || 0), 1);

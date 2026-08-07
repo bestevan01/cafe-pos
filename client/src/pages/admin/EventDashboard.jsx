@@ -5,6 +5,10 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onBack
+ */
 function EventDashboard({ onBack }) {
     const { notify, confirm } = useNotification();
     // ---------------------------------------------------------

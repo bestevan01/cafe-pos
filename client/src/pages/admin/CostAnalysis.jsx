@@ -18,6 +18,10 @@ const unitCostOf = (ing) => {
     return amount > 0 ? Number(ing.purchase_price) / amount : 0;
 };
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onBack
+ */
 function CostAnalysis({ onBack }) {
     const { notify, confirm } = useNotification();
     const [ingredients, setIngredients] = useState([]);
@@ -47,7 +51,7 @@ function CostAnalysis({ onBack }) {
             ]);
             setIngredients(ingRes.data);
             setMenus(recRes.data);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             console.error(err);
             notify('원가 데이터를 불러오지 못했습니다.', { icon: '⚠️' });
         } finally {
@@ -166,7 +170,7 @@ function CostAnalysis({ onBack }) {
             setNewIng({ name: '', purchase_price: '', purchase_amount: '', unit: 'g', category: newIng.category });
             notify('원재료를 추가했습니다.', { icon: '✅' });
             await fetchAll();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             console.error(err);
             notify('원재료 추가에 실패했습니다.', { icon: '⚠️' });
         }
@@ -196,7 +200,7 @@ function CostAnalysis({ onBack }) {
                 auth,
             );
             await fetchAll();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             console.error(err);
             notify('원재료 저장에 실패했습니다.', { icon: '⚠️' });
         }
@@ -213,7 +217,7 @@ function CostAnalysis({ onBack }) {
             await axios.delete(`/api/admin/ingredients/${ing.id}`, auth);
             notify('삭제했습니다.', { icon: '🗑️' });
             await fetchAll();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             console.error(err);
             notify('삭제에 실패했습니다.', { icon: '⚠️' });
         }
@@ -236,7 +240,7 @@ function CostAnalysis({ onBack }) {
             );
             notify(`'${selectedMenu.name}' 레시피를 저장했습니다.`, { icon: '✅' });
             await fetchAll();
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             console.error(err);
             notify('레시피 저장에 실패했습니다.', { icon: '⚠️' });
         }

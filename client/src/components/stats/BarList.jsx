@@ -9,12 +9,13 @@
  *     highlightTop={3}
  *   />
  *
- * @param {Array} data
- * @param {(d)=>React.ReactNode} label     행 이름
- * @param {(d)=>number} value              막대 길이 기준값
- * @param {(d)=>React.ReactNode} [sublabel] 우측 표시값 (없으면 value를 'N원'으로)
- * @param {number} [highlightTop]          상위 N개를 순위 표시 + 강조색
- * @param {number} [max]                   막대 기준 최대값 (없으면 자동)
+ * @param {object} props
+ * @param {any[]} [props.data]
+ * @param {(d:any)=>import('react').ReactNode} props.label      행 이름
+ * @param {(d:any)=>number} props.value                         막대 길이 기준값
+ * @param {(d:any)=>import('react').ReactNode} [props.sublabel] 우측 표시값 (없으면 value를 'N원'으로)
+ * @param {number} [props.highlightTop]                         상위 N개를 순위 표시 + 강조색
+ * @param {number} [props.max]                                  막대 기준 최대값 (없으면 자동)
  */
 function BarList({ data = [], label, value, sublabel, highlightTop = 0, max }) {
     const maxVal = max ?? Math.max(...data.map((d) => Number(value(d)) || 0), 1);

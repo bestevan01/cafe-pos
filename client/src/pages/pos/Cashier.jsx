@@ -376,7 +376,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         try {
             await axios.patch(apiPath, { paymentMethod: method }, getAuthHeader());
             if (!overrideId) setPaymentCheckId(null);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify('처리 실패: ' + err.message, { icon: '⚠️' });
         }
     };

@@ -6,6 +6,10 @@ import Button from '../../components/ui/Button';
 import PasswordStrength from '../../components/PasswordStrength';
 import { isStrongPassword } from '../../utils/passwordPolicy';
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onSwitchToLogin
+ */
 function Register({ onSwitchToLogin }) {
     const { notify } = useNotification();
     const [formData, setFormData] = useState({
@@ -43,7 +47,7 @@ function Register({ onSwitchToLogin }) {
                 notify(res.data.message, { icon: '✅' });
                 onSwitchToLogin();
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify(err.response?.data?.message || '회원가입 실패', { icon: '⚠️' });
         }
     };

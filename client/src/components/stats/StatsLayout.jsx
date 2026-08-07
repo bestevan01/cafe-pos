@@ -8,6 +8,11 @@ import Button from '../ui/Button';
  *     <StatCard ...>...</StatCard>
  *     <StatCard ...>...</StatCard>
  *   </StatsLayout>
+ * @param {object} props
+ * @param {string} props.title
+ * @param {() => void} props.onBack
+ * @param {import('react').ReactNode} props.actions  우측 상단 액션
+ * @param {import('react').ReactNode} props.children
  */
 function StatsLayout({ title, onBack, actions, children }) {
     return (

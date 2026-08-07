@@ -7,6 +7,11 @@ import Button from '../../components/ui/Button';
 import PasswordStrength from '../../components/PasswordStrength';
 import { isStrongPassword } from '../../utils/passwordPolicy';
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onBack
+ * @param {() => void} props.onLogout
+ */
 function EditProfile({ onBack, onLogout }) {
     const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
@@ -94,7 +99,7 @@ function EditProfile({ onBack, onLogout }) {
                 setPwForm({ newPassword: '', confirmPassword: '' });
                 setIsChangingPassword(false);
             }
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify(err.response?.data?.message || '비밀번호 변경 실패', { icon: '⚠️' });
         }
     };
@@ -120,7 +125,7 @@ function EditProfile({ onBack, onLogout }) {
         try {
             // ⚠️ 이 호출 앞에 await(네트워크)를 두면 Safari에서 제스처가 만료돼 팝업이 안 뜬다.
             attResp = await startRegistration({ optionsJSON: options });
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error('패스키 등록 오류:', error.name, error.message); // 진단용(NotAllowedError 포함)
             void prefetchRegisterOptions(user.id); // 다음 시도용 새 옵션 준비
             if (error.name === 'InvalidStateError') notify('이미 등록된 기기입니다!', { icon: '⚠️' });
@@ -142,7 +147,7 @@ function EditProfile({ onBack, onLogout }) {
                 notify('기기가 등록되었습니다.', { icon: '✅' });
                 await fetchPasskeys(user.id);
             }
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
             console.error(error);
             notify('패스키 등록에 실패했습니다.', { icon: '⚠️' });
         } finally {
@@ -163,7 +168,7 @@ function EditProfile({ onBack, onLogout }) {
             await axios.delete(`/api/passkeys/${credentialId}`, getAuthHeader());
             notify('삭제되었습니다.', { icon: '✅' });
             await fetchPasskeys(user.id);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify('삭제 실패: ' + err.message, { icon: '⚠️' });
         }
     };
@@ -180,7 +185,7 @@ function EditProfile({ onBack, onLogout }) {
             await axios.patch(`/api/passkeys/${id}`, { device_name: name }, getAuthHeader());
             setEditingId(null);
             await fetchPasskeys(user.id);
-        } catch (err) {
+        } catch (/** @type {any} */ err) {
             notify(err.response?.data?.message || '이름 변경 실패', { icon: '⚠️' });
         }
     };

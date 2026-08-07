@@ -6,13 +6,14 @@
  *     <BarList .../>
  *   </StatCard>
  *
- * @param {string} title           카드 제목
- * @param {string} [icon]          제목 앞 이모지
- * @param {React.ReactNode} [subtitle] 우측 작은 부제목
- * @param {boolean} [loading]      true면 스피너 + "불러오는 중"
- * @param {boolean} [empty]        true면 "데이터가 없습니다"
- * @param {boolean} [wide]         true면 그리드 한 줄 전체 차지 (1 / -1)
- * @param {React.ReactNode} children  카드 본문(차트 등)
+ * @param {object} props
+ * @param {string} props.title                                카드 제목
+ * @param {string} [props.icon]                               제목 앞 이모지
+ * @param {import('react').ReactNode} [props.subtitle]        우측 작은 부제목
+ * @param {boolean} [props.loading]                           true면 스피너 + "불러오는 중"
+ * @param {boolean} [props.empty]                             true면 "데이터가 없습니다"
+ * @param {boolean} [props.wide]                              true면 그리드 한 줄 전체 차지 (1 / -1)
+ * @param {import('react').ReactNode} [props.children]        카드 본문(차트 등)
  */
 function StatCard({ title, icon, subtitle, loading = false, empty = false, wide = false, children }) {
     return (

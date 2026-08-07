@@ -16,6 +16,10 @@ import { NotificationContext } from '../hooks/useNotification';
  */
 let idCounter = 0;
 
+/**
+ * @param {object} props
+ * @param {import('react').ReactNode} props.children
+ */
 export function NotificationProvider({ children }) {
     const [toasts, setToasts] = useState(
         /** @type {{id: number, message: React.ReactNode, icon?: *, title?: string, loading?: boolean}[]} */ ([]),
