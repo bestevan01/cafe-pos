@@ -1,0 +1,16 @@
+{
+  "//": "VS Code/tsc가 클라이언트를 하나의 프로젝트로 인식하게 한다. vite-env.d.ts(CSS import·import.meta.env 선언)를 포함시키는 것이 핵심.",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strictNullChecks": true,
+    "noImplicitAny": true
+  },
+  "include": ["src/**/*", "*.js"],
+  "exclude": ["node_modules", "dist"]
+}
