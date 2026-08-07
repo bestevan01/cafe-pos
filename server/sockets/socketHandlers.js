@@ -34,6 +34,12 @@ module.exports = (io) => {
         });
     });
 
+    // 현재 캐셔 점유 상태 + 점유자 이름을 함께 담아 반환 (RoleSelection에 "OOO님 사용 중" 표시용)
+    function cashierStatusPayload() {
+        const ownerSocket = currentCashierId ? io.sockets.sockets.get(currentCashierId) : null;
+        return { taken: currentCashierId !== null, name: ownerSocket?.data?.user?.name || null };
+    }
+
     io.on('connection', (socket) => {
         console.log(`[🟢 Socket 연결됨] ID: ${socket.id} (현재 접속자: ${io.engine.clientsCount}명)`);
 
@@ -46,10 +52,25 @@ module.exports = (io) => {
         });
 
         socket.on('claim_cashier', () => {
-            if (currentCashierId === null) {
+            // 관리자는 1인 제한 예외: 다른 직원이 이미 캐셔를 쓰고 있어도 항상 진입 허용.
+            // 단, currentCashierId(점유 락)는 건드리지 않는다 — 관리자가 나가도 실제 담당 직원의
+            // 자리가 반납되면 안 되고, 관리자 자신도 release_cashier 시 잘못 반납시키지 않기 위함.
+            if (socket.data.user?.role === 'admin') {
+                console.log(`[🛒 캐셔 진입(관리자, 1인 제한 예외)] ID: ${socket.id}`);
+                socket.emit('cashier_claimed', true);
+                return;
+            }
+
+            // 재선점 허용 조건: 자리가 비었거나, 본인 소켓이 소유자거나,
+            // 소유자가 같은 계정의 이전 연결(순단 후 아직 타임아웃 안 된 좀비 소켓)인 경우.
+            // 좀비 소켓의 disconnect가 늦게 도착해도 release 가드(socket.id 비교)에 걸려 새 소유권을 해치지 않는다.
+            const ownerSocket = currentCashierId ? io.sockets.sockets.get(currentCashierId) : null;
+            const isSameUser = ownerSocket?.data?.user?.username === socket.data.user?.username;
+
+            if (currentCashierId === null || currentCashierId === socket.id || !ownerSocket || isSameUser) {
                 currentCashierId = socket.id;
                 console.log(`[🛒 캐셔 선점] ID: ${socket.id}`);
-                io.emit('cashier_status', true);
+                io.emit('cashier_status', cashierStatusPayload());
                 socket.emit('cashier_claimed', true);
             } else {
                 console.log(`[⚠️ 캐셔 선점 실패] ID: ${socket.id} (이미 사용 중)`);
@@ -61,7 +82,7 @@ module.exports = (io) => {
             if (socket.id === currentCashierId) {
                 currentCashierId = null;
                 console.log(`[🔓 캐셔 해제] ID: ${socket.id}가 캐셔 자리를 반납함`);
-                io.emit('cashier_status', false);
+                io.emit('cashier_status', cashierStatusPayload());
             }
         });
 
@@ -74,24 +95,29 @@ module.exports = (io) => {
             }
             currentCashierId = null;
             console.log(`[🚨 캐셔 강제 해제] 관리자: ${socket.data.user.username}`);
-            io.emit('cashier_status', false);
+            io.emit('cashier_status', cashierStatusPayload());
             if (typeof ack === 'function') ack({ success: true });
         });
 
         socket.on('request_state', () => {
-            socket.emit('cashier_status', currentCashierId !== null);
-            socket.emit('kitchen_status', kitchenUsers.size > 0);
+            socket.emit('cashier_status', cashierStatusPayload());
+            socket.emit('kitchen_status', kitchenUsers.size);
         });
 
         socket.on('join_kitchen', () => {
+            // 관리자는 user_count와 마찬가지로 주방 접속자 카운트에서 제외(1인 제한 예외와 별개로, 통계성 카운트만 제외).
+            if (socket.data.user?.role === 'admin') {
+                console.log(`[🍳 주방 입장(관리자, 카운트 제외)] ID: ${socket.id}`);
+                return;
+            }
             kitchenUsers.add(socket.id);
-            io.emit('kitchen_status', kitchenUsers.size > 0);
+            io.emit('kitchen_status', kitchenUsers.size);
             console.log(`[🍳 주방 입장] ID: ${socket.id} (현재 주방 인원: ${kitchenUsers.size}명)`);
         });
 
         socket.on('leave_kitchen', () => {
             kitchenUsers.delete(socket.id);
-            io.emit('kitchen_status', kitchenUsers.size > 0);
+            io.emit('kitchen_status', kitchenUsers.size);
         });
 
         socket.on('logout', () => {
@@ -110,12 +136,12 @@ module.exports = (io) => {
             if (socket.id === currentCashierId) {
                 currentCashierId = null;
                 console.log(`[🔓 캐셔 자동 해제] 사유: 캐셔 담당자의 연결 끊김`);
-                io.emit('cashier_status', false);
+                io.emit('cashier_status', cashierStatusPayload());
             }
 
             if (kitchenUsers.has(socket.id)) {
                 kitchenUsers.delete(socket.id);
-                io.emit('kitchen_status', kitchenUsers.size > 0);
+                io.emit('kitchen_status', kitchenUsers.size);
                 console.log(`[🍳 주방 퇴장 (연결 끊김)] 남은 주방 인원: ${kitchenUsers.size}명`);
             }
         });

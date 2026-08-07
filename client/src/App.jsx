@@ -11,7 +11,6 @@ import Register from './pages/auth/Register';
 import ProfileAuth from './pages/auth/ProfileAuth.jsx';
 import EditProfile from './pages/auth/EditProfile.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import ThemeToggle from './components/ThemeToggle';
 import { useTheme } from './hooks/useTheme';
 import { useNotification } from './hooks/useNotification';
 
@@ -43,9 +42,12 @@ function App() {
     });
 
     const [myRole, setMyRole] = useState(null); // 'cashier', 'kitchen', null
+    const [adminStaffMode, setAdminStaffMode] = useState(false); // 관리자가 캐셔/주방 화면을 미리보기 위해 직원 모드로 전환했는지
     const [prevRole, setPrevRole] = useState(null); // 역할 전환 감지용(렌더링 중 UI 상태 리셋에 사용)
     const [isCashierTaken, setIsCashierTaken] = useState(false);
-    const [isKitchenActive, setIsKitchenActive] = useState(false);
+    const [cashierUserName, setCashierUserName] = useState(null); // 캐셔를 점유 중인 사람 이름
+    const [kitchenUserCount, setKitchenUserCount] = useState(0);
+    const isKitchenActive = kitchenUserCount > 0;
 
     // 모달 상태
     const [showSettlement, setShowSettlement] = useState(false);
@@ -76,6 +78,7 @@ function App() {
 
         setAuth({ isLoggedIn: false, user: null, view: 'login' });
         setMyRole(null);
+        setAdminStaffMode(false);
         setShowProfile(false);
         setIsProfileVerified(false);
     }, []);
@@ -161,8 +164,11 @@ function App() {
         socket.on('connect', registerMyUser);
         socket.on('connect_error', handleAuthError);
 
-        socket.on('cashier_status', (isTaken) => setIsCashierTaken(isTaken));
-        socket.on('kitchen_status', (isActive) => setIsKitchenActive(isActive));
+        socket.on('cashier_status', (status) => {
+            setIsCashierTaken(status.taken);
+            setCashierUserName(status.name);
+        });
+        socket.on('kitchen_status', (count) => setKitchenUserCount(count));
         socket.emit('request_state'); // 현재 상태 요청
 
         return () => {
@@ -173,6 +179,29 @@ function App() {
             socket.off('kitchen_status');
         };
     }, [auth.isLoggedIn, auth.user, handleLogout, notify]);
+
+    // 캐셔 사용 중 순단(재연결) 시 자리 자동 재선점.
+    // 재연결되면 소켓 ID가 바뀌어 서버가 이전 소켓 기준으로 자리를 비워버리므로,
+    // 화면은 캐셔인데 서버상 공석이 되어 다른 기기가 선점할 수 있는 틈이 생긴다. (그 반대 방지용)
+    useEffect(() => {
+        if (myRole !== 'cashier') return;
+
+        const reclaimCashier = () => socket.emit('claim_cashier');
+        const handleReclaimResult = (success) => {
+            if (!success) {
+                // 끊긴 사이 다른 사용자(다른 계정)가 선점한 경우 — 역할 선택으로 복귀
+                notify('연결이 끊긴 사이 다른 기기가 캐셔를 선점했습니다.', { icon: '⚠️' });
+                setMyRole(null);
+            }
+        };
+
+        socket.on('connect', reclaimCashier);
+        socket.on('cashier_claimed', handleReclaimResult);
+        return () => {
+            socket.off('connect', reclaimCashier);
+            socket.off('cashier_claimed', handleReclaimResult);
+        };
+    }, [myRole, notify]);
 
     // ---------------------------------------------------------
     // [4] 렌더링 로직 (Render Logic)
@@ -194,8 +223,8 @@ function App() {
         );
     }
 
-    // 관리자 대시보드
-    if (auth.user.role === 'admin') {
+    // 관리자 대시보드 (직원 모드로 전환하지 않은 동안만)
+    if (auth.user.role === 'admin' && !adminStaffMode) {
         // 본인 확인 통과 후엔 EditProfile 전체 페이지로 전환
         if (showProfile && isProfileVerified) {
             return (
@@ -211,7 +240,12 @@ function App() {
         // 대시보드는 그대로 두고, 본인 확인(ProfileAuth)은 그 위에 모달로 띄운다
         return (
             <>
-                <AdminDashboard onLogout={handleManualLogout} onEditProfile={() => setShowProfile(true)} />
+                <AdminDashboard
+                    userName={auth.user.name}
+                    onLogout={handleManualLogout}
+                    onEditProfile={() => setShowProfile(true)}
+                    onEnterStaffMode={() => setAdminStaffMode(true)}
+                />
                 {showProfile && (
                     <ProfileAuth
                         currentUser={auth.user}
@@ -268,6 +302,9 @@ function App() {
                     setMyRole(role);
                 }}
                 isCashierTaken={isCashierTaken}
+                cashierUserName={cashierUserName}
+                kitchenUserCount={kitchenUserCount}
+                isAdmin={auth.user.role === 'admin'}
             />
         );
     };
@@ -282,42 +319,32 @@ function App() {
                 /* 상단 플로팅 헤더 */
                 .global-top-header { position: absolute; top: 15px; left: 20px; right: 20px; z-index: 9999; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
                 
-                .btn-global-action { padding: 8px 12px; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s; font-size: 0.95rem; }
+                /* btn-user-dropdown과 두께(패딩/글자크기/보더)를 맞춤 — 옆에 나란히 있을 때 높이가 어긋나지 않게 */
+                .btn-global-action { padding: 6px 12px; color: white; border: 1px solid transparent; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s; font-size: 0.85rem; }
                 .btn-global-action:active { transform: scale(0.95); }
                 .btn-settle { background-color: var(--success); }
-                .btn-profile { background-color: var(--neutral); }
                 .btn-back-role { background-color: var(--neutral); margin-right: auto; }
-                
-                .global-user-name { font-weight: bold; color: var(--text-primary, #333); font-size: 1rem; text-shadow: 0px 0px 8px var(--bg-color, rgba(255,255,255,0.8)); }
-                
-                .btn-global-logout { padding: 8px 12px; background-color: var(--danger); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: transform 0.1s; }
-                .btn-global-logout:active { transform: scale(0.95); }
 
-                .desktop-user-menu { display: flex; align-items: center; gap: 12px; }
-                .mobile-user-menu { display: none; position: relative; }
-                
-                .btn-mobile-dropdown { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, #fff); color: var(--text-primary, #333); font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; }
-                
-                .mobile-dropdown-content { position: absolute; top: 110%; right: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: visible; min-width: 120px; z-index: 10000; }
-                
+                /* 이름 드롭다운 — PC/모바일 공통(화면 크기와 무관하게 동일한 형태) */
+                .user-menu { position: relative; }
+
+                .btn-user-dropdown { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, #fff); color: var(--text-primary, #333); font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; }
+
+                .dropdown-panel { position: absolute; top: 110%; right: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: visible; width: max-content; z-index: 10000; }
+
                 .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
                 .dropdown-item:last-child { border-bottom: none; }
                 .dropdown-item.logout { color: var(--danger); }
                 .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
-                .global-theme-desktop { display: inline-flex; align-items: center; }
                 .dropdown-item.active { color: var(--accent); font-weight: 800; }
                 .dropdown-theme-wrap { position: relative; }
-                .dropdown-theme-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+                .dropdown-theme-toggle { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; }
                 .dropdown-sub-arrow { color: var(--text-secondary, #999); font-size: 1.1rem; line-height: 1; }
                 .dropdown-submenu { position: absolute; right: calc(100% + 6px); top: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden; min-width: 150px; z-index: 10001; }
 
                 @media (max-width: 768px) {
                     .global-top-header { top: 10px; right: 10px; gap: 8px; left: 10px; }
-                    .btn-global-action { padding: 6px 10px; font-size: 0.85rem; }
-
-                    .desktop-user-menu { display: none; }
-                    .mobile-user-menu { display: block; }
-                    .global-theme-desktop { display: none; } /* 모바일: 테마 버튼은 사용자 드롭다운 안으로 이동 */
+                    .btn-global-action { padding: 6px 10px; }
                 }
                 `}
             </style>
@@ -344,25 +371,10 @@ function App() {
                         </button>
                     )}
 
-                    <span className="global-theme-desktop">
-                        <ThemeToggle />
-                    </span>
-
-                    {/* 🖥️ 데스크탑 뷰 (모바일에서는 숨김) */}
-                    <div className="desktop-user-menu">
-                        <button onClick={() => setShowProfile(true)} className="btn-global-action btn-profile">
-                            ⚙️ 내 정보
-                        </button>
-                        <span className="global-user-name">{auth.user.name}님</span>
-                        <button onClick={handleManualLogout} className="btn-global-logout">
-                            로그아웃
-                        </button>
-                    </div>
-
-                    {/* 📱 모바일 뷰 (데스크탑에서는 숨김) */}
-                    <div className="mobile-user-menu">
+                    {/* 이름 드롭다운 — PC/모바일 공통 */}
+                    <div className="user-menu">
                         <button
-                            className="btn-mobile-dropdown"
+                            className="btn-user-dropdown"
                             onClick={() => {
                                 setIsDropdownOpen(!isDropdownOpen);
                                 setIsThemeSubOpen(false);
@@ -373,7 +385,7 @@ function App() {
 
                         {/* 드롭다운 열렸을 때 나오는 메뉴들 */}
                         {isDropdownOpen && (
-                            <div className="mobile-dropdown-content">
+                            <div className="dropdown-panel">
                                 <div className="dropdown-theme-wrap">
                                     <button
                                         className="dropdown-item dropdown-theme-toggle"
@@ -405,6 +417,20 @@ function App() {
                                         </div>
                                     )}
                                 </div>
+                                {auth.user.role === 'admin' && adminStaffMode && (
+                                    <button
+                                        onClick={() => {
+                                            if (myRole === 'cashier') socket.emit('release_cashier');
+                                            if (myRole === 'kitchen') socket.emit('leave_kitchen');
+                                            setMyRole(null);
+                                            setAdminStaffMode(false);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        className="dropdown-item"
+                                    >
+                                        🛡️ 관리자 대시보드
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => {
                                         setShowProfile(true);

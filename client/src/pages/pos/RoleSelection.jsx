@@ -2,7 +2,15 @@ import { useEffect, useRef } from 'react';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
 
-function RoleSelection({ onSelectRole, isCashierTaken }) {
+/**
+ * @param {object} props
+ * @param {(role: 'cashier'|'kitchen') => void} props.onSelectRole
+ * @param {boolean} props.isCashierTaken
+ * @param {string|null} props.cashierUserName  캐셔 점유자 이름
+ * @param {number} props.kitchenUserCount
+ * @param {boolean} props.isAdmin  관리자는 1인 제한 예외
+ */
+function RoleSelection({ onSelectRole, isCashierTaken, cashierUserName, kitchenUserCount, isAdmin }) {
     const { notify } = useNotification();
     const cashierClaimedHandlerRef = useRef(null);
 
@@ -74,7 +82,7 @@ function RoleSelection({ onSelectRole, isCashierTaken }) {
                 .role-icon { font-size: 4rem; margin-bottom: 15px; }
                 .role-name { font-size: 1.4rem; font-weight: bold; margin: 0 0 8px 0; }
                 .role-status { font-size: 0.95rem; font-weight: bold; margin: 0; }
-                
+
                 .status-red { color: var(--danger); }
                 .status-green { color: var(--success); }
 
@@ -96,12 +104,15 @@ function RoleSelection({ onSelectRole, isCashierTaken }) {
 
             <div className="role-grid">
                 {/* 1. 캐셔 버튼 */}
-                <button onClick={handleCashierClick} disabled={isCashierTaken} className="role-card">
+                <button onClick={handleCashierClick} disabled={isCashierTaken && !isAdmin} className="role-card">
                     <div className="role-content-wrapper">
                         <div className="role-icon">🛒</div>
                         <h2 className="role-name">캐셔 (주문)</h2>
                         {isCashierTaken ? (
-                            <p className="role-status status-red">사용 중...</p>
+                            <p className={`role-status ${isAdmin ? 'status-green' : 'status-red'}`}>
+                                {cashierUserName ? `${cashierUserName}님 사용 중` : '사용 중...'}
+                                {isAdmin && ' (관리자 진입 가능)'}
+                            </p>
                         ) : (
                             <p className="role-status status-green">선택 가능</p>
                         )}
@@ -113,7 +124,9 @@ function RoleSelection({ onSelectRole, isCashierTaken }) {
                     <div className="role-content-wrapper">
                         <div className="role-icon">👨‍🍳</div>
                         <h2 className="role-name">주방 (조리)</h2>
-                        <p className="role-status status-green">언제나 가능</p>
+                        <p className="role-status status-green">
+                            {kitchenUserCount > 0 ? `${kitchenUserCount}명 접속 중` : '대기 중'}
+                        </p>
                     </div>
                 </button>
             </div>

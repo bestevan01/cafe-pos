@@ -5,14 +5,23 @@ import MenuDashboard from './MenuDashboard';
 import EventDashboard from './EventDashboard';
 import UsersDashboard from './UsersDashboard';
 import CostAnalysis from './CostAnalysis';
-import ThemeToggle from '../../components/ThemeToggle';
-import Button from '../../components/ui/Button';
 import { socket } from '../../utils/socket';
+import { useTheme } from '../../hooks/useTheme';
 import { useNotification } from '../../hooks/useNotification';
 
-function AdminDashboard({ onLogout, onEditProfile }) {
+/**
+ * @param {object} props
+ * @param {string} props.userName
+ * @param {() => void} props.onLogout
+ * @param {() => void} props.onEditProfile
+ * @param {() => void} props.onEnterStaffMode  캐셔/주방 화면으로 전환
+ */
+function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode }) {
     const [view, setView] = useState('home');
     const { notify, confirm } = useNotification();
+    const { theme, setTheme } = useTheme();
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isThemeSubOpen, setIsThemeSubOpen] = useState(false);
 
     // 데드 스위치: 캐셔 잠금이 꼬여 아무도 접속하지 못할 때 강제 해제
     const handleForceReleaseCashier = async () => {
@@ -41,15 +50,91 @@ function AdminDashboard({ onLogout, onEditProfile }) {
     // 메인(Home) 화면 렌더링
     return (
         <div className="admin-container">
-            {/* 상단 우측 헤더 영역 */}
+            {/* 상단 우측 헤더 영역 — 이름 드롭다운 하나로 PC/모바일 공통 */}
             <div className="top-right-header">
-                <ThemeToggle />
-                <Button variant="neutral" icon="⚙️" onClick={onEditProfile}>
-                    내 정보
-                </Button>
-                <Button variant="danger" onClick={onLogout}>
-                    로그아웃
-                </Button>
+                <div className="user-menu">
+                    <button
+                        className="btn-user-dropdown"
+                        onClick={() => {
+                            setIsDropdownOpen(!isDropdownOpen);
+                            setIsThemeSubOpen(false);
+                        }}
+                    >
+                        👤 {userName}님 ▼
+                    </button>
+
+                    {isDropdownOpen && (
+                        <div className="dropdown-panel">
+                            <div className="dropdown-theme-wrap">
+                                <button
+                                    className="dropdown-item dropdown-theme-toggle"
+                                    onClick={() => setIsThemeSubOpen(!isThemeSubOpen)}
+                                >
+                                    <span>🎨 테마 변경</span>
+                                    <span className="dropdown-sub-arrow">‹</span>
+                                </button>
+                                {isThemeSubOpen && (
+                                    <div className="dropdown-submenu">
+                                        <button
+                                            className={`dropdown-item ${theme === 'light' ? 'active' : ''}`}
+                                            onClick={() => setTheme('light')}
+                                        >
+                                            ☀️ 라이트 모드
+                                        </button>
+                                        <button
+                                            className={`dropdown-item ${theme === 'dark' ? 'active' : ''}`}
+                                            onClick={() => setTheme('dark')}
+                                        >
+                                            🌙 다크 모드
+                                        </button>
+                                        <button
+                                            className={`dropdown-item ${theme === 'system' ? 'active' : ''}`}
+                                            onClick={() => setTheme('system')}
+                                        >
+                                            💻 시스템 설정
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setIsDropdownOpen(false);
+                                    onEnterStaffMode();
+                                }}
+                                className="dropdown-item"
+                            >
+                                🛒 캐셔/주방 화면
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsDropdownOpen(false);
+                                    onEditProfile();
+                                }}
+                                className="dropdown-item"
+                            >
+                                ⚙️ 내 정보
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsDropdownOpen(false);
+                                    handleForceReleaseCashier();
+                                }}
+                                className="dropdown-item danger"
+                            >
+                                🚨 캐셔 강제 해제
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsDropdownOpen(false);
+                                    onLogout();
+                                }}
+                                className="dropdown-item logout"
+                            >
+                                🚪 로그아웃
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <style>
@@ -76,6 +161,26 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                     display: flex; gap: 10px; align-items: center; z-index: 100;
                 }
 
+                /* 이름 드롭다운 — PC/모바일 공통(화면 크기와 무관하게 동일한 형태) */
+                .user-menu { position: relative; }
+
+                .btn-user-dropdown { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, #fff); color: var(--text-primary, #333); font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; }
+
+                /* min-width 고정값 대신 가장 긴 항목(캐셔/주방 화면, 캐셔 강제 해제)에 맞춰 너비 자동 결정 */
+                .dropdown-panel { position: absolute; top: 110%; right: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: visible; width: max-content; z-index: 10000; }
+
+                .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
+                .dropdown-item:last-child { border-bottom: none; }
+                .dropdown-item.logout, .dropdown-item.danger { color: var(--danger); }
+                .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
+                .dropdown-item.active { color: var(--accent); font-weight: 800; }
+                .dropdown-theme-wrap { position: relative; }
+                /* dropdown-theme-wrap에 한 겹 더 감싸져 있어 flex stretch를 못 받고 내용물 크기로만 줄어들던 문제 수정 */
+                /* + 화살표를 오른쪽 끝(space-between)이 아니라 텍스트 바로 옆에 붙임 */
+                .dropdown-theme-toggle { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; }
+                .dropdown-sub-arrow { color: var(--text-secondary, #999); font-size: 1.1rem; line-height: 1; }
+                .dropdown-submenu { position: absolute; right: calc(100% + 6px); top: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden; min-width: 150px; z-index: 10001; }
+
                 /* 대시보드 카드 그리드 */
                 .admin-grid { 
                     display: grid; grid-template-columns: repeat(3, 1fr); 
@@ -95,20 +200,10 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                 .card-title { font-size: 1.3rem; font-weight: bold; color: var(--text-primary, #333); margin-bottom: 8px; }
                 .card-desc { font-size: 0.95rem; color: var(--text-secondary, #888); word-break: keep-all; }
 
-                /* 비상용 캐셔 강제 해제 버튼 */
-                .btn-force-release {
-                    padding: 12px 20px; background-color: transparent;
-                    color: var(--danger); border: 1px solid var(--danger); border-radius: var(--radius-md);
-                    font-weight: bold; font-size: 0.95rem; cursor: pointer;
-                    transition: background-color 0.2s, transform 0.1s;
-                }
-                .btn-force-release:hover { background-color: var(--danger-bg); }
-                .btn-force-release:active { transform: scale(0.97); }
-
-                /* 모바일 반응형 */
+                /* 모바일 반응형 — 메뉴 형태(드롭다운)는 PC와 동일, 배치만 좁은 화면에 맞춤 */
                 @media (max-width: 768px) {
-                    /* 헤더를 절대배치 → 흐름 안(상단 바)으로: 콘텐츠가 항상 그 아래로 흘러 버튼을 침범하지 않음 */
-                    .top-right-header { position: static; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
+                    /* 헤더를 절대배치 → 흐름 안(상단 바)으로: 가운데 정렬된 타이틀이 좁은 화면에서 버튼과 겹치지 않게 함 */
+                    .top-right-header { position: static; justify-content: flex-end; margin-bottom: 10px; }
                     /* 위에서부터 흐르게 하고, 카드 그리드가 남는 세로 공간을 채우도록 → 화면 높이에 유연 대응 */
                     .home-content { justify-content: flex-start; }
                     .admin-title { font-size: 1.6rem; margin: 4px 0 18px; }
@@ -161,11 +256,6 @@ function AdminDashboard({ onLogout, onEditProfile }) {
                         <div className="card-desc">가입 승인 및 권한 설정</div>
                     </button>
                 </div>
-
-                {/* 운영 도구: 캐셔 잠금이 꼬였을 때 비상 해제 */}
-                <button onClick={handleForceReleaseCashier} className="btn-force-release">
-                    🚨 캐셔 강제 해제 (비상용)
-                </button>
             </div>
         </div>
     );
