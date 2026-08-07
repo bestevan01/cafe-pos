@@ -22,10 +22,12 @@ function Register({ onSwitchToLogin }) {
     // 시스템 테마(OS 설정) 강제 적용
     useSystemTheme();
 
+    /** @param {import('react').ChangeEvent<HTMLInputElement>} e */
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    /** @param {import('react').FormEvent<HTMLFormElement>} e */
     const handleSubmit = async (e) => {
         e.preventDefault();
 

@@ -9,10 +9,14 @@ import Button from '../../components/ui/Button';
 
 const UNITS = ['g', 'ml', '개'];
 const CATEGORIES = ['식재료', '부자재']; // 부자재 = 컵/빨대/뚜껑 등 포장재
+/** @param {number|string} n */
 const won = (n) => Math.round(Number(n) || 0).toLocaleString();
+/** @param {import('../../types').Ingredient} ing */
 const catOf = (ing) => (CATEGORIES.includes(ing.category) ? ing.category : '식재료');
+/** @param {string} u */
 const unitLabel = (u) => (u === 'ea' ? '개' : u); // 레거시 'ea' 표시 보정
 // 단위당 원가(원/단위). 구매 용량 0 이하이면 0.
+/** @param {import('../../types').Ingredient} ing */
 const unitCostOf = (ing) => {
     const amount = Number(ing.purchase_amount);
     return amount > 0 ? Number(ing.purchase_price) / amount : 0;
@@ -70,6 +74,7 @@ function CostAnalysis({ onBack }) {
     const unitCostMap = useMemo(() => new Map(ingredients.map((i) => [i.id, unitCostOf(i)])), [ingredients]);
 
     const recipeCostOf = useCallback(
+        /** @param {import('../../types').MenuWithRecipe} menu */
         (menu) =>
             Math.round(
                 (menu.items || []).reduce(
@@ -81,6 +86,7 @@ function CostAnalysis({ onBack }) {
     );
 
     const effectiveCostOf = useCallback(
+        /** @param {import('../../types').MenuWithRecipe} menu */
         (menu) => (menu.cost_override != null ? Number(menu.cost_override) : recipeCostOf(menu)),
         [recipeCostOf],
     );
@@ -114,8 +120,10 @@ function CostAnalysis({ onBack }) {
     }, [analysis]);
 
     // ---- 메뉴 선택 → 레시피 편집 초안 세팅 ----
+    /** @param {import('../../types').MenuWithRecipe} menu */
     const selectMenu = (menu) => {
         setSelectedMenuId(menu.menu_id);
+        /** @type {Record<string, string>} */
         const draft = {};
         for (const it of menu.items || []) draft[it.ingredient_id] = String(it.amount);
         setDraftAmounts(draft);
@@ -133,6 +141,7 @@ function CostAnalysis({ onBack }) {
 
     // 분류별 원가 합계 (편집기 하단에 식재료/부자재 분해 표시)
     const draftCostByCat = useMemo(() => {
+        /** @type {Record<string, number>} */
         const out = { 식재료: 0, 부자재: 0 };
         for (const ing of ingredients) {
             out[catOf(ing)] += (Number(draftAmounts[ing.id]) || 0) * unitCostOf(ing);
@@ -178,11 +187,17 @@ function CostAnalysis({ onBack }) {
     };
 
     // 행 입력값을 로컬에서 즉시 반영
+    /**
+     * @param {number} id
+     * @param {string} field
+     * @param {any} value
+     */
     const editIngredientField = (id, field, value) => {
         setIngredients((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
     };
 
     // 행을 서버에 저장 (blur 시)
+    /** @param {import('../../types').Ingredient} ing */
     const saveIngredient = async (ing) => {
         if (!ing.name?.trim() || !(Number(ing.purchase_amount) > 0) || !(Number(ing.purchase_price) >= 0)) {
             notify('값이 올바르지 않습니다. 다시 확인하세요.', { icon: '⚠️' });
@@ -207,6 +222,7 @@ function CostAnalysis({ onBack }) {
         }
     };
 
+    /** @param {import('../../types').Ingredient} ing */
     const deleteIngredient = async (ing) => {
         const ok = await confirm(`'${ing.name}' 원재료를 삭제하면 이 재료가 들어간 레시피에서도 함께 제거됩니다.`, {
             title: '원재료 삭제',

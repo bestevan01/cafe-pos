@@ -19,8 +19,17 @@ function SalesDashboard({ onBack }) {
     const now = new Date();
     const [salesData, setSalesData] = useState(/** @type {import('../../types').OrderRow[]} */ ([]));
     const [loading, setLoading] = useState(true);
-    const [summary, setSummary] = useState({ today: 0, month: 0, total: 0, totalCount: 0, periods: [] });
-    const monthCacheRef = useRef({}); // { 'year-month': rows } — 받은 달 캐싱
+    const [summary, setSummary] = useState(
+        /** @type {import('../../types').SalesSummary} */ ({
+            today: 0,
+            month: 0,
+            total: 0,
+            totalCount: 0,
+            periods: [],
+        }),
+    );
+    // { 'year-month': rows } — 받은 달 캐싱
+    const monthCacheRef = useRef(/** @type {Record<string, import('../../types').OrderRow[]>} */ ({}));
 
     // 필터링 상태 (연·월 = 서버 fetch 단위(기본 이번 달), 일·시·결제 = 클라 필터)
     const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
@@ -30,7 +39,9 @@ function SalesDashboard({ onBack }) {
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
 
     // UI 상태 (정렬, 고급 통계 모드)
-    const [sortConfig, setSortConfig] = useState({ key: null, direction: 'default' });
+    const [sortConfig, setSortConfig] = useState(
+        /** @type {{key: string|null, direction: 'asc'|'desc'|'default'}} */ ({ key: null, direction: 'default' }),
+    );
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     // API 권한 토큰
@@ -52,6 +63,11 @@ function SalesDashboard({ onBack }) {
 
     // 연+월 단위로 받아 캐싱. 이미 받은 달은 재요청 없이 즉시 표시.
     const fetchMonth = useCallback(
+        /**
+         * @param {string|number} year
+         * @param {string|number} month
+         * @param {{force?: boolean}} [opts]
+         */
         async (year, month, { force = false } = {}) => {
             const key = `${year}-${month}`;
             if (!force && monthCacheRef.current[key]) {
@@ -84,6 +100,7 @@ function SalesDashboard({ onBack }) {
         void fetchMonth(selectedYear, selectedMonth);
     }, [selectedYear, selectedMonth, fetchMonth]);
 
+    /** @param {string} id */
     const handleDelete = async (id) => {
         if (
             !(await confirm('정말 삭제(환불) 처리하시겠습니까?', {
@@ -124,8 +141,12 @@ function SalesDashboard({ onBack }) {
         let sortableItems = [...filteredData];
         if (sortConfig.key !== null && sortConfig.direction !== 'default') {
             sortableItems.sort((a, b) => {
-                let aValue = a[sortConfig.key] ?? '';
-                let bValue = b[sortConfig.key] ?? '';
+                const sortKey = /** @type {keyof import('../../types').OrderRow} */ (sortConfig.key);
+                // 컬럼마다 값의 타입(문자열/숫자/날짜)이 달라 any로 두고 아래에서 분기 처리한다.
+                /** @type {any} */
+                let aValue = a[sortKey] ?? '';
+                /** @type {any} */
+                let bValue = b[sortKey] ?? '';
 
                 if (sortConfig.key === 'created_at') {
                     aValue = new Date(aValue);
@@ -160,8 +181,9 @@ function SalesDashboard({ onBack }) {
     // ---------------------------------------------------------
     // [5] 헬퍼 함수 (정렬, 엑셀, 옵션 생성)
     // ---------------------------------------------------------
+    /** @param {string} key */
     const requestSort = (key) => {
-        let direction = 'asc';
+        let direction = /** @type {'asc'|'desc'|'default'} */ ('asc');
         if (sortConfig.key === key) {
             if (sortConfig.direction === 'asc') direction = 'desc';
             else if (sortConfig.direction === 'desc') direction = 'default';
@@ -169,6 +191,7 @@ function SalesDashboard({ onBack }) {
         setSortConfig({ key, direction });
     };
 
+    /** @param {string} name */
     const getSortIndicator = (name) => {
         if (sortConfig.key !== name || sortConfig.direction === 'default') return ' -';
         return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
@@ -488,7 +511,7 @@ function SalesDashboard({ onBack }) {
                             {loading ? (
                                 <tr>
                                     <td
-                                        colSpan="8"
+                                        colSpan={8}
                                         style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}
                                     >
                                         불러오는 중...
@@ -497,7 +520,7 @@ function SalesDashboard({ onBack }) {
                             ) : sortedData.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan="8"
+                                        colSpan={8}
                                         style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}
                                     >
                                         데이터가 없습니다.

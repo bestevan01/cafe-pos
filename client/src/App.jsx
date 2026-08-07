@@ -41,9 +41,9 @@ function App() {
         return { isLoggedIn: false, user: null, view: 'login' };
     });
 
-    const [myRole, setMyRole] = useState(null); // 'cashier', 'kitchen', null
+    const [myRole, setMyRole] = useState(/** @type {'cashier'|'kitchen'|null} */ (null));
     const [adminStaffMode, setAdminStaffMode] = useState(false); // 관리자가 캐셔/주방 화면을 미리보기 위해 직원 모드로 전환했는지
-    const [prevRole, setPrevRole] = useState(null); // 역할 전환 감지용(렌더링 중 UI 상태 리셋에 사용)
+    const [prevRole, setPrevRole] = useState(/** @type {'cashier'|'kitchen'|null} */ (null)); // 역할 전환 감지용(렌더링 중 UI 상태 리셋에 사용)
     const [isCashierTaken, setIsCashierTaken] = useState(false);
     const [cashierUserName, setCashierUserName] = useState(null); // 캐셔를 점유 중인 사람 이름
     const [kitchenUserCount, setKitchenUserCount] = useState(0);
@@ -151,6 +151,7 @@ function App() {
 
         // 인증 실패(만료/위조 토큰)로 연결이 거부된 경우에만 재로그인 유도.
         // 일시적 네트워크 오류는 type 표시가 없으므로 무시 → socket.io가 자동 재시도.
+        /** @param {any} err */
         const handleAuthError = (err) => {
             if (err?.data?.type === 'auth') {
                 socket.disconnect(); // 무한 재시도 중단
@@ -187,6 +188,7 @@ function App() {
         if (myRole !== 'cashier') return;
 
         const reclaimCashier = () => socket.emit('claim_cashier');
+        /** @param {boolean} success */
         const handleReclaimResult = (success) => {
             if (!success) {
                 // 끊긴 사이 다른 사용자(다른 계정)가 선점한 경우 — 역할 선택으로 복귀
@@ -206,6 +208,7 @@ function App() {
     // ---------------------------------------------------------
     // [4] 렌더링 로직 (Render Logic)
     // ---------------------------------------------------------
+    /** @param {any} userData */
     const handleLoginSuccess = (userData) => {
         setAuth({ isLoggedIn: true, user: userData, view: 'app' });
     };

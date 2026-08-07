@@ -4,13 +4,16 @@ import { useTheme } from '../hooks/useTheme';
 export default function ThemeToggle() {
     const { theme, setTheme } = useTheme(); // 전역 공용 스토어
     const [isOpen, setIsOpen] = useState(false);
-    const [menuStyle, setMenuStyle] = useState({ left: '50%', transform: 'translateX(-50%)' });
-    const dropdownRef = useRef(null);
+    const [menuStyle, setMenuStyle] = useState(
+        /** @type {import('react').CSSProperties} */ ({ left: '50%', transform: 'translateX(-50%)' }),
+    );
+    const dropdownRef = useRef(/** @type {HTMLDivElement|null} */ (null));
 
     // 1. 드롭다운 외부 클릭 감지 (닫기)
     useEffect(() => {
+        /** @param {Event} event */
         function handleClickOutside(event) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+            if (dropdownRef.current && !dropdownRef.current.contains(/** @type {Node} */ (event.target))) {
                 setIsOpen(false);
             }
         }

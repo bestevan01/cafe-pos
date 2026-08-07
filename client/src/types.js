@@ -1,9 +1,9 @@
 /**
  * 서버 API 응답·도메인 데이터의 공용 타입 정의 (JSDoc 전용, 런타임 코드 없음).
  *
- * 사용법:
- *   /** @type {import('../../types').Menu[]} *\/
- *   const [menuList, setMenuList] = useState([]);
+ * 사용법: 상태 선언 위에 JSDoc 타입 태그를 붙이고,
+ * 값은 "import(이 파일까지의 상대경로).타입이름" 형태로 참조한다.
+ * (예: src/pages/admin/ 아래에서는 상대경로가 ../../types 가 된다)
  *
  * 형태의 출처는 server/migrations/*.sql(테이블)과 server/routes/*.js(계산형 응답)이다.
  * DB에서 온 boolean은 MySQL TINYINT(1)이라 0|1 숫자로 들어온다.
@@ -24,7 +24,7 @@
  * @property {string} username
  * @property {string} name
  * @property {Role} role
- * @property {string} [created_at]
+ * @property {string} created_at
  */
 
 /**
@@ -174,7 +174,7 @@
  * @property {number} purchase_price  구매 가격(원)
  * @property {number|string} purchase_amount  구매 용량/수량 (DECIMAL이라 문자열로 올 수 있음)
  * @property {string} unit  'g' | 'ml' | 'ea'
- * @property {string} [category]  '식재료' | '부자재'
+ * @property {string} category  '식재료' | '부자재'
  * @property {string} [updated_at]
  */
 

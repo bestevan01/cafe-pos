@@ -13,7 +13,7 @@ import Button from '../../components/ui/Button';
 function ProfileAuth({ currentUser, onSuccess, onCancel }) {
     const { notify } = useNotification();
     const [password, setPassword] = useState('');
-    const formRef = useRef(null);
+    const formRef = useRef(/** @type {HTMLFormElement|null} */ (null));
 
     useEffect(() => {
         // 이전 화면에서 남은 WebAuthn 의식이 있으면 취소한다.
@@ -29,6 +29,7 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
     // ---------------------------------------------------------
     // [1] 비밀번호 인증 핸들러
     // ---------------------------------------------------------
+    /** @param {any} e */
     const handlePasswordAuth = async (e) => {
         e.preventDefault();
         try {
@@ -47,6 +48,7 @@ function ProfileAuth({ currentUser, onSuccess, onCancel }) {
     };
 
     // 비밀번호 자동완성이 채워지면(:-webkit-autofill 애니메이션 감지) 자동으로 제출 — 로그인 화면과 동일 동작
+    /** @param {import('react').AnimationEvent} e */
     const handleAutoFill = (e) => {
         if (e.animationName === 'onAutoFillDetected') {
             // 브라우저가 DOM에 값을 채울 시간을 짧게(50ms) 준 뒤 폼 제출

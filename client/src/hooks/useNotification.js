@@ -27,8 +27,7 @@ import { createContext, useContext } from 'react';
  * @property {(message: import('react').ReactNode, options?: ConfirmOptions) => Promise<boolean>} confirm
  */
 
-/** @type {import('react').Context<NotificationApi|null>} */
-export const NotificationContext = createContext(null);
+export const NotificationContext = createContext(/** @type {NotificationApi|null} */ (null));
 
 /**
  * 전역 알림 훅.

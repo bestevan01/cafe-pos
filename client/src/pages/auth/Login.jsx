@@ -13,20 +13,22 @@ import Button from '../../components/ui/Button';
 function Login({ onLoginSuccess, onSwitchToRegister }) {
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [submitting, setSubmitting] = useState(false);
-    const formRef = useRef(null);
+    const formRef = useRef(/** @type {HTMLFormElement|null} */ (null));
     const { notify } = useNotification();
     // Safari 대응: '패스키로 로그인' 버튼 클릭 시 옵션을 await로 받아오면 제스처가 만료돼 팝업이 안 뜬다.
     // → 옵션을 미리 받아 두고 클릭 시 곧바로 startAuthentication()을 호출한다.
-    const [passkeyAuthOptions, setPasskeyAuthOptions] = useState(null);
+    const [passkeyAuthOptions, setPasskeyAuthOptions] = useState(/** @type {any} */ (null));
 
     // 로그인 화면은 시스템(OS) 테마 설정을 따름
     useSystemTheme();
 
+    /** @param {import('react').ChangeEvent<HTMLInputElement>} e */
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     // 로그인 성공 시 공통 처리
+    /** @param {any} data */
     const handleSuccess = (data) => {
         localStorage.setItem('token', data.token);
         localStorage.setItem(
@@ -66,6 +68,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         };
     }, [prefetchAuthOptions]);
 
+    /** @param {import('react').AnimationEvent} e */
     const handleAutoFill = (e) => {
         if (e.animationName === 'onAutoFillDetected') {
             // 브라우저가 DOM에 값을 채울 시간을 아주 짧게(50ms) 준 뒤 폼 제출
@@ -75,6 +78,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         }
     };
 
+    /** @param {any} e */
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (submitting) return; // 중복 제출 방지

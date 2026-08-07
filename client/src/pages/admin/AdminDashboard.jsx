@@ -32,11 +32,14 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
         );
         if (!ok) return;
 
-        socket.emit('force_release_cashier', (res) => {
-            if (res?.success)
-                notify('캐셔 잠금을 해제했습니다. 이제 직원이 캐셔로 접속할 수 있습니다.', { icon: '✅' });
-            else notify('해제 실패: ' + (res?.message || '알 수 없는 오류'), { icon: '⚠️' });
-        });
+        socket.emit(
+            'force_release_cashier',
+            /** @param {any} res */ (res) => {
+                if (res?.success)
+                    notify('캐셔 잠금을 해제했습니다. 이제 직원이 캐셔로 접속할 수 있습니다.', { icon: '✅' });
+                else notify('해제 실패: ' + (res?.message || '알 수 없는 오류'), { icon: '⚠️' });
+            },
+        );
     };
 
     // 화면 전환 라우팅

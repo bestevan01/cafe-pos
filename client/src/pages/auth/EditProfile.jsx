@@ -40,17 +40,21 @@ function EditProfile({ onBack, onLogout }) {
     });
 
     // 등록 옵션을 미리(콜드스타트 서버를 깨우면서) 받아 둔다. 챌린지 유효시간은 5분.
-    const prefetchRegisterOptions = useCallback(async (userId) => {
-        if (!userId) return;
-        try {
-            const resp = await axios.get(`/api/passkey/register-options?userId=${userId}`, getAuthHeader());
-            setRegisterOptions(resp.data);
-        } catch {
-            setRegisterOptions(null);
-        }
-    }, []);
+    const prefetchRegisterOptions = useCallback(
+        /** @param {string} userId */ async (userId) => {
+            if (!userId) return;
+            try {
+                const resp = await axios.get(`/api/passkey/register-options?userId=${userId}`, getAuthHeader());
+                setRegisterOptions(resp.data);
+            } catch {
+                setRegisterOptions(null);
+            }
+        },
+        [],
+    );
 
     const fetchPasskeys = useCallback(
+        /** @param {string} userId */
         async (userId) => {
             try {
                 const res = await axios.get(`/api/passkeys?userId=${userId}`, getAuthHeader());
@@ -156,6 +160,7 @@ function EditProfile({ onBack, onLogout }) {
         }
     };
 
+    /** @param {string} credentialId */
     const handleDeletePasskey = async (credentialId) => {
         if (
             !(await confirm('정말 이 기기를 삭제하시겠습니까?', {
@@ -174,11 +179,13 @@ function EditProfile({ onBack, onLogout }) {
         }
     };
 
+    /** @param {import('../../types').Passkey} key */
     const startRename = (key) => {
         setEditingId(key.id);
         setEditName(key['device_name'] || '');
     };
 
+    /** @param {string} id */
     const handleRenamePasskey = async (id) => {
         const name = editName.trim();
         if (!name) return notify('이름을 입력해주세요.', { icon: '⚠️' });

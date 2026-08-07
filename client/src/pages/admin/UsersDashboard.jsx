@@ -46,6 +46,10 @@ function UsersDashboard({ onBack }) {
         void fetchUsers();
     }, [fetchUsers]);
 
+    /**
+     * @param {string} id
+     * @param {import('../../types').Role} newRole
+     */
     const handleRoleChange = async (id, newRole) => {
         if (
             !(await confirm(`정말 권한을 ${newRole}(으)로 변경하시겠습니까?`, {
@@ -63,6 +67,7 @@ function UsersDashboard({ onBack }) {
         }
     };
 
+    /** @param {import('../../types').User} targetUser */
     const handleDeleteUser = async (targetUser) => {
         if (targetUser.role === 'pending') {
             if (
@@ -263,7 +268,7 @@ function UsersDashboard({ onBack }) {
 /**
  * @param {object} props
  * @param {any} props.user  직원 레코드 (id/username/name/role)
- * @param {(id: any, newRole: 'admin'|'staff') => void} props.handleRoleChange
+ * @param {(id: any, newRole: import('../../types').Role) => void} props.handleRoleChange
  * @param {(id: any) => void} props.handleDeleteUser
  * @param {any} props.currentUserId  본인 계정은 버튼 대신 '내 계정' 표시
  */
@@ -301,12 +306,14 @@ function RenderActionButtons({ user, handleRoleChange, handleDeleteUser, current
     );
 }
 
+/** @param {string} role */
 function getRoleName(role) {
     if (role === 'admin') return '👑 관리자';
     if (role === 'staff') return '☕ 직원';
     return '⏳ 대기중';
 }
 
+/** @param {string} role */
 function getRoleClass(role) {
     if (role === 'admin') return 'role-admin';
     if (role === 'staff') return 'role-staff';

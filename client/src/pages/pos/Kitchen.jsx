@@ -19,7 +19,9 @@ function Kitchen() {
     });
 
     // DB에서 온 평문 데이터를 주문 번호별로 그룹화
+    /** @param {import('../../types').OrderRow[]} flatList */
     const groupOrdersById = (flatList) => {
+        /** @type {Record<string, import('../../types').OrderGroup>} */
         const map = {};
         flatList.forEach((item) => {
             if (item.is_completed === 1) return;
@@ -98,6 +100,7 @@ function Kitchen() {
     // ---------------------------------------------------------
     // [3] 이벤트 핸들러
     // ---------------------------------------------------------
+    /** @param {string} displayId */
     const handleComplete = async (displayId) => {
         if (!(await confirm('조리를 완료 처리하시겠습니까?', { confirmText: '완료' }))) return;
         try {
@@ -107,6 +110,7 @@ function Kitchen() {
         }
     };
 
+    /** @param {string} displayId */
     const handleDelete = async (displayId) => {
         if (
             !(await confirm('주문을 취소하시겠습니까?', {

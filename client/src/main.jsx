@@ -12,7 +12,7 @@ axios.defaults.timeout = 90000;
 // 앱이 열리는 즉시 백그라운드로 서버를 깨운다(예열). 사용자가 로그인 입력하는 동안 미리 기동.
 axios.get('/ping').catch(() => {});
 
-createRoot(document.getElementById('root')).render(
+createRoot(/** @type {HTMLElement} */ (document.getElementById('root'))).render(
     <StrictMode>
         <NotificationProvider>
             <App />

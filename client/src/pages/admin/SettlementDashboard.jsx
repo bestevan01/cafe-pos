@@ -137,7 +137,7 @@ function SettlementDashboard({ onBack }) {
                             {loading ? (
                                 <tr>
                                     <td
-                                        colSpan="7"
+                                        colSpan={7}
                                         style={{
                                             padding: '30px',
                                             textAlign: 'center',
@@ -150,7 +150,7 @@ function SettlementDashboard({ onBack }) {
                             ) : settlements.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan="7"
+                                        colSpan={7}
                                         style={{
                                             padding: '30px',
                                             textAlign: 'center',

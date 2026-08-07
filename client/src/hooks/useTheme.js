@@ -24,6 +24,7 @@ mql.addEventListener('change', () => {
     if (theme === 'system') apply(); // 시스템 모드일 때만 OS 변경 추종
 });
 
+/** @param {'light'|'dark'|'system'} next */
 export function setTheme(next) {
     theme = next;
     localStorage.setItem('theme', next);
@@ -31,6 +32,7 @@ export function setTheme(next) {
     listeners.forEach((fn) => fn());
 }
 
+/** @param {() => void} fn */
 function subscribe(fn) {
     listeners.add(fn);
     return () => listeners.delete(fn);

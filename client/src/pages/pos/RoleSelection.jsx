@@ -12,7 +12,7 @@ import { useNotification } from '../../hooks/useNotification';
  */
 function RoleSelection({ onSelectRole, isCashierTaken, cashierUserName, kitchenUserCount, isAdmin }) {
     const { notify } = useNotification();
-    const cashierClaimedHandlerRef = useRef(null);
+    const cashierClaimedHandlerRef = useRef(/** @type {((success: boolean) => void)|null} */ (null));
 
     // 언마운트 시 응답을 아직 못 받은 리스너가 남아있으면 해제(사라진 컴포넌트를 참조하는 클로저 호출 방지)
     useEffect(() => {
@@ -29,6 +29,7 @@ function RoleSelection({ onSelectRole, isCashierTaken, cashierUserName, kitchenU
     const handleCashierClick = () => {
         // 소켓을 통해 캐셔 역할 선점 시도 (중복 방지)
         socket.emit('claim_cashier');
+        /** @param {boolean} success */
         const handleCashierClaimed = (success) => {
             if (success) onSelectRole('cashier');
             else notify('이미 다른 사람이 캐셔를 보고 있습니다!', { icon: '⚠️' });

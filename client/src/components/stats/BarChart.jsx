@@ -15,6 +15,7 @@
  */
 function BarChart({ data = [], label, value, color = '#42a5f5', height = 240 }) {
     const maxVal = Math.max(...data.map((d) => Number(value(d)) || 0), 1);
+    /** @param {number} v */
     const fmt = (v) => (v >= 10000 ? `${(v / 10000).toFixed(1)}만` : v.toLocaleString());
 
     return (

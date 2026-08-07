@@ -73,6 +73,7 @@ function EventDashboard({ onBack }) {
     // ---------------------------------------------------------
 
     // 🌟 메뉴 버튼 클릭 시 선택/해제 토글
+    /** @param {string} menuName */
     const handleMenuSelect = (menuName) => {
         if (selectedMenus.includes(menuName)) {
             setSelectedMenus(selectedMenus.filter((name) => name !== menuName));
@@ -83,10 +84,10 @@ function EventDashboard({ onBack }) {
 
     const handleAddEvent = async () => {
         if (!newEventName.trim()) return notify('이벤트 이름을 입력해주세요!', { icon: '⚠️' });
-        if (newEventType === 'discount' && (!newDiscountAmount || newDiscountAmount <= 0)) {
+        if (newEventType === 'discount' && (!newDiscountAmount || Number(newDiscountAmount) <= 0)) {
             return notify('할인 금액을 올바르게 입력해주세요!', { icon: '⚠️' });
         }
-        if (hasDailyLimit && (!dailyLimitQty || dailyLimitQty <= 0)) {
+        if (hasDailyLimit && (!dailyLimitQty || Number(dailyLimitQty) <= 0)) {
             return notify('제한 수량을 올바르게 입력해주세요!', { icon: '⚠️' });
         }
         if (hasTargetMenu && selectedMenus.length === 0) {
@@ -118,6 +119,7 @@ function EventDashboard({ onBack }) {
         }
     };
 
+    /** @param {string} id */
     const toggleEventStatus = async (id) => {
         const targetEvent = events.find((ev) => ev.id === id);
         if (!targetEvent) return;
@@ -129,6 +131,7 @@ function EventDashboard({ onBack }) {
         }
     };
 
+    /** @param {string} id */
     const handleDelete = async (id) => {
         if (
             !(await confirm('이 이벤트를 정말 삭제하시겠습니까?', {
@@ -147,6 +150,7 @@ function EventDashboard({ onBack }) {
     };
 
     // 리스트 화면에 보여줄 메뉴 이름 요약 함수
+    /** @param {string} target_menus */
     const renderTargetMenus = (target_menus) => {
         if (!target_menus || target_menus === 'all') return '전체 메뉴';
         try {

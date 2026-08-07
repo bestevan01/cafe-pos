@@ -21,16 +21,18 @@ function CashSettlement({ onClose }) {
     const [prevClosing, setPrevClosing] = useState(/** @type {number|null} */ (null));
 
     // 화폐별 개수 상태
-    const [counts, setCounts] = useState({
-        50000: 0,
-        10000: 0,
-        5000: 0,
-        1000: 0,
-        500: 0,
-        100: 0,
-        50: 0,
-        10: 0,
-    });
+    const [counts, setCounts] = useState(
+        /** @type {Record<number, number>} */ ({
+            50000: 0,
+            10000: 0,
+            5000: 0,
+            1000: 0,
+            500: 0,
+            100: 0,
+            50: 0,
+            10: 0,
+        }),
+    );
 
     // ---------------------------------------------------------
     // [2] 계산 로직 (Memo)
@@ -81,6 +83,10 @@ function CashSettlement({ onClose }) {
     // ---------------------------------------------------------
     // [4] 이벤트 핸들러 (오픈/마감)
     // ---------------------------------------------------------
+    /**
+     * @param {number} type  화폐 단위
+     * @param {string} value  입력값
+     */
     const handleCountChange = (type, value) => {
         let numValue = parseInt(value) || 0;
         if (numValue < 0) numValue = 0;
@@ -110,6 +116,7 @@ function CashSettlement({ onClose }) {
     };
 
     const handleClose = async () => {
+        if (!calcData) return;
         const expected = calcData.expected;
         const diff = totalAmount - expected;
 

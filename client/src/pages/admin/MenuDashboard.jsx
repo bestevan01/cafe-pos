@@ -41,6 +41,7 @@ function MenuDashboard({ onBack }) {
         void fetchMenu();
     }, [fetchMenu]);
 
+    /** @param {import('react').FormEvent<HTMLFormElement>} e */
     const handleAdd = async (e) => {
         e.preventDefault();
         try {
@@ -53,6 +54,7 @@ function MenuDashboard({ onBack }) {
         }
     };
 
+    /** @param {string} id */
     const handleDelete = async (id) => {
         if (
             !(await confirm('정말 이 메뉴를 삭제하시겠습니까?', {
@@ -82,6 +84,7 @@ function MenuDashboard({ onBack }) {
         }
     };
 
+    /** @param {import('../../types').Menu} menu */
     const toggleSoldOut = async (menu) => {
         try {
             const newVal = menu.is_soldout ? 0 : 1;
@@ -95,13 +98,15 @@ function MenuDashboard({ onBack }) {
     // ---------------------------------------------------------
     // [3] 이벤트 핸들러 및 헬퍼
     // ---------------------------------------------------------
+    /** @param {any} e */
     const handleInputChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    /** @param {import('../../types').Menu} menu */
     const startEdit = (menu) => {
         setEditingId(menu.id);
-        setFormData({ name: menu.name, price: menu.price, type: menu.type });
+        setFormData({ name: menu.name, price: String(menu.price), type: menu.type });
         // 모바일 환경 UX: 수정 버튼 클릭 시 폼 위치로 스크롤 이동
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };

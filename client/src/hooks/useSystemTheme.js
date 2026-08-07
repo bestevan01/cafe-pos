@@ -10,6 +10,7 @@ export const useSystemTheme = () => {
         const root = document.documentElement;
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
+        /** @param {MediaQueryList|MediaQueryListEvent} e */
         const applySystemTheme = (e) => {
             root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
         };
