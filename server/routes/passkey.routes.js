@@ -14,10 +14,7 @@ const {
 } = require('@simplewebauthn/server');
 
 const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
-const FRONTEND_URL = process.env.FRONTEND_URL || 'bu-cafe-pos.vercel.app';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
-const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
+const { RP_ID, FRONTEND_ORIGIN: EXPECTED_ORIGIN } = require('../config/frontend');
 
 // 제공자(AAGUID)를 알 수 없는 '기기 전용' 패스키(보안키 등) 폴백용: User-Agent로 기기/브라우저 추정.
 // ⚠️ iOS UA엔 'Mac OS X'가 들어있어 iPhone/iPad를 Mac보다 먼저, Edge/Chrome도 더 구체적인 것부터 검사한다.

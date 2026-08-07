@@ -34,8 +34,8 @@ const setupSocketHandlers = require('./sockets/socketHandlers');
 // [2] 환경 변수 및 상수 설정 (Constants)
 // ---------------------------------------------------------
 const PORT = process.env.PORT || 3000;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'bu-cafe-pos.vercel.app';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+// FRONTEND_URL 검증·파생은 config/frontend.js가 담당한다(폴백 없음, 누락 시 기동 중단).
+const { FRONTEND_ORIGIN, IS_PRODUCTION } = require('./config/frontend');
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
@@ -43,7 +43,7 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
-const CORS_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://localhost:5173';
+const CORS_ORIGIN = FRONTEND_ORIGIN;
 
 // ---------------------------------------------------------
 // [3] Express App 및 Socket.IO 초기화 (Init)
