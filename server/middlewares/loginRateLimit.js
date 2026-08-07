@@ -7,9 +7,15 @@ const pool = require('../config/db');
 const WINDOW_SEC = 10 * 60; // 10분
 const MAX_FAILURES = 8; // 윈도우 내 최대 실패 허용치
 
+/** @param {import('express').Request} req */
 const getKey = (req) => req.ip || req.socket?.remoteAddress || 'unknown';
 
 // 차단 여부 검사 미들웨어. 막혀야 하면 429, 아니면 통과.
+/**
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
 const loginRateLimiter = async (req, res, next) => {
     const key = getKey(req);
     req.loginKey = key; // 라우트에서 성공/실패를 기록할 때 사용
@@ -28,7 +34,7 @@ const loginRateLimiter = async (req, res, next) => {
                 message: `로그인 시도가 너무 많습니다. 약 ${waitMin}분 후 다시 시도해주세요.`,
             });
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // DB 장애로 전 직원이 로그인 못 하는 사태를 막기 위해 통과시킨다.
         console.error('[⚠️ 레이트리밋 검사 실패 — 통과 처리]', err.message);
     }
@@ -36,6 +42,7 @@ const loginRateLimiter = async (req, res, next) => {
 };
 
 // 실패 1회 기록. 윈도우가 만료됐으면 새 윈도우로 리셋(원자적 upsert).
+/** @param {string} key */
 const recordLoginFailure = async (key) => {
     try {
         await pool.query(
@@ -49,16 +56,17 @@ const recordLoginFailure = async (key) => {
         if (Math.random() < 0.05) {
             await pool.query('DELETE FROM login_attempts WHERE reset_at < NOW()');
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[⚠️ 로그인 실패 기록 실패]', err.message);
     }
 };
 
 // 성공 시 해당 키의 카운터 제거.
+/** @param {string} key */
 const recordLoginSuccess = async (key) => {
     try {
         await pool.query('DELETE FROM login_attempts WHERE attempt_key = ?', [key]);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[⚠️ 로그인 성공 기록 실패]', err.message);
     }
 };

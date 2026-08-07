@@ -6,7 +6,7 @@ router.get('', async (req, res) => {
     try {
         await pool.query('SELECT 1');
         res.status(200).send('pong');
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('[Ping DB Error]', error);
         res.status(500).send('error');
     }

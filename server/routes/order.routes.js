@@ -18,7 +18,9 @@ router.post('', authenticateToken, async (req, res) => {
         // 이미 들어왔는지 검사한다. (실수로 '주문 전송'을 두 번 누른 경우 감지)
         if (!force && items.length > 0) {
             // 메뉴별 총수량으로 정규화한 시그니처. 이벤트로 행이 쪼개져도 합쳐서 비교.
+            /** @param {any[]} list */
             const signatureOf = (list) => {
+                /** @type {Record<string, number>} */
                 const agg = {};
                 for (const i of list) agg[i.menu_name] = (agg[i.menu_name] || 0) + Number(i.quantity);
                 return Object.keys(agg)
@@ -35,6 +37,7 @@ router.post('', authenticateToken, async (req, res) => {
             `);
 
             // 최근 주문들을 display_id별로 묶어 같은 시그니처가 있으면 중복으로 판단
+            /** @type {Record<string, any[]>} */
             const groups = {};
             for (const r of recentRows) {
                 (groups[r.display_id] = groups[r.display_id] || []).push(r);
@@ -49,12 +52,13 @@ router.post('', authenticateToken, async (req, res) => {
 
         // 메뉴 가격표를 DB에서 직접 로드 (클라이언트가 보낸 price는 신뢰하지 않음)
         const [menuRows] = await conn.query('SELECT name, price FROM menu');
-        const menuMap = new Map(menuRows.map((m) => [m.name, Number(m.price)]));
+        const menuMap = new Map(menuRows.map((/** @type {any} */ m) => [m.name, Number(m.price)]));
 
         const SHOT_EXTRA = 500;
 
         // 메뉴명으로 서버 기준 단가를 계산. 샷은 "(샷 N개)" 접미사로 N잔당 +500*N.
         // 레거시 "(샷추가)"(=1샷)도 호환. 모르는 메뉴면 null.
+        /** @param {string} menuName */
         const resolveBaseUnitPrice = (menuName) => {
             let baseName = menuName;
             let shots = 0;
@@ -91,12 +95,13 @@ router.post('', authenticateToken, async (req, res) => {
         }
 
         // 해당 메뉴가 이벤트 적용 대상인지 검사 (target_menus 기준)
+        /** @param {string} menuName */
         const isEligibleForEvent = (menuName) => {
             if (!event) return false;
             if (!event.target_menus || event.target_menus === 'all') return true;
             try {
-                return JSON.parse(event.target_menus).some((t) => menuName.includes(t));
-            } catch (e) {
+                return JSON.parse(event.target_menus).some((/** @type {string} */ t) => menuName.includes(t));
+            } catch (/** @type {any} */ e) {
                 return false;
             }
         };
@@ -218,13 +223,13 @@ router.post('', authenticateToken, async (req, res) => {
         });
 
         res.json({ success: true });
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error(`[🔥 POST /api/orders 원본 에러] 주문자: ${staff_name || '키오스크'}`, error);
 
         if (conn) {
             try {
                 await conn.rollback();
-            } catch (rollbackError) {
+            } catch (/** @type {any} */ rollbackError) {
                 console.error(`[⚠️ DB 롤백 실패 (연결 끊김)]`, rollbackError.message);
             }
         }
@@ -242,7 +247,7 @@ router.get('', authenticateToken, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM orders WHERE is_delivered = 0 ORDER BY created_at DESC');
         res.json(rows);
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('[🔥 GET /api/orders 에러]', error);
         res.status(500).json({
             success: false,
@@ -264,7 +269,7 @@ router.patch('/:display_id/deliver', authenticateToken, async (req, res) => {
 
         io.emit('order_updated', { display_id, ...rows[0], is_delivered: 1 });
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/deliver 에러]`, err);
         res.status(500).json({
             success: false,
@@ -285,7 +290,7 @@ router.patch('/:display_id/complete', authenticateToken, async (req, res) => {
         ]);
         io.emit('order_updated', { display_id, is_paid: 1, is_completed: 1 });
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/complete 에러]`, err);
         res.status(500).json({
             success: false,
@@ -308,7 +313,7 @@ router.patch('/:display_id/pay', authenticateToken, async (req, res) => {
 
         io.emit('order_updated', { display_id, is_paid: 1, is_completed: rows[0]?.is_completed || 0 });
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/pay 에러]`, err);
         res.status(500).json({
             success: false,
@@ -326,7 +331,7 @@ router.patch('/:display_id/complete_kitchen', authenticateToken, async (req, res
         await pool.query('UPDATE orders SET is_completed = 1 WHERE display_id = ?', [display_id]);
         io.emit('order_updated', { display_id, is_completed: 1 });
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/complete_kitchen 에러]`, err);
         res.status(500).json({
             success: false,
@@ -370,7 +375,7 @@ router.delete('/:display_id', authenticateToken, async (req, res) => {
         }
         io.emit('order_deleted', display_id);
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/orders/${display_id} 에러]`, err);
         res.status(500).json({
             success: false,

@@ -9,9 +9,11 @@ router.use(authenticateToken, requireAdmin);
 
 const ALLOWED_UNITS = ['g', 'ml', '개', 'ea']; // 'ea'는 레거시 호환용(신규는 '개')
 const ALLOWED_CATEGORIES = ['식재료', '부자재']; // 부자재 = 컵/빨대/뚜껑 등 포장재
+/** @param {string} c */
 const normalizeCategory = (c) => (ALLOWED_CATEGORIES.includes(c) ? c : '식재료');
 
 // 단위당 원가(원/단위). 구매 용량이 0 이하이면 0으로 안전 처리.
+/** @param {any} ing */
 const unitCostOf = (ing) => {
     const amount = Number(ing.purchase_amount);
     return amount > 0 ? Number(ing.purchase_price) / amount : 0;
@@ -24,8 +26,8 @@ router.get('/ingredients', async (req, res) => {
     try {
         // 식재료 → 부자재 순으로 그룹핑되도록 정렬
         const [rows] = await pool.query("SELECT * FROM ingredients ORDER BY IF(category = '부자재', 1, 0), name");
-        res.json(rows.map((r) => ({ ...r, unit_cost: unitCostOf(r) })));
-    } catch (err) {
+        res.json(rows.map((/** @type {any} */ r) => ({ ...r, unit_cost: unitCostOf(r) })));
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/ingredients 에러]', err);
         res.status(500).json({
             success: false,
@@ -48,7 +50,7 @@ router.post('/ingredients', async (req, res) => {
             [name, purchase_price, purchase_amount, unit, normalizeCategory(category)],
         );
         res.json({ success: true, id: result.insertId });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 POST /api/admin/ingredients 에러]', err);
         res.status(500).json({ success: false, message: '원재료 추가에 실패했습니다.', debug_info: debugInfo(err) });
     }
@@ -103,7 +105,7 @@ router.patch('/ingredients/:id', async (req, res) => {
             values,
         );
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/admin/ingredients/${id} 에러]`, err);
         res.status(500).json({ success: false, message: '원재료 수정에 실패했습니다.', debug_info: debugInfo(err) });
     }
@@ -115,7 +117,7 @@ router.delete('/ingredients/:id', async (req, res) => {
         // 이 원재료를 쓰는 레시피 행은 FK ON DELETE CASCADE로 함께 정리된다.
         await pool.query('DELETE FROM ingredients WHERE id = ?', [id]);
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/admin/ingredients/${id} 에러]`, err);
         res.status(500).json({ success: false, message: '원재료 삭제에 실패했습니다.', debug_info: debugInfo(err) });
     }
@@ -130,6 +132,7 @@ router.get('/recipes', async (req, res) => {
         const [menus] = await pool.query('SELECT id, name, price, cost_override FROM menu ORDER BY id');
         const [recipes] = await pool.query('SELECT menu_id, ingredient_id, amount FROM menu_recipes');
 
+        /** @type {Record<string, any[]>} */
         const byMenu = {};
         for (const r of recipes) {
             (byMenu[r.menu_id] = byMenu[r.menu_id] || []).push({
@@ -138,7 +141,7 @@ router.get('/recipes', async (req, res) => {
             });
         }
         res.json(
-            menus.map((m) => ({
+            menus.map((/** @type {any} */ m) => ({
                 menu_id: m.id,
                 name: m.name,
                 price: Number(m.price),
@@ -146,7 +149,7 @@ router.get('/recipes', async (req, res) => {
                 items: byMenu[m.id] || [],
             })),
         );
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/recipes 에러]', err);
         res.status(500).json({ success: false, message: '레시피를 불러오지 못했습니다.', debug_info: debugInfo(err) });
     }
@@ -180,11 +183,11 @@ router.put('/recipes/:menuId', async (req, res) => {
         }
         await conn.commit();
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         if (conn) {
             try {
                 await conn.rollback();
-            } catch (rollbackErr) {
+            } catch (/** @type {any} */ rollbackErr) {
                 console.error('[⚠️ 레시피 저장 롤백 실패]', rollbackErr.message);
             }
         }
@@ -211,7 +214,7 @@ router.patch('/menu/:id/cost-override', async (req, res) => {
             id,
         ]);
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/admin/menu/${id}/cost-override 에러]`, err);
         res.status(500).json({ success: false, message: '수동 원가 저장에 실패했습니다.', debug_info: debugInfo(err) });
     }
@@ -227,16 +230,21 @@ router.get('/cost-analysis', async (req, res) => {
         const [ingredients] = await pool.query('SELECT * FROM ingredients');
         const [recipes] = await pool.query('SELECT menu_id, ingredient_id, amount FROM menu_recipes');
 
-        const unitCost = new Map(ingredients.map((i) => [i.id, unitCostOf(i)]));
+        const unitCost = new Map(ingredients.map((/** @type {any} */ i) => [i.id, unitCostOf(i)]));
+        /** @type {Record<string, any[]>} */
         const recipeByMenu = {};
         for (const r of recipes) {
             (recipeByMenu[r.menu_id] = recipeByMenu[r.menu_id] || []).push(r);
         }
 
-        const rows = menus.map((m) => {
+        const rows = menus.map((/** @type {any} */ m) => {
             const items = recipeByMenu[m.id] || [];
             const recipeCost = Math.round(
-                items.reduce((sum, it) => sum + Number(it.amount) * (unitCost.get(it.ingredient_id) || 0), 0),
+                items.reduce(
+                    (/** @type {number} */ sum, /** @type {any} */ it) =>
+                        sum + Number(it.amount) * (unitCost.get(it.ingredient_id) || 0),
+                    0,
+                ),
             );
             const hasOverride = m.cost_override !== null;
             const effectiveCost = hasOverride ? Number(m.cost_override) : recipeCost;
@@ -255,17 +263,21 @@ router.get('/cost-analysis', async (req, res) => {
             };
         });
 
-        const totalPrice = rows.reduce((s, r) => s + r.price, 0);
-        const totalCost = rows.reduce((s, r) => s + r.effective_cost, 0);
+        const totalPrice = rows.reduce((/** @type {number} */ s, /** @type {any} */ r) => s + r.price, 0);
+        const totalCost = rows.reduce((/** @type {number} */ s, /** @type {any} */ r) => s + r.effective_cost, 0);
         const summary = {
             menu_count: rows.length,
             avg_margin: totalPrice > 0 ? (totalPrice - totalCost) / totalPrice : 0,
-            best_profit: rows.slice().sort((a, b) => b.profit - a.profit)[0] || null,
-            worst_margin: rows.filter((r) => r.has_recipe || r.manual).sort((a, b) => a.margin - b.margin)[0] || null,
+            best_profit:
+                rows.slice().sort((/** @type {any} */ a, /** @type {any} */ b) => b.profit - a.profit)[0] || null,
+            worst_margin:
+                rows
+                    .filter((/** @type {any} */ r) => r.has_recipe || r.manual)
+                    .sort((/** @type {any} */ a, /** @type {any} */ b) => a.margin - b.margin)[0] || null,
         };
 
         res.json({ rows, summary });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/cost-analysis 에러]', err);
         res.status(500).json({ success: false, message: '원가 분석에 실패했습니다.', debug_info: debugInfo(err) });
     }

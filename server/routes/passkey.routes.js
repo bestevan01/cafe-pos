@@ -13,7 +13,7 @@ const {
     verifyAuthenticationResponse,
 } = require('@simplewebauthn/server');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'bu-cafe-pos.vercel.app';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const RP_ID = IS_PRODUCTION ? FRONTEND_URL : 'localhost';
@@ -21,7 +21,10 @@ const EXPECTED_ORIGIN = IS_PRODUCTION ? `https://${FRONTEND_URL}` : 'http://loca
 
 // 제공자(AAGUID)를 알 수 없는 '기기 전용' 패스키(보안키 등) 폴백용: User-Agent로 기기/브라우저 추정.
 // ⚠️ iOS UA엔 'Mac OS X'가 들어있어 iPhone/iPad를 Mac보다 먼저, Edge/Chrome도 더 구체적인 것부터 검사한다.
+/** @param {string|undefined} userAgent */
 function uaDeviceName(userAgent) {
+    // User-Agent 헤더가 없는 요청(일부 클라이언트/프록시)에서도 죽지 않도록 방어
+    if (!userAgent) return '기타 기기';
     let name = '기타 기기';
     if (userAgent.includes('iPhone')) name = 'iPhone';
     else if (userAgent.includes('iPad')) name = 'iPad';
@@ -51,7 +54,7 @@ router.get('/passkey/register-options', authenticateToken, async (req, res) => {
             rpID: RP_ID,
             userID: new Uint8Array(Buffer.from(String(user.id))),
             userName: user.username,
-            excludeCredentials: userPasskeys.map((key) => ({
+            excludeCredentials: userPasskeys.map((/** @type {any} */ key) => ({
                 id: key.id,
                 transports: key.transports ? key.transports.split(',') : [],
             })),
@@ -69,7 +72,7 @@ router.get('/passkey/register-options', authenticateToken, async (req, res) => {
         });
 
         res.json(options);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 GET /api/passkey/register-options 에러] 대상 유저 ID: ${userId}`, err);
         res.status(500).json({
             success: false,
@@ -92,7 +95,7 @@ router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
 
         const verification = await verifyRegistrationResponse({
             response: body,
-            expectedChallenge: consumed.payload,
+            expectedChallenge: String(consumed.payload),
             expectedOrigin: EXPECTED_ORIGIN,
             expectedRPID: RP_ID,
         });
@@ -126,7 +129,7 @@ router.post('/passkey/register-verify', authenticateToken, async (req, res) => {
         } else {
             res.status(400).json({ success: false, message: '패스키 검증에 실패했습니다.' });
         }
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error(`[🔥 POST /api/passkey/register-verify 에러] 대상 유저 ID: ${userId}`, error);
         res.status(500).json({
             success: false,
@@ -145,7 +148,7 @@ router.get('/passkey/login-options', async (req, res) => {
         // 로그인용 챌린지 저장(15분). 메모리 대신 DB → 재시작에도 생존.
         await issueToken('webauthn_login', 15 * 60, { token: options.challenge });
         res.json(options);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/passkey/login-options 에러]', err);
         res.status(500).json({
             success: false,
@@ -207,7 +210,7 @@ router.post('/passkey/login-verify', async (req, res) => {
         } else {
             res.status(400).json({ success: false, message: '패스키 로그인 검증에 실패했습니다.' });
         }
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
         console.error('[🔥 POST /api/passkey/login-verify 에러]', error);
         res.status(400).json({
             success: false,
@@ -225,7 +228,7 @@ router.get('/passkeys', authenticateToken, async (req, res) => {
             [userId],
         );
         res.json(rows);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 GET /api/passkeys 에러] 대상 유저 ID: ${userId}`, err);
         res.status(500).json({
             success: false,
@@ -252,7 +255,7 @@ router.patch('/passkeys/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ success: false, message: '패스키를 찾을 수 없습니다.' });
         }
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/passkeys/${id} 에러]`, err);
         res.status(500).json({
             success: false,
@@ -271,7 +274,7 @@ router.delete('/passkeys/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ success: false, message: '삭제할 패스키를 찾을 수 없습니다.' });
         }
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/passkeys/${id} 에러]`, err);
         res.status(500).json({
             success: false,

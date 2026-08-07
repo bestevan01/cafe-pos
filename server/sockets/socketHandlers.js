@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 
 // ⚠️ 아래 실시간 상태는 의도적으로 '단일 인스턴스' 인메모리다.
 //  - 현 배포(Render 단일 인스턴스 + Node 단일 스레드)에서 안전: 이벤트 핸들러가 직렬 실행되어
@@ -9,17 +9,20 @@ const JWT_SECRET = process.env.JWT_SECRET;
 //  - 스케일아웃(인스턴스 ≥ 2) 시: 이 상태를 공유(Redis/DB)해야 하고 + io.emit이 인스턴스를 넘도록
 //    Socket.IO Redis 어댑터가 필요하다. 어댑터 없이 DB로만 옮기면 브로드캐스트가 안 넘어가 무의미하므로,
 //    단일 인스턴스인 지금은 인메모리가 정답이라 그대로 둔다. (레이트리밋·챌린지만 DB화한 것과 동일 판단)
+/** @type {string|null} */
 let currentCashierId = null;
 const connectedUsers = new Map();
 const kitchenUsers = new Set();
 
+/** @param {import('socket.io').Server} io */
 module.exports = (io) => {
     // 핸드셰이크 단계에서 JWT를 검증해야만 소켓 연결을 허용합니다.
     io.use((socket, next) => {
         // 인증 실패 에러에는 type:'auth' 표시를 달아, 클라이언트가
         // 일시적 네트워크 오류와 구분해 '재로그인'을 유도할 수 있게 한다.
+        /** @param {string} message */
         const authError = (message) => {
-            const err = new Error(message);
+            const err = /** @type {Error & {data?: {type: string}}} */ (new Error(message));
             err.data = { type: 'auth' };
             return err;
         };
@@ -27,7 +30,7 @@ module.exports = (io) => {
         const token = socket.handshake.auth && socket.handshake.auth.token;
         if (!token) return next(authError('인증 토큰이 없습니다.'));
 
-        jwt.verify(token, JWT_SECRET, (err, user) => {
+        jwt.verify(token, JWT_SECRET, (/** @type {any} */ err, /** @type {any} */ user) => {
             if (err) return next(authError('유효하지 않은 토큰입니다.'));
             socket.data.user = user; // 검증된 신원을 소켓에 저장
             next();
@@ -88,7 +91,7 @@ module.exports = (io) => {
 
         // 데드 스위치: 잠금이 꼬여 아무도 캐셔로 접속하지 못할 때 관리자가 강제 해제.
         // 소켓 ID와 무관하게 currentCashierId를 비운다. (관리자 전용)
-        socket.on('force_release_cashier', (ack) => {
+        socket.on('force_release_cashier', (/** @type {any} */ ack) => {
             if (socket.data.user?.role !== 'admin') {
                 if (typeof ack === 'function') ack({ success: false, message: '관리자 권한이 필요합니다.' });
                 return;
@@ -127,7 +130,7 @@ module.exports = (io) => {
             broadcastUserCount();
         });
 
-        socket.on('disconnect', (reason) => {
+        socket.on('disconnect', (/** @type {string} */ reason) => {
             console.log(`[🔴 Socket 끊김] ID: ${socket.id}, 사유: ${reason}`);
 
             connectedUsers.delete(socket.id);
@@ -146,7 +149,7 @@ module.exports = (io) => {
             }
         });
 
-        socket.on('error', (err) => {
+        socket.on('error', (/** @type {any} */ err) => {
             console.error(`[❌ Socket 에러] ID: ${socket.id}, 에러 상세:`, err);
         });
 

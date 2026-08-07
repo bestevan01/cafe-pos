@@ -24,9 +24,9 @@ router.get('/summary', authenticateToken, requireAdmin, async (req, res) => {
             month: Number(month.s),
             total: Number(total.s),
             totalCount: Number(total.c),
-            periods: periods.map((p) => ({ year: Number(p.year), month: Number(p.month) })),
+            periods: periods.map((/** @type {any} */ p) => ({ year: Number(p.year), month: Number(p.month) })),
         });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/sales/summary 에러]', err);
         res.status(500).json({
             success: false,
@@ -39,9 +39,11 @@ router.get('/summary', authenticateToken, requireAdmin, async (req, res) => {
 // 상세 내역: 연+월 단위로만 조회 (전체 로딩 방지). 미지정 시 이번 달.
 router.get('', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const year = parseInt(req.query.year, 10);
-        const month = parseInt(req.query.month, 10);
-        let sql, params;
+        const year = parseInt(String(req.query.year), 10);
+        const month = parseInt(String(req.query.month), 10);
+        let sql;
+        /** @type {any[]} */
+        let params;
         if (year && month) {
             sql =
                 'SELECT * FROM orders WHERE is_paid=1 AND YEAR(created_at)=? AND MONTH(created_at)=? ORDER BY created_at DESC';
@@ -53,7 +55,7 @@ router.get('', authenticateToken, requireAdmin, async (req, res) => {
         }
         const [rows] = await pool.query(sql, params);
         res.json(rows);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/sales 에러]', err);
         res.status(500).json({
             success: false,
@@ -89,7 +91,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         }
 
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/admin/sales/${id} 에러]`, err);
         res.status(500).json({
             success: false,

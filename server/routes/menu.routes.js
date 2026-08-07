@@ -8,7 +8,7 @@ router.get('', authenticateToken, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM menu');
         res.json(rows);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/menu 에러]', err);
         res.status(500).json({
             success: false,
@@ -26,7 +26,7 @@ router.post('', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await pool.query('INSERT INTO menu (name, price, type) VALUES (?, ?, ?)', [name, price, type]);
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 POST /api/menu 에러]', err);
         res.status(500).json({
             success: false,
@@ -73,7 +73,7 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
             );
         }
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/menu/${id} 에러]`, err);
         res.status(500).json({
             success: false,
@@ -88,7 +88,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM menu WHERE id = ?', [id]);
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/menu/${id} 에러]`, err);
         res.status(500).json({
             success: false,

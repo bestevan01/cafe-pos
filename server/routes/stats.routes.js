@@ -21,7 +21,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
                                              GROUP BY HOUR(created_at)
                                              ORDER BY hour`);
         res.json({ itemStats: itemRows, timeStats: timeRows });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/stats 에러]', err);
         res.status(500).json({
             success: false,

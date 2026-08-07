@@ -20,7 +20,7 @@ router.get('/', authenticateToken, async (req, res) => {
         `;
         const [rows] = await pool.query(query);
         res.json(rows);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 GET /api/events 에러]`, err);
         res.status(500).json({
             success: false,
@@ -43,7 +43,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
             [name, type, discount_amount || 0, daily_limit || null, target_menus || 'all', is_active ? 1 : 0],
         );
         res.json({ success: true, id: result.insertId });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 POST /api/events 에러]`, err);
         res.status(500).json({
             success: false,
@@ -60,7 +60,7 @@ router.patch('/:id/toggle', authenticateToken, requireAdmin, async (req, res) =>
         await pool.query('UPDATE events SET is_active = ? WHERE id = ?', [is_active ? 1 : 0, id]);
         req.app.get('io').emit('events_updated');
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/events/${id} 에러]`, err);
         res.status(500).json({
             success: false,
@@ -76,7 +76,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         await pool.query('DELETE FROM events WHERE id = ?', [id]);
         req.app.get('io').emit('events_updated');
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/events/${id} 에러]`, err);
         res.status(500).json({
             success: false,

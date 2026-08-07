@@ -16,7 +16,7 @@ router.get('/status', authenticateToken, async (req, res) => {
         } else {
             res.json({ status: todayRows[0]['is_closed'] ? 'closed' : 'opened', data: todayRows[0] });
         }
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/settlement/status 에러]', err);
         res.status(500).json({
             success: false,
@@ -40,7 +40,7 @@ router.post('/open', authenticateToken, async (req, res) => {
 
         await pool.query('INSERT INTO cash_settlements (date, opening_amount) VALUES (CURDATE(), ?)', [amount]);
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         // 2차 방어(DB 레벨): date에 UNIQUE 제약이 있으면 동시 오픈 경쟁도 여기서 차단됨
         if (err && err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ success: false, message: '오늘은 이미 오픈되었습니다.' });
@@ -68,7 +68,7 @@ router.get('/calc', authenticateToken, async (req, res) => {
         const cashSales = parseInt(orders[0]['cash_sales']);
 
         res.json({ opening, sales: cashSales, expected: opening + cashSales });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/settlement/calc 에러]', err);
         res.status(500).json({
             success: false,
@@ -101,7 +101,7 @@ router.post('/close', authenticateToken, async (req, res) => {
             return res.status(409).json({ success: false, message: '오늘은 이미 마감되었습니다.' });
         }
         res.json({ success: true });
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 POST /api/settlement/close 에러]', err);
         res.status(500).json({
             success: false,
@@ -115,7 +115,7 @@ router.get('/history', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM cash_settlements ORDER BY date DESC');
         res.json(rows);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/settlements 에러]', err);
         res.status(500).json({
             success: false,

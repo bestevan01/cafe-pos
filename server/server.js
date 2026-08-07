@@ -59,12 +59,12 @@ const io = new Server(server, {
 // [4] 데이터베이스 연결 확인 (DB Connection)
 // ---------------------------------------------------------
 pool.getConnection()
-    .then(async (conn) => {
+    .then(async (/** @type {any} */ conn) => {
         console.log('✅ [DB] 데이터베이스 연결 성공!');
         conn.release();
         await ensureSchema();
     })
-    .catch((err) => {
+    .catch((/** @type {any} */ err) => {
         console.error('❌ [DB] 데이터베이스 연결 실패:', err);
     });
 
@@ -78,7 +78,7 @@ async function ensureSchema() {
                 last_number INT  NOT NULL DEFAULT 0
             )
         `);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('⚠️ [DB] daily_order_counters 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 
@@ -107,14 +107,14 @@ async function ensureSchema() {
                 CONSTRAINT fk_recipe_ingredient FOREIGN KEY (ingredient_id) REFERENCES ingredients (id) ON DELETE CASCADE
             )
         `);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('⚠️ [DB] 원가분석 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 
     // menu.cost_override 컬럼 보장 (이미 있으면 무시)
     try {
         await pool.query('ALTER TABLE menu ADD COLUMN cost_override INT NULL DEFAULT NULL');
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         if (err.code !== 'ER_DUP_FIELDNAME') {
             console.error('⚠️ [DB] menu.cost_override 컬럼 추가 실패 (수동 마이그레이션 필요):', err.message);
         }
@@ -123,7 +123,7 @@ async function ensureSchema() {
     // ingredients.category 컬럼 보장 (식재료/부자재 분류, 이미 있으면 무시)
     try {
         await pool.query("ALTER TABLE ingredients ADD COLUMN category VARCHAR(10) NOT NULL DEFAULT '식재료'");
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         if (err.code !== 'ER_DUP_FIELDNAME') {
             console.error('⚠️ [DB] ingredients.category 컬럼 추가 실패 (수동 마이그레이션 필요):', err.message);
         }
@@ -142,7 +142,7 @@ async function ensureSchema() {
                 KEY idx_purpose_expires (purpose, expires_at)
             )
         `);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('⚠️ [DB] ephemeral_tokens 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 
@@ -158,7 +158,7 @@ async function ensureSchema() {
                 KEY idx_reset (reset_at)
             )
         `);
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('⚠️ [DB] login_attempts 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 }

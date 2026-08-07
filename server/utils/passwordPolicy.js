@@ -1,5 +1,6 @@
 // 비밀번호 정책(서버측 강제). 프론트(src/utils/passwordPolicy.js)와 규칙을 동일하게 유지할 것.
 // 클라이언트 검증을 우회한 직접 API 호출도 차단한다.
+/** @param {string} pw */
 function isStrongPassword(pw) {
     return (
         typeof pw === 'string' &&

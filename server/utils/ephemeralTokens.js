@@ -11,7 +11,7 @@ const pool = require('../config/db');
 async function cleanupExpired() {
     try {
         await pool.query('DELETE FROM ephemeral_tokens WHERE expires_at < NOW()');
-    } catch (err) {
+    } catch (/** @type {any} */ err) {
         console.error('[⚠️ ephemeral_tokens 정리 실패]', err.message);
     }
 }

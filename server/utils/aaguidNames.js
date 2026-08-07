@@ -21,11 +21,12 @@ const AAGUID_NAMES = {
  * @param {string} aaguid
  * @returns {string|null}
  */
+/** @param {string|null|undefined} aaguid */
 function aaguidToProviderName(aaguid) {
     if (!aaguid) return null;
     const id = String(aaguid).toLowerCase();
     if (id === '00000000-0000-0000-0000-000000000000') return null; // 프라이버시상 미제공
-    return AAGUID_NAMES[id] || null;
+    return /** @type {Record<string, string>} */ (AAGUID_NAMES)[id] || null;
 }
 
 module.exports = { aaguidToProviderName };
