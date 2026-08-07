@@ -1,11 +1,20 @@
 name: Keep Render Server Alive
+# 역할 분담:
+#  - 이 워크플로: 아침에 '완전히 잠든' Render 인스턴스를 깨우는 용도.
+#    Render가 cron-job.org 요청은 봇으로 보고 거부하는데 GitHub 요청은 받아주기 때문에,
+#    콜드 상태에서 최초로 깨우는 일은 반드시 여기서 해야 한다.
+#  - 이후 영업시간 동안 깨어 있게 유지하는 것은 cron-job.org가 담당한다.
+#    (Asia/Seoul 기준 '*/10 8-19 * 3-6,9-12 1-5')
 on:
   schedule:
-    # ⚠️ GitHub Actions cron은 UTC 기준. KST = UTC+9 이므로 23시 UTC = 다음날 08시 KST.
-    # 요일도 하루 밀리므로 UTC 일~목(0-4)이 KST 월~금이 된다. (기존 1-5는 KST 화~토가 되어
-    # 영업일인 월요일 아침이 비고, 비영업일인 토요일 아침에 낭비되고 있었음)
-    # → 영업(월~목 09~18시) 시작 직전인 KST 08:05~08:55에 10분 간격으로 깨워 콜드스타트 방지.
-    - cron: '5/10 23 * 3-6,9-12 0-4'
+    # ⚠️ GitHub Actions cron은 UTC 전용. KST = UTC+9라 23시 UTC = 다음 날 08시 KST.
+    #
+    # 요일(0-4 = UTC 일~목)은 KST 월~금으로 정확히 대응되므로 cron에서 걸러도 안전하다.
+    # 하지만 '월'은 하루 밀림 때문에 cron에서 거를 수 없다.
+    #   예) KST 9/1 08:05 = UTC 8/31 23:05 → cron 월 필터에 8월이 없으면 학기 첫날이 비어버린다.
+    # 그래서 월 범위는 경계달(2월·8월)까지 넉넉히 열어두고,
+    # 실제 운영월 판단은 아래 스텝에서 KST 기준으로 한다.
+    - cron: '5/10 23 * 2-6,8-12 0-4'
   workflow_dispatch:
 
 jobs:
@@ -25,6 +34,17 @@ jobs:
     steps:
       - name: Ping Server
         run: |
+          # 학기 운영월(KST 3~6월, 9~12월)이 아니면 Render를 깨우지 않고 끝낸다.
+          # cron이 아니라 여기서 판단하는 이유는 위 주석 참고.
+          KST_MONTH=$(TZ=Asia/Seoul date +%m)
+          case "$KST_MONTH" in
+            03 | 04 | 05 | 06 | 09 | 10 | 11 | 12) ;;
+            *)
+              echo "방학 기간 (KST ${KST_MONTH}월) — 건너뜀"
+              exit 0
+              ;;
+          esac
+
           # 콜드스타트는 최대 ~60초까지 걸리므로 넉넉히 기다린다.
           code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "${{ matrix.url }}/ping")
-          echo "${{ matrix.name }} (${{ matrix.url }}) -> $code"
+          echo "$(TZ=Asia/Seoul date '+%F %T KST') ${{ matrix.name }} (${{ matrix.url }}) -> $code"
