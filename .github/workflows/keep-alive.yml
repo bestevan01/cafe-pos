@@ -1,7 +1,11 @@
 name: Keep Render Server Alive
 on:
   schedule:
-    - cron: '5/10 23 * 3-6,9-12 1-5'
+    # ⚠️ GitHub Actions cron은 UTC 기준. KST = UTC+9 이므로 23시 UTC = 다음날 08시 KST.
+    # 요일도 하루 밀리므로 UTC 일~목(0-4)이 KST 월~금이 된다. (기존 1-5는 KST 화~토가 되어
+    # 영업일인 월요일 아침이 비고, 비영업일인 토요일 아침에 낭비되고 있었음)
+    # → 영업(월~목 09~18시) 시작 직전인 KST 08:05~08:55에 10분 간격으로 깨워 콜드스타트 방지.
+    - cron: '5/10 23 * 3-6,9-12 0-4'
   workflow_dispatch:
 
 jobs:
