@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="255" height="130" viewBox="0 0 255 130" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Baek's Coffee">
+    <style>
+        .lg-ink { fill: #165027; }
+        .lg-stroke { stroke: #165027; }
+        .lg-cream { fill: #FDF6DC; }
+        @media (prefers-color-scheme: dark) {
+        .lg-ink { fill: #FDF6DC; }
+        .lg-stroke { stroke: #FDF6DC; }
+        .lg-cream { fill: none; }
+        }
+    </style>
+    <path class="lg-stroke" d="M50,46 C39,46 39,35 50,35 C60,35 60,25 50,25 C44,25 43,19 49,17" fill="none"
+          stroke-width="3.5" stroke-linecap="round"/>
+    <rect class="lg-cream lg-stroke" x="18" y="46" width="64" height="13" rx="3" stroke-width="3.5"/>
+    <path class="lg-cream lg-stroke" d="M20,59 L80,59 L74,120 Q73,125 68,125 L32,125 Q27,125 26,120 Z"
+          stroke-width="3.5" stroke-linejoin="round"/>
+    <path class="lg-stroke" d="M24,88 L76,88" fill="none" stroke-width="2.5" stroke-linecap="round"/>
+    <text class="lg-ink" x="104" y="76" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="600"
+          font-size="34" letter-spacing="1">BAEK'S
+    </text>
+    <text class="lg-ink" x="105" y="109" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="600"
+          font-size="21" letter-spacing="5">COFFEE
+    </text>
+</svg>

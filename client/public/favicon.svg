@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="116" height="116" viewBox="0 0 116 116" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Baek's Coffee">
+    <rect x="0" y="0" width="116" height="116" rx="26" fill="#165027"/>
+    <ellipse cx="58" cy="28" rx="15" ry="8" fill="#FDF6DC"/>
+    <path d="M60,22 Q66,18 62,13" fill="none" stroke="#FDF6DC" stroke-width="3" stroke-linecap="round"/>
+    <rect x="26" y="28" width="64" height="10" rx="2" fill="#FDF6DC"/>
+    <path d="M29,38 L87,38 L82,91 Q81,96 75,96 L41,96 Q35,96 34,91 Z" fill="#FDF6DC"/>
+    <circle cx="46" cy="58" r="4.5" fill="#165027"/>
+    <circle cx="47.5" cy="56.5" r="1.3" fill="#FDF6DC"/>
+    <path d="M66,57 Q72,63 78,57" fill="none" stroke="#165027" stroke-width="3" stroke-linecap="round"/>
+    <path d="M43,71 Q58,91 73,71 Q58,79 43,71 Z" fill="#165027"/>
+    <ellipse cx="58" cy="83" rx="4.5" ry="3" fill="#FDF6DC"/>
+</svg>
