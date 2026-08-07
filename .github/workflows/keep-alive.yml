@@ -11,7 +11,20 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    strategy:
+      # 한 서버가 느리거나 죽어 있어도 나머지는 계속 깨우도록 서로 독립 실행한다.
+      fail-fast: false
+      matrix:
+        include:
+          - name: 본부동
+            url: https://cafe-server-0qur.onrender.com
+          - name: 은혜관
+            url: https://cafe-pos-kk4t.onrender.com
+    # develop 브랜치로 배포되는 테스트 서버(cafe-server-beta)는 상시 가동이 필요 없어 제외한다.
+    name: Ping ${{ matrix.name }}
     steps:
       - name: Ping Server
         run: |
-          curl -s -o /dev/null -w "%{http_code}" https://cafe-server-0qur.onrender.com/ping
+          # 콜드스타트는 최대 ~60초까지 걸리므로 넉넉히 기다린다.
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "${{ matrix.url }}/ping")
+          echo "${{ matrix.name }} (${{ matrix.url }}) -> $code"
