@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="116" height="116" viewBox="0 0 116 116" xmlns="http://www.w3.org/2000/svg" role="img"
-     aria-label="Baek's Coffee">
+     aria-label="Baek's Cafe">
     <rect x="0" y="0" width="116" height="116" rx="26" fill="#165027"/>
     <ellipse cx="58" cy="28" rx="15" ry="8" fill="#FDF6DC"/>
     <path d="M60,22 Q66,18 62,13" fill="none" stroke="#FDF6DC" stroke-width="3" stroke-linecap="round"/>

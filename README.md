@@ -1,6 +1,6 @@
-# Cafe POS 시스템 | Baek's Coffee
+# Cafe POS 시스템 | Baek's Cafe
 
-Baek's Coffee(백석대학교 본부동 1층, 기부 연계 카페) 운영을 위한 웹 기반 POS(주문·정산·통계) 시스템입니다.
+Baek's Cafe(백석대학교 본부동 1층, 기부 연계 카페) 운영을 위한 웹 기반 POS(주문·정산·통계) 시스템입니다.
 
 ## 주요 기능
 

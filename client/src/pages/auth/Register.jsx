@@ -98,7 +98,7 @@ function Register({ onSwitchToLogin }) {
             </style>
 
             <div className="register-card">
-                <img src="/logo.svg" alt="Baek's Coffee" className="register-logo" />
+                <img src="/logo.svg" alt="Baek's Cafe" className="register-logo" />
                 <h2 className="register-title">직원 회원가입</h2>
 
                 <form onSubmit={handleSubmit} className="register-form">

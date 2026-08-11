@@ -232,7 +232,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                         {store.label}
                     </div>
                 )}
-                <img src="/logo.svg" alt="Baek's Coffee" className="login-logo" />
+                <img src="/logo.svg" alt="Baek's Cafe" className="login-logo" />
                 <h2 className="login-title">직원 로그인</h2>
 
                 <form ref={formRef} onSubmit={handleSubmit} className="login-form">
