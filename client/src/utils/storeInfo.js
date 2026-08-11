@@ -11,6 +11,12 @@
 // 글자색은 배경 밝기에서 자동으로 정한다. 설정값을 하나 줄이면서,
 // 색을 잘못 넣어 글씨가 안 보이는 상태가 되는 것도 막는다.
 
+// 로컬 테스트용 기본값 — 따옴표 안에 값을 넣으면 개발 서버(npm run dev)에서 그 매장으로 보인다.
+//   예) const LOCAL_NAME = '은혜관점';  const LOCAL_COLOR = '#5C3A21';
+// import.meta.env.DEV일 때만 쓰이므로, 값을 넣은 채 커밋해도 배포 빌드에는 영향이 없다.
+const LOCAL_NAME = '';
+const LOCAL_COLOR = '';
+
 /** 색이 없거나 해석할 수 없을 때 쓰는 중립색. 특정 매장 색을 흉내내지 않도록 회색 계열. */
 const FALLBACK_BG = '#455a64';
 const LIGHT_TEXT = '#FDF6DC'; // 브랜드 크림
@@ -54,10 +60,11 @@ function luminance(hex) {
  *   단, 로컬 개발 중에는 설정 없이도 구분되도록 기본값을 준다.
  */
 export function getStoreInfo() {
-    const name = String(import.meta.env['VITE_STORE_NAME'] ?? '').trim();
+    const dev = Boolean(import.meta.env.DEV);
+    const name = String(import.meta.env['VITE_STORE_NAME'] || (dev && LOCAL_NAME) || '').trim();
     if (!name) {
-        return import.meta.env.DEV ? { label: '로컬 개발 환경', bg: FALLBACK_BG, fg: LIGHT_TEXT } : null;
+        return dev ? { label: '로컬 개발 환경', bg: FALLBACK_BG, fg: LIGHT_TEXT } : null;
     }
-    const bg = normalizeHex(String(import.meta.env['VITE_STORE_COLOR'] ?? '')) ?? FALLBACK_BG;
+    const bg = normalizeHex(String(import.meta.env['VITE_STORE_COLOR'] || (dev && LOCAL_COLOR) || '')) ?? FALLBACK_BG;
     return { label: name, bg, fg: luminance(bg) < 0.35 ? LIGHT_TEXT : DARK_TEXT };
 }
