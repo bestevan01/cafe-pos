@@ -3,6 +3,7 @@ import axios from 'axios';
 import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
 import { useSystemTheme } from '../../hooks/useSystemTheme';
 import { useNotification } from '../../hooks/useNotification';
+import { getStoreInfo } from '../../utils/storeInfo';
 import Button from '../../components/ui/Button';
 
 /**
@@ -11,6 +12,8 @@ import Button from '../../components/ui/Button';
  * @param {() => void} props.onSwitchToRegister
  */
 function Login({ onLoginSuccess, onSwitchToRegister }) {
+    // 접속 도메인으로 결정되므로 세션 중 바뀌지 않는다 — 상태로 둘 필요 없음
+    const store = getStoreInfo();
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [submitting, setSubmitting] = useState(false);
     const formRef = useRef(/** @type {HTMLFormElement|null} */ (null));
@@ -173,6 +176,16 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                     border: 1px solid var(--border-color, transparent);
                     transition: background-color 0.3s ease;
                 }
+                /* 매장 구분 띠. 카드 패딩(40px 30px)을 음수 마진으로 상쇄해 상단을 꽉 채운다.
+                   align-self: stretch가 없으면 부모의 align-items:center 때문에 글자 폭만큼만 줄어든다. */
+                .store-strip {
+                    align-self: stretch;
+                    margin: -40px -30px 24px -30px;
+                    padding: 10px 16px;
+                    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+                    font-size: 0.9rem; font-weight: 600; letter-spacing: 0.5px;
+                    text-align: center; word-break: keep-all;
+                }
                 .login-logo { width: 210px; max-width: 80%; height: auto; margin: 0 0 16px 0; }
                 .login-title { margin: 0 0 25px 0; color: var(--text-secondary, #666); font-size: 1.15rem; font-weight: 500; }
                 
@@ -214,7 +227,12 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             </style>
 
             <div className="login-card">
-                <img src="/logo.svg" alt="Baek's Coffee" className="login-logo" />
+                {store && (
+                    <div className="store-strip" style={{ backgroundColor: store.bg, color: store.fg }}>
+                        {store.label}
+                    </div>
+                )}
+                <img src="/logo.svg" alt="Baek's Cafe" className="login-logo" />
                 <h2 className="login-title">직원 로그인</h2>
 
                 <form ref={formRef} onSubmit={handleSubmit} className="login-form">

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="255" height="130" viewBox="0 0 255 130" xmlns="http://www.w3.org/2000/svg" role="img"
-     aria-label="Baek's Coffee">
+     aria-label="Baek's Cafe">
     <style>
         .lg-ink { fill: #165027; }
         .lg-stroke { stroke: #165027; }
@@ -20,7 +20,7 @@
     <text class="lg-ink" x="104" y="76" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="600"
           font-size="34" letter-spacing="1">BAEK'S
     </text>
-    <text class="lg-ink" x="105" y="109" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="600"
-          font-size="21" letter-spacing="5">COFFEE
+    <text class="lg-ink" x="105" y="113" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="600"
+          font-size="26" letter-spacing="5">CAFE
     </text>
 </svg>
