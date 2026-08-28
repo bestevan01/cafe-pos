@@ -15,6 +15,10 @@ function UsersDashboard({ onBack }) {
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
     const [users, setUsers] = useState(/** @type {import('../../types').User[]} */ ([]));
+    // 초기화 직후 임시 비밀번호를 보여주는 모달. 닫으면 다시 볼 수 없다.
+    const [resetResult, setResetResult] = useState(
+        /** @type {{name: string, username: string, password: string}|null} */ (null),
+    );
     // localStorage는 렌더링 전에도 동기적으로 읽을 수 있으므로 effect 없이 lazy initializer로 초기화
     const [currentUserId] = useState(() => {
         const userStr = localStorage.getItem('user');
@@ -45,6 +49,23 @@ function UsersDashboard({ onBack }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void fetchUsers();
     }, [fetchUsers]);
+
+    // 관리자가 임시 비밀번호를 발급한다. 평문은 서버 응답에서 한 번만 오므로
+    // 화면에 띄워두고 관리자가 직원에게 직접 전달하게 한다(다시 조회할 수 없다).
+    /** @param {import('../../types').User} target */
+    const handleResetPassword = async (target) => {
+        const ok = await confirm(
+            `${target.name}(@${target.username})님의 비밀번호를 초기화합니다.\n기존 비밀번호는 즉시 사용할 수 없게 되고, 임시 비밀번호가 한 번만 표시됩니다.`,
+            { title: '🔑 비밀번호 초기화', confirmText: '초기화' },
+        );
+        if (!ok) return;
+        try {
+            const res = await axios.post(`/api/admin/users/${target.id}/reset-password`, {}, getAuthHeader());
+            setResetResult({ name: res.data.name, username: res.data.username, password: res.data.tempPassword });
+        } catch (/** @type {any} */ err) {
+            notify(err.response?.data?.message || '비밀번호 초기화에 실패했습니다.', { icon: '⚠️' });
+        }
+    };
 
     /**
      * @param {string} id
@@ -144,7 +165,31 @@ function UsersDashboard({ onBack }) {
                 .role-pending { background-color: var(--warning-bg); color: #ef6c00; }
                 
                 .btn-action-base { padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: bold; border: none; cursor: pointer; color: white; transition: transform 0.1s; }
-                .btn-approve { background-color: #4caf50; } .btn-demote { background-color: #9e9e9e; } .btn-promote { background-color: #2196f3; } .btn-wait { background-color: var(--warning); } .btn-delete { background-color: #d32f2f; }
+                .btn-approve { background-color: #4caf50; } .btn-demote { background-color: #9e9e9e; } .btn-promote { background-color: #2196f3; } .btn-wait { background-color: var(--warning); } .btn-delete { background-color: #d32f2f; } .btn-reset { background-color: #6f42c1; }
+
+                /* 임시 비밀번호 안내 모달 — 닫으면 다시 볼 수 없으므로 눈에 띄게 */
+                .reset-overlay {
+                    position: fixed; inset: 0; background-color: rgba(0,0,0,0.6); z-index: 9999;
+                    display: flex; justify-content: center; align-items: center; padding: 20px;
+                }
+                .reset-modal {
+                    background-color: var(--card-bg); padding: 28px 24px; border-radius: var(--radius-lg);
+                    width: 100%; max-width: 400px; box-sizing: border-box; text-align: center;
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                }
+                .reset-modal h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 1.25rem; }
+                .reset-who { color: var(--text-secondary); font-size: 0.92rem; margin: 0 0 20px; }
+                .reset-pw {
+                    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                    font-size: 1.35rem; font-weight: bold; letter-spacing: 1px;
+                    color: var(--text-primary); background-color: var(--bg-color);
+                    border: 2px dashed var(--border-color); border-radius: var(--radius-md);
+                    padding: 16px 12px; margin-bottom: 16px; user-select: all; word-break: break-all;
+                }
+                .reset-warn {
+                    font-size: 0.85rem; color: var(--danger); line-height: 1.6;
+                    margin: 0 0 20px; word-break: keep-all;
+                }
                 .my-account-label { color: var(--text-blue, var(--accent)); font-weight: bold; font-size: 0.9rem; padding: 8px; }
 
                 /* 다크모드 오버라이드 */
@@ -221,6 +266,7 @@ function UsersDashboard({ onBack }) {
                                             user={user}
                                             handleRoleChange={handleRoleChange}
                                             handleDeleteUser={handleDeleteUser}
+                                            handleResetPassword={handleResetPassword}
                                             currentUserId={currentUserId}
                                         />
                                     </div>
@@ -229,6 +275,37 @@ function UsersDashboard({ onBack }) {
                         ))}
                     </tbody>
                 </table>
+
+                {resetResult && (
+                    <div className="reset-overlay" onClick={() => setResetResult(null)}>
+                        <div className="reset-modal" onClick={(e) => e.stopPropagation()}>
+                            <h3>🔑 임시 비밀번호</h3>
+                            <p className="reset-who">
+                                {resetResult.name} (@{resetResult.username})
+                            </p>
+                            <div className="reset-pw">{resetResult.password}</div>
+                            <p className="reset-warn">
+                                이 창을 닫으면 다시 볼 수 없습니다. 본인에게 직접 전달해주세요.
+                                <br />
+                                직원이 로그인하면 새 비밀번호를 정하는 화면이 자동으로 뜹니다.
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    void navigator.clipboard?.writeText(resetResult.password);
+                                    notify('복사했습니다.', { icon: '📋' });
+                                }}
+                                size="lg"
+                                full
+                                style={{ marginBottom: 8 }}
+                            >
+                                복사하기
+                            </Button>
+                            <Button onClick={() => setResetResult(null)} variant="secondary" size="lg" full>
+                                전달했습니다
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 {/* 2. 모바일 뷰: 카드 형식 */}
                 <div className="users-card-view">
@@ -251,6 +328,7 @@ function UsersDashboard({ onBack }) {
                                     user={user}
                                     handleRoleChange={handleRoleChange}
                                     handleDeleteUser={handleDeleteUser}
+                                    handleResetPassword={handleResetPassword}
                                     currentUserId={currentUserId}
                                 />
                             </div>
@@ -269,10 +347,11 @@ function UsersDashboard({ onBack }) {
  * @param {object} props
  * @param {any} props.user  직원 레코드 (id/username/name/role)
  * @param {(id: any, newRole: import('../../types').Role) => void} props.handleRoleChange
+ * @param {(user: any) => void} props.handleResetPassword
  * @param {(id: any) => void} props.handleDeleteUser
  * @param {any} props.currentUserId  본인 계정은 버튼 대신 '내 계정' 표시
  */
-function RenderActionButtons({ user, handleRoleChange, handleDeleteUser, currentUserId }) {
+function RenderActionButtons({ user, handleRoleChange, handleDeleteUser, handleResetPassword, currentUserId }) {
     if (user.id === currentUserId) return <div className="my-account-label">👤 내 계정</div>;
 
     return (
@@ -295,6 +374,11 @@ function RenderActionButtons({ user, handleRoleChange, handleDeleteUser, current
             {user.role !== 'pending' && (
                 <button className="btn-action-base btn-wait" onClick={() => handleRoleChange(user.id, 'pending')}>
                     ⏸ 대기로
+                </button>
+            )}
+            {user.role !== 'pending' && (
+                <button className="btn-action-base btn-reset" onClick={() => handleResetPassword(user)}>
+                    🔑 비밀번호 초기화
                 </button>
             )}
             {user.role !== 'admin' && (

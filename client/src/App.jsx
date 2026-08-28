@@ -10,6 +10,7 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ProfileAuth from './pages/auth/ProfileAuth.jsx';
 import EditProfile from './pages/auth/EditProfile.jsx';
+import ForcePasswordChange from './pages/auth/ForcePasswordChange';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import { useTheme } from './hooks/useTheme';
 import { useNotification } from './hooks/useNotification';
@@ -222,6 +223,22 @@ function App() {
             <Login
                 onLoginSuccess={handleLoginSuccess}
                 onSwitchToRegister={() => setAuth({ ...auth, view: 'register' })}
+            />
+        );
+    }
+
+    // 관리자가 임시 비밀번호를 발급한 계정은 새 비밀번호를 정하기 전까지 앱에 들어갈 수 없다.
+    // 임시 비밀번호는 사람 손을 거쳐 전달되므로, 그 상태로 계속 쓰면 계정이 열려 있는 것과 같다.
+    if (auth.user.mustChangePassword) {
+        return (
+            <ForcePasswordChange
+                user={auth.user}
+                onDone={() => {
+                    const updated = { ...auth.user, mustChangePassword: false };
+                    localStorage.setItem('user', JSON.stringify(updated));
+                    setAuth((prev) => ({ ...prev, user: updated }));
+                }}
+                onLogout={handleManualLogout}
             />
         );
     }

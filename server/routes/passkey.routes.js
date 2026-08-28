@@ -203,7 +203,15 @@ router.post('/passkey/login-verify', async (req, res) => {
                 JWT_SECRET,
                 { expiresIn: '12h' },
             );
-            res.json({ success: true, token, role: user.role, name: user.name, username: user.username, id: user.id });
+            res.json({
+                success: true,
+                token,
+                role: user.role,
+                name: user.name,
+                username: user.username,
+                id: user.id,
+                mustChangePassword: user.must_change_password === 1,
+            });
         } else {
             res.status(400).json({ success: false, message: '패스키 로그인 검증에 실패했습니다.' });
         }

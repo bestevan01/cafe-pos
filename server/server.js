@@ -129,6 +129,15 @@ async function ensureSchema() {
         }
     }
 
+    // users.must_change_password 컬럼 보장 (관리자 임시 비밀번호 발급 표시, 이미 있으면 무시)
+    try {
+        await pool.query('ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0');
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] users.must_change_password 컬럼 추가 실패 (수동 마이그레이션 필요):', err.message);
+        }
+    }
+
     // 단기·1회용 토큰 저장소 (WebAuthn 챌린지 등). 메모리 대신 DB로 재시작/스케일아웃 대비.
     try {
         await pool.query(`

@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
+const { generateTempPassword } = require('../utils/tempPassword');
 const debugInfo = require('../utils/debugInfo');
 const { loginRateLimiter, recordLoginFailure, recordLoginSuccess } = require('../middlewares/loginRateLimit');
 const { isStrongPassword, PASSWORD_POLICY_MESSAGE } = require('../utils/passwordPolicy');
@@ -55,7 +56,16 @@ router.post('/login', loginRateLimiter, async (req, res) => {
             expiresIn: '12h',
         });
 
-        res.json({ success: true, token, role: user.role, name: user.name, username: user.username, id: user.id });
+        res.json({
+            success: true,
+            token,
+            role: user.role,
+            name: user.name,
+            username: user.username,
+            id: user.id,
+            // 관리자가 임시 비밀번호를 발급한 계정이면 클라이언트가 변경 화면을 강제로 띄운다.
+            mustChangePassword: user.must_change_password === 1,
+        });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 POST /api/login 에러] 시도 아이디: ${username}`, err);
         res.status(500).json({
@@ -78,7 +88,11 @@ router.patch('/users/:id/password', authenticateToken, async (req, res) => {
         }
 
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-        await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashedNewPassword, id]);
+        // 본인이 새 비밀번호를 정했으므로 임시 비밀번호 표시를 함께 내린다.
+        await pool.query('UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?', [
+            hashedNewPassword,
+            id,
+        ]);
 
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
@@ -100,6 +114,37 @@ router.get('/admin/users', authenticateToken, requireAdmin, async (req, res) => 
         res.status(500).json({
             success: false,
             message: '유저 목록을 불러오지 못했습니다.',
+            debug_info: debugInfo(err),
+        });
+    }
+});
+
+// 관리자가 직원의 비밀번호를 임시 값으로 초기화한다.
+// 이메일·휴대폰을 수집하지 않는 구조라 자동 재설정 링크를 보낼 수 없으므로,
+// 관리자가 직원에게 직접 전달하는 방식을 택했다. 전달 과정 자체가 신원 확인 역할을 한다.
+// 평문은 이 응답에서 딱 한 번만 나가고 DB에는 해시만 남는다(관리자도 다시 볼 수 없다).
+router.post('/admin/users/:id/reset-password', authenticateToken, requireAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [target] = await pool.query('SELECT username, name FROM users WHERE id = ?', [id]);
+        if (target.length === 0) {
+            return res.status(404).json({ success: false, message: '해당 직원을 찾을 수 없습니다.' });
+        }
+
+        const tempPassword = generateTempPassword();
+        const hashed = await bcrypt.hash(tempPassword, 10);
+        // must_change_password를 세워 다음 로그인 때 본인이 새 비밀번호를 정하도록 강제한다.
+        await pool.query('UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?', [hashed, id]);
+
+        // 감사 추적용. 비밀번호 자체는 절대 로그에 남기지 않는다.
+        console.log(`[🔑 비밀번호 초기화] 대상: ${target[0]['username']} / 처리자: ${req.user.username}`);
+
+        res.json({ success: true, tempPassword, name: target[0]['name'], username: target[0]['username'] });
+    } catch (/** @type {any} */ err) {
+        console.error(`[🔥 POST /api/admin/users/${id}/reset-password 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '비밀번호 초기화에 실패했습니다.',
             debug_info: debugInfo(err),
         });
     }

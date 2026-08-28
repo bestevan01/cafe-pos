@@ -21,6 +21,18 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
     // Safari 대응: '패스키로 로그인' 버튼 클릭 시 옵션을 await로 받아오면 제스처가 만료돼 팝업이 안 뜬다.
     // → 옵션을 미리 받아 두고 클릭 시 곧바로 startAuthentication()을 호출한다.
     const [passkeyAuthOptions, setPasskeyAuthOptions] = useState(/** @type {any} */ (null));
+    const [showHelp, setShowHelp] = useState(false);
+
+    // 모달이 열려 있는 동안 ESC로 닫는다.
+    useEffect(() => {
+        if (!showHelp) return;
+        /** @param {KeyboardEvent} e */
+        const onKey = (e) => {
+            if (e.key === 'Escape') setShowHelp(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [showHelp]);
 
     // 로그인 화면은 시스템(OS) 테마 설정을 따름
     useSystemTheme();
@@ -41,6 +53,8 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 role: data.role,
                 username: data.username,
                 id: data.id,
+                // 관리자가 임시 비밀번호를 발급한 계정이면 App이 변경 화면을 강제로 띄운다.
+                mustChangePassword: Boolean(data.mustChangePassword),
             }),
         );
         notify(`${data.name}님, 환영합니다!`, { icon: '✅' });
@@ -205,6 +219,34 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 .divider-line { flex: 1; height: 1px; background-color: var(--border-color, #ddd); transition: background-color 0.3s; }
                 .divider-text { padding: 0 15px; color: var(--text-secondary, #999); font-size: 0.85rem; }
                 
+                .forgot-link {
+                    margin-top: 18px; text-align: center; font-size: 0.88rem;
+                    color: var(--text-secondary, #888); cursor: pointer;
+                    background: none; border: none; padding: 4px 8px; font-family: inherit;
+                    text-decoration: underline; text-underline-offset: 3px;
+                }
+                .forgot-link:hover { color: var(--accent); }
+                /* 안내는 모달로 띄운다. 카드 안에 펼치면 로그인 폼이 밀려 스크롤이 생긴다. */
+                .forgot-overlay {
+                    position: fixed; inset: 0; z-index: 9999;
+                    background-color: rgba(0,0,0,0.6);
+                    display: flex; justify-content: center; align-items: center; padding: 20px;
+                }
+                .forgot-modal {
+                    background-color: var(--card-bg); width: 100%; max-width: 360px;
+                    max-height: 85dvh; overflow-y: auto;
+                    padding: 26px 24px; border-radius: var(--radius-lg);
+                    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                    box-sizing: border-box; text-align: left;
+                }
+                .forgot-modal h3 {
+                    margin: 0 0 16px; font-size: 1.15rem; color: var(--text-primary); text-align: center;
+                }
+                .forgot-case { margin-bottom: 16px; font-size: 0.9rem; line-height: 1.65; color: var(--text-secondary); word-break: keep-all; }
+                .forgot-case:last-of-type { margin-bottom: 20px; }
+                .forgot-case b { display: block; margin-bottom: 4px; color: var(--text-primary); }
+                .forgot-case ol { margin: 8px 0 0; padding-left: 20px; }
+                .forgot-case li { margin-bottom: 5px; }
                 .register-text { margin-top: 30px; font-size: 0.95rem; color: var(--text-secondary, #666); }
                 .register-link { color: var(--accent); cursor: pointer; font-weight: bold; margin-left: 5px; transition: color 0.2s; }
                 .register-link:active { color: var(--accent-hover); }
@@ -280,6 +322,39 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 >
                     패스키(지문/FaceID)로 로그인
                 </Button>
+
+                <button type="button" className="forgot-link" onClick={() => setShowHelp((v) => !v)}>
+                    비밀번호를 잊으셨나요?
+                </button>
+                {showHelp && (
+                    <div className="forgot-overlay" onClick={() => setShowHelp(false)}>
+                        <div
+                            className="forgot-modal"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="비밀번호를 잊었을 때"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3>비밀번호를 잊으셨나요?</h3>
+                            <div className="forgot-case">
+                                <b>패스키를 등록해 두셨다면</b>
+                                패스키로 로그인한 뒤, 내 이름 → 내 정보에서 비밀번호를 바꾸실 수 있습니다.
+                            </div>
+                            <div className="forgot-case">
+                                <b>등록해 두지 않으셨다면</b>
+                                관리자에게 초기화를 요청하세요.
+                                <ol>
+                                    <li>관리자가 임시 비밀번호를 알려줍니다.</li>
+                                    <li>그 값으로 로그인합니다.</li>
+                                    <li>새 비밀번호를 정하는 화면이 자동으로 뜹니다.</li>
+                                </ol>
+                            </div>
+                            <Button onClick={() => setShowHelp(false)} variant="secondary" size="lg" full>
+                                닫기
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="register-text">
                     계정이 없으신가요?
