@@ -12,9 +12,10 @@ import Button from '../ui/Button';
  * @param {string} props.title
  * @param {() => void} props.onBack
  * @param {import('react').ReactNode} props.actions  우측 상단 액션
+ * @param {import('react').ReactNode} [props.summary]  그리드 위에 놓이는 요약 영역(선택)
  * @param {import('react').ReactNode} props.children
  */
-function StatsLayout({ title, onBack, actions, children }) {
+function StatsLayout({ title, onBack, actions, summary, children }) {
     return (
         <div className="stats-layout">
             <style>{`
@@ -26,7 +27,8 @@ function StatsLayout({ title, onBack, actions, children }) {
                 .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
                 /* 모바일: minmax(0,1fr)로 칸이 컨테이너를 넘지 않게 (넓은 표는 내부에서 가로 스크롤) */
                 @media (max-width: 900px) { .stats-grid { grid-template-columns: minmax(0, 1fr); } }
-                @media (max-width: 768px) { .stats-layout { padding: 16px; } .stats-layout-title { font-size: 1.35rem; } }
+                .stats-summary { margin-bottom: 20px; }
+                @media (max-width: 768px) { .stats-layout { padding: 16px; } .stats-layout-title { font-size: 1.35rem; } .stats-summary { margin-bottom: 16px; } }
             `}</style>
 
             <div className="stats-layout-header">
@@ -39,6 +41,7 @@ function StatsLayout({ title, onBack, actions, children }) {
                 {actions && <div className="stats-layout-actions">{actions}</div>}
             </div>
 
+            {summary && <div className="stats-summary">{summary}</div>}
             <div className="stats-grid">{children}</div>
         </div>
     );
