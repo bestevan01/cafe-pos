@@ -301,16 +301,16 @@ function CostAnalysis({ onBack }) {
     );
 
     // 분석 화면 우측 상단: 편집 탭으로 이동하는 버튼들
+    // 테마 토글만 고정 바에, 화면 전환 버튼은 고정 바 아래 흐름에 둔다.
     const navActions = (
-        <div className="cost-nav">
-            <ThemeToggle />
+        <>
             <Button variant="secondary" icon="🧺" onClick={() => setView('ingredients')}>
                 원재료 관리
             </Button>
             <Button variant="secondary" icon="📝" onClick={() => setView('recipes')}>
                 레시피 수정
             </Button>
-        </div>
+        </>
     );
 
     const ingredientsCard = (
@@ -706,7 +706,7 @@ function CostAnalysis({ onBack }) {
 
     // 기본: 원가·순익 분석(통계) — 우측 상단 버튼으로 편집 탭 이동
     return (
-        <StatsLayout title="💰 원가 · 순익 분석" onBack={onBack} actions={navActions}>
+        <StatsLayout title="💰 원가 · 순익 분석" onBack={onBack} actions={<ThemeToggle />} pageActions={navActions}>
             {styleTag}
             {analysisCard}
         </StatsLayout>

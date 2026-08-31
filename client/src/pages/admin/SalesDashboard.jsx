@@ -264,6 +264,15 @@ function SalesDashboard({ onBack }) {
                 {`
                 .sales-container { padding: 20px; background-color: var(--bg-color, #f4f6f8); height: 100dvh; display: flex; flex-direction: column; box-sizing: border-box; transition: background-color 0.3s ease; overflow: hidden; }
                 .sales-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; gap: 10px; }
+                /* PC에서는 .sales-container가 height:100dvh + overflow:hidden이라 페이지가 스크롤되지
+                   않는다(표만 내부 스크롤). 헤더는 늘 보이므로 sticky가 필요 없고, 오히려 sticky를 걸면
+                   기준이 뷰포트가 아닌 이 컨테이너가 되어 음수 마진과 충돌해 아래 요소를 덮는다.
+                   컨테이너가 실제로 스크롤되는 모바일에서만 고정한다(아래 미디어쿼리). */
+                .sales-header {
+                    margin: -20px -20px 20px -20px; padding: 12px 20px;
+                    border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08));
+                }
+                .sales-page-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; flex-shrink: 0; }
                 .header-left, .header-right { display: flex; align-items: center; gap: 10px; }
                 .sales-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
                 
@@ -305,12 +314,24 @@ function SalesDashboard({ onBack }) {
 
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
+                    .sales-page-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
                     .sales-container { height: auto; min-height: 100dvh; padding: 15px; overflow: visible; }
-                    .sales-header { flex-direction: column; align-items: flex-start; gap: 12px; position: relative; }
-                    .header-left { width: 100%; }
+                    /* 모바일에서는 컨테이너가 overflow:visible + height:auto로 바뀌어 페이지가 스크롤된다.
+                       이때만 헤더를 고정한다. 세로로 쌓으면 고정 바가 화면을 계속 차지하므로 한 줄 유지. */
+                    .sales-header {
+                        position: sticky; top: 0; z-index: 30;
+                        flex-direction: row; align-items: center; gap: 8px;
+                        margin: -15px -15px 16px -15px; padding: 10px 15px;
+                        background: var(--bg-color, #f4f6f8);
+                    }
+                    .header-left { width: auto; min-width: 0; }
                     /* 액션 버튼을 3등분 그리드로 → 컨테이너 폭에 갇혀 오른쪽으로 넘치지 않음 */
-                    .header-right { width: 100%; margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-                    .theme-wrapper { position: absolute; top: 0; right: 0; }
+                    /* 버튼 3개는 .sales-page-actions로 옮겼다. 여기엔 테마 토글만 남아
+                       3열 그리드를 유지하면 빈 칸이 생겨 토글이 왼쪽으로 붙는다. */
+                    .header-right { width: auto; margin-top: 0; display: flex; }
+                    /* 헤더가 한 줄 flex로 유지되므로 absolute로 띄울 필요가 없다.
+                       띄워두면 sticky 헤더의 padding 위로 올라가 잘린다. */
+                    .theme-wrapper { position: static; flex-shrink: 0; }
                     /* 좁으면 버튼 글자가 두 줄로 줄바꿈(grid가 높이를 맞춤). nowrap·패딩 축소 */
                     .sl-hdr-btn { white-space: normal; min-width: 0; padding-left: 6px; padding-right: 6px; font-size: 0.82rem; line-height: 1.25; }
                     .stats-grid { grid-template-columns: 1fr; }
@@ -344,24 +365,29 @@ function SalesDashboard({ onBack }) {
                     <div className="theme-wrapper">
                         <ThemeToggle />
                     </div>
-                    <Button
-                        variant="secondary"
-                        icon="🔄"
-                        className="sl-hdr-btn"
-                        onClick={() => {
-                            void fetchMonth(selectedYear, selectedMonth, { force: true });
-                            void fetchSummary();
-                        }}
-                    >
-                        새로고침
-                    </Button>
-                    <Button variant="secondary" icon="📊" className="sl-hdr-btn" onClick={() => setShowAdvanced(true)}>
-                        고급 통계
-                    </Button>
-                    <Button variant="secondary" icon="📗" className="sl-hdr-btn" onClick={exportExcel}>
-                        엑셀 다운로드
-                    </Button>
                 </div>
+            </div>
+
+            {/* 페이지 전용 버튼은 고정 바에 넣지 않는다. 좁은 화면에서 두 줄로 접히면
+                고정 바가 계속 화면을 잡아먹어 표가 밀린다. */}
+            <div className="sales-page-actions">
+                <Button
+                    variant="secondary"
+                    icon="🔄"
+                    className="sl-hdr-btn"
+                    onClick={() => {
+                        void fetchMonth(selectedYear, selectedMonth, { force: true });
+                        void fetchSummary();
+                    }}
+                >
+                    새로고침
+                </Button>
+                <Button variant="secondary" icon="📊" className="sl-hdr-btn" onClick={() => setShowAdvanced(true)}>
+                    고급 통계
+                </Button>
+                <Button variant="secondary" icon="📗" className="sl-hdr-btn" onClick={exportExcel}>
+                    엑셀 다운로드
+                </Button>
             </div>
 
             {/* 요약 통계 카드 (서버 집계 — 데이터가 쌓여도 즉시) */}
