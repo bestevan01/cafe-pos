@@ -54,6 +54,14 @@ function SettlementDashboard({ onBack }) {
                 
                 /* 헤더 영역 */
                 .settle-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: nowrap; gap: 15px; }
+                /* 내용이 길어져도 뒤로/제목/테마 버튼은 항상 닿을 수 있게 상단 고정.
+                   컨테이너 좌우 패딩을 음수 마진으로 상쇄해 배경이 화면 폭을 채운다. */
+                .settle-header {
+                    position: sticky; top: 0; z-index: 30;
+                    margin: -20px -20px 20px -20px; padding: 12px 20px;
+                    background: var(--bg-color, #f4f6f8);
+                    border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08));
+                }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .settle-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
                 .theme-wrapper { display: flex; align-items: center; }
@@ -82,11 +90,17 @@ function SettlementDashboard({ onBack }) {
 
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
+                    .settle-header { margin: -15px -15px 16px -15px; padding: 10px 15px; }
                     .settle-container { padding: 15px; }
-                    .settle-header { position: relative; flex-direction: column; align-items: flex-start; gap: 12px; }
+                    .settle-header {
+                        /* 세로로 쌓으면 고정 바가 화면을 계속 차지한다. 한 줄로 유지하고 sticky도 그대로 둔다. */
+                        flex-direction: row; align-items: center; gap: 8px;
+                    }
                     .header-left { width: 100%; gap: 10px; padding-right: 40px; box-sizing: border-box; }
                     .settle-title { font-size: 1.5rem; }
-                    .theme-wrapper { position: absolute; top: 0; right: 0; }
+                    /* 헤더가 한 줄 flex로 유지되므로 absolute로 띄울 필요가 없다.
+                       띄워두면 sticky 헤더의 padding 위로 올라가 잘린다. */
+                    .theme-wrapper { position: static; flex-shrink: 0; }
 
                     .settle-content { padding: 0; background-color: transparent; box-shadow: none; border: none; }
                     .settle-table-view { display: none; } 

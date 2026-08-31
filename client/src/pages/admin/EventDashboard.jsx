@@ -171,6 +171,14 @@ function EventDashboard({ onBack }) {
                 {`
                 .event-dashboard-container { padding: 20px; background-color: var(--bg-color); min-height: 100dvh; box-sizing: border-box; transition: background-color 0.3s ease, color 0.3s ease; }
                 .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
+                /* 내용이 길어져도 뒤로/제목/테마 버튼은 항상 닿을 수 있게 상단 고정.
+                   컨테이너 좌우 패딩을 음수 마진으로 상쇄해 배경이 화면 폭을 채운다. */
+                .header-bar {
+                    position: sticky; top: 0; z-index: 30;
+                    margin: -20px -20px 20px -20px; padding: 12px 20px;
+                    background: var(--bg-color, #f4f6f8);
+                    border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08));
+                }
                 .header-left { display: flex; align-items: center; gap: 15px; }
                 .page-title { margin: 0; font-size: 1.8rem; color: var(--text-primary); }
 
@@ -209,6 +217,7 @@ function EventDashboard({ onBack }) {
                 .btn-toggle:active { transform: scale(0.95); }
 
                 @media (max-width: 768px) {
+                    .header-bar { margin: -20px -20px 16px -20px; padding: 10px 20px; }
                     .event-item { flex-direction: column; align-items: flex-start; }
                     .action-buttons { width: 100%; justify-content: flex-end; margin-top: 10px; }
                     .form-row { flex-direction: column; align-items: stretch !important; height: auto !important; min-height: auto !important; }
