@@ -107,7 +107,13 @@ router.patch('/users/:id/password', authenticateToken, async (req, res) => {
 
 router.get('/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT id, username, name, role, created_at FROM users');
+        const [rows] = await pool.query(
+            // 클라이언트가 권한별로 묶어 표시하므로 서버에서도 같은 순서로 내려준다.
+            // (조치가 필요한 대기중 → 관리자 → 직원, 그룹 안에서는 이름순)
+            `SELECT id, username, name, role, created_at
+             FROM users
+             ORDER BY FIELD(role, 'pending', 'admin', 'staff'), name`,
+        );
         res.json(rows);
     } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/users 에러]', err);
