@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import axios from 'axios';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
@@ -127,12 +127,24 @@ function UsersDashboard({ onBack }) {
         }
     };
 
-    // 현재 접속한 관리자를 목록 최상단으로 정렬
-    const displayUsers = [...users].sort((a, b) => {
-        if (a.id === currentUserId) return -1;
-        if (b.id === currentUserId) return 1;
-        return 0;
-    });
+    // 권한별로 묶어서 보여준다. 섞여 있으면 학기 초에 승인할 사람을 골라내기 어렵다.
+    // 조치가 필요한 '대기중'을 맨 위에 둔다.
+    const GROUPS = [
+        { key: 'pending', label: '승인 대기', icon: '⏳' },
+        { key: 'admin', label: '관리자', icon: '👑' },
+        { key: 'staff', label: '직원', icon: '☕' },
+    ];
+    const userGroups = GROUPS.map((g) => ({
+        ...g,
+        users: users
+            .filter((u) => u.role === g.key)
+            // 그룹 안에서는 내 계정을 먼저, 나머지는 이름순
+            .sort((a, b) => {
+                if (a.id === currentUserId) return -1;
+                if (b.id === currentUserId) return 1;
+                return String(a.name).localeCompare(String(b.name), 'ko');
+            }),
+    })).filter((g) => g.users.length > 0);
 
     // ---------------------------------------------------------
     // [3] 렌더링 (Render)
@@ -159,6 +171,11 @@ function UsersDashboard({ onBack }) {
                 .users-card-view { display: none; } 
 
                 /* 뱃지 및 버튼 스타일 */
+                /* 권한별 구분 헤더 */
+                .group-row td { background-color: var(--bg-color, #fafafa); padding: 10px 15px !important; border-bottom: 1px solid var(--border-color, #eee) !important; }
+                .group-row-card { display: flex; align-items: center; gap: 10px; padding: 10px 4px 6px; margin-top: 10px; }
+                .group-label { font-size: 0.85rem; font-weight: bold; color: var(--text-secondary, #666); letter-spacing: 0.3px; }
+                .group-count { font-size: 0.78rem; color: var(--text-secondary, #999); background-color: var(--card-bg); border: 1px solid var(--border-color, #ddd); border-radius: var(--radius-sm); padding: 1px 7px; margin-left: 8px; }
                 .role-badge { padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: bold; display: inline-block; }
                 .role-admin { background-color: var(--accent-bg); color: #1565c0; }
                 .role-staff { background-color: var(--success-bg); color: var(--success); }
@@ -248,30 +265,42 @@ function UsersDashboard({ onBack }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {displayUsers.map((user) => (
-                            <tr key={user.id}>
-                                <td>
-                                    <strong>{user.name}</strong>
-                                </td>
-                                <td>{user.username}</td>
-                                <td>{new Date(user.created_at).toLocaleDateString()}</td>
-                                <td>
-                                    <span className={`role-badge ${getRoleClass(user.role)}`}>
-                                        {getRoleName(user.role)}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '5px' }}>
-                                        <RenderActionButtons
-                                            user={user}
-                                            handleRoleChange={handleRoleChange}
-                                            handleDeleteUser={handleDeleteUser}
-                                            handleResetPassword={handleResetPassword}
-                                            currentUserId={currentUserId}
-                                        />
-                                    </div>
-                                </td>
-                            </tr>
+                        {userGroups.map((group) => (
+                            <Fragment key={group.key}>
+                                <tr className="group-row">
+                                    <td colSpan={5}>
+                                        <span className="group-label">
+                                            {group.icon} {group.label}
+                                        </span>
+                                        <span className="group-count">{group.users.length}명</span>
+                                    </td>
+                                </tr>
+                                {group.users.map((user) => (
+                                    <tr key={user.id}>
+                                        <td>
+                                            <strong>{user.name}</strong>
+                                        </td>
+                                        <td>{user.username}</td>
+                                        <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                                        <td>
+                                            <span className={`role-badge ${getRoleClass(user.role)}`}>
+                                                {getRoleName(user.role)}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '5px' }}>
+                                                <RenderActionButtons
+                                                    user={user}
+                                                    handleRoleChange={handleRoleChange}
+                                                    handleDeleteUser={handleDeleteUser}
+                                                    handleResetPassword={handleResetPassword}
+                                                    currentUserId={currentUserId}
+                                                />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </Fragment>
                         ))}
                     </tbody>
                 </table>
@@ -309,30 +338,40 @@ function UsersDashboard({ onBack }) {
 
                 {/* 2. 모바일 뷰: 카드 형식 */}
                 <div className="users-card-view">
-                    {displayUsers.map((user) => (
-                        <div key={user.id} className="user-card">
-                            <div className="user-card-header">
-                                <div>
-                                    <div className="user-name">{user.name}</div>
-                                    <div className="user-id">@{user.username}</div>
-                                </div>
-                                <span className={`role-badge ${getRoleClass(user.role)}`}>
-                                    {getRoleName(user.role)}
+                    {userGroups.map((group) => (
+                        <Fragment key={group.key}>
+                            <div className="group-row-card">
+                                <span className="group-label">
+                                    {group.icon} {group.label}
                                 </span>
+                                <span className="group-count">{group.users.length}명</span>
                             </div>
-                            <div className="user-card-body">
-                                <div>📅 가입일: {new Date(user.created_at).toLocaleDateString()}</div>
-                            </div>
-                            <div className="user-card-actions">
-                                <RenderActionButtons
-                                    user={user}
-                                    handleRoleChange={handleRoleChange}
-                                    handleDeleteUser={handleDeleteUser}
-                                    handleResetPassword={handleResetPassword}
-                                    currentUserId={currentUserId}
-                                />
-                            </div>
-                        </div>
+                            {group.users.map((user) => (
+                                <div key={user.id} className="user-card">
+                                    <div className="user-card-header">
+                                        <div>
+                                            <div className="user-name">{user.name}</div>
+                                            <div className="user-id">@{user.username}</div>
+                                        </div>
+                                        <span className={`role-badge ${getRoleClass(user.role)}`}>
+                                            {getRoleName(user.role)}
+                                        </span>
+                                    </div>
+                                    <div className="user-card-body">
+                                        <div>📅 가입일: {new Date(user.created_at).toLocaleDateString()}</div>
+                                    </div>
+                                    <div className="user-card-actions">
+                                        <RenderActionButtons
+                                            user={user}
+                                            handleRoleChange={handleRoleChange}
+                                            handleDeleteUser={handleDeleteUser}
+                                            handleResetPassword={handleResetPassword}
+                                            currentUserId={currentUserId}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </Fragment>
                     ))}
                 </div>
             </Card>
