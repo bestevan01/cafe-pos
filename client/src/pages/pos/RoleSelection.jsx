@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
+import StoreBadge from '../../components/StoreBadge';
 
 /**
  * @param {object} props
@@ -53,8 +54,10 @@ function RoleSelection({ onSelectRole, isCashierTaken, cashierUserName, kitchenU
                     padding: 40px 20px; box-sizing: border-box;
                     transition: background-color 0.3s ease;
                 }
+                /* margin-top을 0으로 명시 — 비워두면 브라우저 기본값 h1 { margin: 0.67em 0 }이 남아
+                   글자 크기에 비례한 여백이 화면마다 다르게 붙는다(관리자 대시보드와 어긋나던 원인). */
                 .role-title {
-                    margin-bottom: 40px; color: var(--text-primary, #333);
+                    margin: 0 0 32px; color: var(--text-primary, #333);
                     font-size: 1.8rem; text-align: center; font-weight: bold; word-break: keep-all;
                 }
                 
@@ -101,6 +104,7 @@ function RoleSelection({ onSelectRole, isCashierTaken, cashierUserName, kitchenU
                 `}
             </style>
 
+            <StoreBadge />
             <h1 className="role-title">역할을 선택해주세요</h1>
 
             <div className="role-grid">
