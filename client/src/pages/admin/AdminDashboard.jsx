@@ -8,6 +8,7 @@ import CostAnalysis from './CostAnalysis';
 import { socket } from '../../utils/socket';
 import { useTheme } from '../../hooks/useTheme';
 import { useNotification } from '../../hooks/useNotification';
+import StoreBadge from '../../components/StoreBadge';
 
 /**
  * @param {object} props
@@ -156,7 +157,8 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                     flex: 1; display: flex; flex-direction: column;
                     align-items: center; justify-content: center;
                 }
-                .admin-title { font-size: 2.2rem; margin-bottom: 30px; color: var(--text-primary, #333); text-align: center; }
+                /* margin-top을 0으로 명시 — 비워두면 브라우저 기본값 h1 { margin: 0.67em 0 }이 남는다(역할 선택 화면과 동일) */
+                .admin-title { font-size: 2.2rem; margin: 0 0 32px; color: var(--text-primary, #333); text-align: center; }
 
                 /* 상단 버튼 스타일 */
                 .top-right-header {
@@ -209,7 +211,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                     .top-right-header { position: static; justify-content: flex-end; margin-bottom: 10px; }
                     /* 위에서부터 흐르게 하고, 카드 그리드가 남는 세로 공간을 채우도록 → 화면 높이에 유연 대응 */
                     .home-content { justify-content: flex-start; }
-                    .admin-title { font-size: 1.6rem; margin: 4px 0 18px; }
+                    .admin-title { font-size: 1.6rem; margin: 0 0 20px; }
 
                     .admin-grid {
                         grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 16px;
@@ -225,6 +227,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
             </style>
 
             <div className="home-content">
+                <StoreBadge />
                 <h1 className="admin-title">🛡️ 관리자 대시보드</h1>
 
                 <div className="admin-grid">
