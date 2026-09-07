@@ -10,11 +10,11 @@ const authCfg = () => ({ headers: { Authorization: `Bearer ${localStorage.getIte
 const STATUS = [
     { key: 'ok', label: '정상' },
     { key: 'fail', label: '미흡' },
-    { key: 'na', label: '해당없음' },
+    { key: 'na', label: '해당 없음' },
 ];
 
 /**
- * 직원용 위생점검 화면. 하루 1건이고, 같은 날이면 다시 열어 고칠 수 있다.
+ * 직원용 위생 점검 화면. 하루 1건이고, 같은 날이면 다시 열어 고칠 수 있다.
  *
  * 제출한 문구는 서버가 DB의 항목에서 다시 읽어 기록에 복사한다(클라이언트가 보낸 문구는 쓰지 않는다).
  * 그래서 나중에 관리자가 항목을 고쳐도 이미 낸 기록은 그대로 남는다.
@@ -132,7 +132,7 @@ function HygieneCheck({ onClose }) {
         try {
             if (existing) await axios.put(`/api/hygiene/checks/${existing.id}`, body, authCfg());
             else await axios.post('/api/hygiene/checks', body, authCfg());
-            notify(existing ? '점검 기록을 수정했습니다.' : '오늘 위생점검을 제출했습니다.', { icon: '✅' });
+            notify(existing ? '점검 기록을 수정했습니다.' : '오늘 위생 점검을 제출했습니다.', { icon: '✅' });
             onClose();
         } catch (/** @type {any} */ err) {
             // 다른 사람이 먼저 제출한 경우. 덮어쓰지 않고 그 기록을 불러와 수정 모드로 바꾼다.
@@ -191,7 +191,7 @@ function HygieneCheck({ onClose }) {
 
             <div className="hc-card">
                 <div className="hc-head">
-                    <h2 className="hc-title">🧼 위생점검</h2>
+                    <h2 className="hc-title">🧼 위생 점검</h2>
                     <p className="hc-sub">
                         {loading
                             ? '불러오는 중…'

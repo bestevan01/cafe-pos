@@ -37,7 +37,7 @@ const weekdayOf = (/** @type {string} */ ds) => {
 };
 
 /**
- * 위생점검 — 관리자 진입점.
+ * 위생 점검 — 관리자 진입점.
  * 기본 화면은 '점검 기록'이고, 체크리스트 편집은 한 뎁스 더 들어간다(원가·순익 분석과 같은 구성).
  *
  * @param {object} props
@@ -127,7 +127,7 @@ function HygieneDashboard({ onBack }) {
 
     return (
         <StatsLayout
-            title="🧼 위생점검"
+            title="🧼 위생 점검"
             onBack={onBack}
             actions={<ThemeToggle />}
             pageActions={
@@ -320,7 +320,7 @@ function HygieneDashboard({ onBack }) {
             <div className="hyg-report">
                 <div className="rp-head">
                     <p className="rp-store">{store ? store.label : 'Baek\u2019s Cafe'}</p>
-                    <p className="rp-title">위생점검 기록 보고서</p>
+                    <p className="rp-title">위생 점검 기록 보고서</p>
                     <p className="rp-meta">
                         점검 기간 {range.from} ~ {range.to} · 출력일 {ymd(printedAt)}
                     </p>

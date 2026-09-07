@@ -6,7 +6,7 @@ const debugInfo = require('../utils/debugInfo');
 const crypto = require('crypto');
 const r2 = require('../config/r2');
 
-// 직원용 위생점검 API. 로그인만 하면 누구나 쓴다(역할 무관).
+// 직원용 위생 점검 API. 로그인만 하면 누구나 쓴다(역할 무관).
 // 항목 편집·기록 조회는 관리자 전용이라 hygieneAdmin.routes.js에 따로 있다.
 router.use(authenticateToken);
 
@@ -24,7 +24,7 @@ router.get('/items', async (req, res) => {
         console.error('[🔥 GET /api/hygiene/items 에러]', err);
         res.status(500).json({
             success: false,
-            message: '위생점검 항목을 불러오지 못했습니다.',
+            message: '위생 점검 항목을 불러오지 못했습니다.',
             debug_info: debugInfo(err),
         });
     }

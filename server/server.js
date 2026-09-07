@@ -173,7 +173,7 @@ async function ensureSchema() {
         console.error('⚠️ [DB] login_attempts 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 
-    // 위생점검 체크리스트. 자세한 설계 의도는 migrations/009_hygiene_checklist.sql 참고.
+    // 위생 점검 체크리스트. 자세한 설계 의도는 migrations/009_hygiene_checklist.sql 참고.
     // 결과 행에 항목 문구를 복사해 두는 것이 핵심 — 관리자가 항목을 고쳐도 과거 기록이 바뀌면 안 된다.
     try {
         await pool.query(`
@@ -240,7 +240,7 @@ async function ensureSchema() {
             )
         `);
     } catch (/** @type {any} */ err) {
-        console.error('⚠️ [DB] 위생점검 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
+        console.error('⚠️ [DB] 위생 점검 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 }
 

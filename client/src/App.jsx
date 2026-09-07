@@ -378,11 +378,11 @@ function App() {
                         </button>
                     )}
 
-                    {/* 위생점검은 역할과 무관한 작업이다. 시재 점검 옆(캐셔 전용)에 두면
+                    {/* 위생 점검은 역할과 무관한 작업이다. 시재 점검 옆(캐셔 전용)에 두면
                         캐셔로 들어간 사람만 닿을 수 있으므로, 역할을 고르기 전 화면에 둔다. */}
                     {!myRole && (
                         <button onClick={() => setShowHygiene(true)} className="btn-global-action btn-hygiene">
-                            🧼 위생점검
+                            🧼 위생 점검
                         </button>
                     )}
 
@@ -473,7 +473,7 @@ function App() {
             {/* 시재 점검 모달 */}
             {showSettlement && <CashSettlement onClose={() => setShowSettlement(false)} />}
 
-            {/* 위생점검 모달 */}
+            {/* 위생 점검 모달 */}
             {showHygiene && <HygieneCheck onClose={() => setShowHygiene(false)} />}
 
             {/* 메인 화면 렌더링 */}

@@ -226,7 +226,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                         grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 0;
                         flex: 1;
                         /* 카드 크기는 화면 높이와 무관하게 고정하고, 넘치면 목록처럼 스크롤한다.
-                           148px는 설명이 두 줄인 카드(원가/순익 분석·위생점검)의 자연 높이.
+                           148px는 설명이 두 줄인 카드(원가/순익 분석·위생 점검)의 자연 높이.
                            minmax(…, auto)로 둬서 나중에 설명이 더 길어져도 잘리지 않는다.
                            align-content: start가 없으면 남는 공간만큼 행이 늘어나 고정 높이가 무의미해진다. */
                         align-content: start; grid-auto-rows: minmax(148px, auto);
@@ -276,7 +276,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                     </button>
                     <button onClick={() => setView('hygiene')} className="admin-card">
                         <div className="card-icon">🧼</div>
-                        <div className="card-title">위생점검</div>
+                        <div className="card-title">위생 점검</div>
                         <div className="card-desc">점검 기록 확인 및 체크리스트 관리</div>
                     </button>
                 </div>

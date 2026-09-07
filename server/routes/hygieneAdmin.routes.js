@@ -5,7 +5,7 @@ const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
 const { HYGIENE_CATEGORIES } = require('../utils/hygieneCategories');
 
-// 위생점검 관리자 API — 체크리스트 항목 편집. 이 라우터는 전부 관리자 전용.
+// 위생 점검 관리자 API — 체크리스트 항목 편집. 이 라우터는 전부 관리자 전용.
 router.use(authenticateToken, requireAdmin);
 
 const MAX_LABEL = 200;
