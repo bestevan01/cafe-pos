@@ -6,6 +6,7 @@ import RoleSelection from './pages/pos/RoleSelection';
 import Cashier from './pages/pos/Cashier';
 import Kitchen from './pages/pos/Kitchen';
 import CashSettlement from './pages/pos/CashSettlement.jsx';
+import HygieneCheck from './pages/pos/HygieneCheck.jsx';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ProfileAuth from './pages/auth/ProfileAuth.jsx';
@@ -52,6 +53,7 @@ function App() {
 
     // 모달 상태
     const [showSettlement, setShowSettlement] = useState(false);
+    const [showHygiene, setShowHygiene] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const [isProfileVerified, setIsProfileVerified] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -327,6 +329,7 @@ function App() {
                 .btn-global-action { padding: 6px 12px; color: white; border: 1px solid transparent; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: transform 0.1s; font-size: 0.85rem; }
                 .btn-global-action:active { transform: scale(0.95); }
                 .btn-settle { background-color: var(--success); }
+                .btn-hygiene { background-color: var(--accent); }
                 .btn-back-role { background-color: var(--neutral); margin-right: auto; }
 
                 /* 이름 드롭다운 — PC/모바일 공통(화면 크기와 무관하게 동일한 형태) */
@@ -372,6 +375,14 @@ function App() {
                     {myRole === 'cashier' && (
                         <button onClick={() => setShowSettlement(true)} className="btn-global-action btn-settle">
                             💰 시재 점검
+                        </button>
+                    )}
+
+                    {/* 위생점검은 역할과 무관한 작업이다. 시재 점검 옆(캐셔 전용)에 두면
+                        캐셔로 들어간 사람만 닿을 수 있으므로, 역할을 고르기 전 화면에 둔다. */}
+                    {!myRole && (
+                        <button onClick={() => setShowHygiene(true)} className="btn-global-action btn-hygiene">
+                            🧼 위생점검
                         </button>
                     )}
 
@@ -461,6 +472,9 @@ function App() {
 
             {/* 시재 점검 모달 */}
             {showSettlement && <CashSettlement onClose={() => setShowSettlement(false)} />}
+
+            {/* 위생점검 모달 */}
+            {showHygiene && <HygieneCheck onClose={() => setShowHygiene(false)} />}
 
             {/* 메인 화면 렌더링 */}
             {renderContent()}

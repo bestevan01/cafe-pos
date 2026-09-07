@@ -5,6 +5,7 @@ import MenuDashboard from './MenuDashboard';
 import EventDashboard from './EventDashboard';
 import UsersDashboard from './UsersDashboard';
 import CostAnalysis from './CostAnalysis';
+import HygieneDashboard from './HygieneDashboard';
 import { socket } from '../../utils/socket';
 import { useTheme } from '../../hooks/useTheme';
 import { useNotification } from '../../hooks/useNotification';
@@ -50,6 +51,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
     if (view === 'event') return <EventDashboard onBack={() => setView('home')} />;
     if (view === 'users') return <UsersDashboard onBack={() => setView('home')} />;
     if (view === 'cost') return <CostAnalysis onBack={() => setView('home')} />;
+    if (view === 'hygiene') return <HygieneDashboard onBack={() => setView('home')} />;
 
     // 메인(Home) 화면 렌더링
     return (
@@ -271,6 +273,11 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                         <div className="card-icon">👥</div>
                         <div className="card-title">직원 관리</div>
                         <div className="card-desc">가입 승인 및 권한 설정</div>
+                    </button>
+                    <button onClick={() => setView('hygiene')} className="admin-card">
+                        <div className="card-icon">🧼</div>
+                        <div className="card-title">위생점검</div>
+                        <div className="card-desc">점검 기록 확인 및 체크리스트 관리</div>
                     </button>
                 </div>
             </div>
