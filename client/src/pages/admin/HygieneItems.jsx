@@ -10,7 +10,7 @@ import { useNotification } from '../../hooks/useNotification';
 // 컴포넌트 밖에 두는 이유: 안에 두면 매 렌더마다 새 함수가 되어 useCallback 의존성이 흔들린다.
 const authCfg = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
-// 서버(utils/hygieneDefaults.js)의 HYGIENE_CATEGORIES와 같은 목록을 유지한다.
+// 서버(utils/hygieneCategories.js)의 HYGIENE_CATEGORIES와 같은 목록을 유지한다.
 // 자유 입력이면 '냉장·냉동'과 '냉장/냉동'처럼 같은 뜻이 갈려 보고서에서 묶이지 않는다.
 const CATEGORIES = ['개인위생', '조리·기구', '냉장·냉동', '매장·홀', '폐기물', '기타'];
 
@@ -200,16 +200,6 @@ function HygieneItems({ onBack }) {
         }
     };
 
-    const seed = async () => {
-        try {
-            const res = await axios.post('/api/admin/hygiene/items/seed', {}, authCfg());
-            notify(`기본 항목 ${res.data.inserted}개를 넣었습니다.`, { icon: '✅' });
-            load();
-        } catch {
-            notify('기본 항목을 넣지 못했습니다.', { icon: '⚠️' });
-        }
-    };
-
     return (
         <StatsLayout title="📋 체크리스트 수정" onBack={onBack} actions={<ThemeToggle />}>
             <style>{`
@@ -223,6 +213,8 @@ function HygieneItems({ onBack }) {
                 .hyg-input { height: 34px; padding: 0 10px; font-family: inherit; font-size: .92rem; line-height: normal; border: 1px solid var(--border-color, #ddd); border-radius: 8px; background: var(--bg-color, #fff); color: var(--text-primary, #222); box-sizing: border-box; width: 100%; }
                 .hyg-actions { display: flex; gap: 4px; align-items: center; }
                 .hyg-add { display: grid; grid-template-columns: 26px 108px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-color, #ddd); }
+                /* 첫 항목을 만들 때는 위에 맞출 목록이 없다. 손잡이 자리를 빼고 왼쪽으로 붙인다. */
+                .hyg-add.first { grid-template-columns: 108px minmax(0, 1fr) auto; }
                 .hyg-retired { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #eee); color: var(--text-secondary, #888); }
                 .hyg-retired:last-child { border-bottom: none; }
                 .hyg-hint { color: var(--text-secondary, #999); font-size: .85rem; line-height: 1.6; margin: 14px 0 0; }
@@ -233,6 +225,7 @@ function HygieneItems({ onBack }) {
                     .hyg-row, .hyg-add { grid-template-columns: 26px minmax(0, 1fr); gap: 6px 10px; }
                     .hyg-row > .hyg-grip { grid-row: span 3; align-self: center; }
                     .hyg-add > .hyg-grip { visibility: hidden; }
+                    .hyg-add.first { grid-template-columns: minmax(0, 1fr); }
                     .hyg-actions { justify-content: flex-end; }
                 }
             `}</style>
@@ -243,11 +236,8 @@ function HygieneItems({ onBack }) {
                         <p>
                             아직 점검 항목이 없습니다.
                             <br />
-                            기본 항목을 불러온 뒤 매장에 맞게 고쳐 쓰는 것을 권합니다.
+                            아래에서 분류를 고르고 점검 문구를 적어 추가하세요.
                         </p>
-                        <Button icon="📥" onClick={seed}>
-                            기본 항목 불러오기
-                        </Button>
                     </div>
                 ) : (
                     <div ref={listRef}>
@@ -292,37 +282,35 @@ function HygieneItems({ onBack }) {
                     </div>
                 )}
 
+                <div className={`hyg-add ${active.length === 0 ? 'first' : ''}`}>
+                    {active.length > 0 && <div className="hyg-grip" aria-hidden="true" />}
+                    <select
+                        className="hyg-input"
+                        value={draft.category}
+                        onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                        aria-label="분류"
+                    >
+                        {CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                                {c}
+                            </option>
+                        ))}
+                    </select>
+                    <input
+                        className="hyg-input"
+                        placeholder="점검 문구 (예: 냉장고 온도 5℃ 이하 확인)"
+                        value={draft.label}
+                        onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                    />
+                    <Button onClick={addItem}>추가</Button>
+                </div>
+
                 {active.length > 0 && (
-                    <>
-                        <div className="hyg-add">
-                            <div className="hyg-grip" aria-hidden="true" />
-                            <select
-                                className="hyg-input"
-                                value={draft.category}
-                                onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                                aria-label="분류"
-                            >
-                                {CATEGORIES.map((c) => (
-                                    <option key={c} value={c}>
-                                        {c}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                className="hyg-input"
-                                placeholder="점검 문구 (예: 냉장고 온도 5℃ 이하 확인)"
-                                value={draft.label}
-                                onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                                onKeyDown={(e) => e.key === 'Enter' && addItem()}
-                            />
-                            <Button onClick={addItem}>추가</Button>
-                        </div>
-                        <p className="hyg-hint">
-                            문구를 고치면 칸을 벗어날 때 자동 저장됩니다.{' '}
-                            <strong>이미 제출된 기록은 바뀌지 않습니다</strong>— 점검 당시 문구가 기록에 그대로
-                            남습니다.
-                        </p>
-                    </>
+                    <p className="hyg-hint">
+                        문구를 고치면 칸을 벗어날 때 자동 저장됩니다.{' '}
+                        <strong>이미 제출된 기록은 바뀌지 않습니다</strong>— 점검 당시 문구가 기록에 그대로 남습니다.
+                    </p>
                 )}
             </StatCard>
 

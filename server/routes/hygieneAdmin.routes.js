@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
-const { DEFAULT_HYGIENE_ITEMS, HYGIENE_CATEGORIES } = require('../utils/hygieneDefaults');
+const { HYGIENE_CATEGORIES } = require('../utils/hygieneCategories');
 
 // 위생점검 관리자 API — 체크리스트 항목 편집. 이 라우터는 전부 관리자 전용.
 router.use(authenticateToken, requireAdmin);
@@ -116,23 +116,6 @@ router.delete('/items/:id', async (req, res) => {
     } catch (/** @type {any} */ err) {
         console.error('[🔥 DELETE /api/admin/hygiene/items/:id 에러]', err);
         res.status(500).json({ success: false, message: '항목 삭제에 실패했습니다.', debug_info: debugInfo(err) });
-    }
-});
-
-// 기본 항목 불러오기. 자동 시딩 대신 버튼으로 두는 이유:
-// 매장마다 점검 항목이 다를 수 있고, 원치 않는 데이터가 말없이 생기지 않게 하려는 것.
-router.post('/items/seed', async (req, res) => {
-    try {
-        const [[{ cnt }]] = await pool.query('SELECT COUNT(*) AS cnt FROM hygiene_items');
-        if (cnt > 0) {
-            return res.status(409).json({ success: false, message: '이미 항목이 있어 기본 항목을 넣지 않았습니다.' });
-        }
-        const values = DEFAULT_HYGIENE_ITEMS.map((it, i) => [it.label, it.category, i + 1]);
-        await pool.query('INSERT INTO hygiene_items (label, category, sort_order) VALUES ?', [values]);
-        res.json({ success: true, inserted: values.length });
-    } catch (/** @type {any} */ err) {
-        console.error('[🔥 POST /api/admin/hygiene/items/seed 에러]', err);
-        res.status(500).json({ success: false, message: '기본 항목 추가에 실패했습니다.', debug_info: debugInfo(err) });
     }
 });
 
