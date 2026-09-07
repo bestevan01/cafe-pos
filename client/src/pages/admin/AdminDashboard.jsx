@@ -144,17 +144,21 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
             <style>
                 {`
                 /* 전체 레이아웃 */
+                /* 화면 높이에 가둬 두고, 넘치는 것은 카드 그리드 안에서만 스크롤시킨다.
+                   그래야 매장 배지·제목·이름 메뉴가 스크롤에 딸려 올라가지 않는다.
+                   폭이 아니라 '내용이 넘치는지'로 결정되므로 폰·태블릿·PC를 따로 나눌 필요가 없다
+                   (아이패드 미니 가로 1133×744처럼 넓지만 낮은 화면도 여기에 걸린다). */
                 .admin-container {
                     padding: 20px;
                     background-color: var(--bg-color, #f4f6f8);
-                    min-height: 100dvh;
+                    height: 100dvh;
                     display: flex; flex-direction: column;
                     transition: background-color 0.3s ease;
                     box-sizing: border-box;
                     position: relative; 
                 }
                 .home-content {
-                    flex: 1; display: flex; flex-direction: column;
+                    flex: 1; min-height: 0; display: flex; flex-direction: column;
                     align-items: center; justify-content: center;
                 }
                 /* margin-top을 0으로 명시 — 비워두면 브라우저 기본값 h1 { margin: 0.67em 0 }이 남는다(역할 선택 화면과 동일) */
@@ -187,9 +191,12 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                 .dropdown-submenu { position: absolute; right: calc(100% + 6px); top: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden; min-width: 150px; z-index: 10001; }
 
                 /* 대시보드 카드 그리드 */
+                /* min-height: 0이 있어야 flex 자식이 내용 높이 아래로 줄어들어 스크롤이 생긴다.
+                   flex: 1을 주지 않는 이유: 공간이 넉넉하면 자연 높이로 남아 가운데 정렬이 유지된다. */
                 .admin-grid { 
                     display: grid; grid-template-columns: repeat(3, 1fr); 
-                    gap: 25px; width: 100%; max-width: 1000px; margin-bottom: 50px; 
+                    gap: 25px; width: 100%; max-width: 1000px; margin-bottom: 50px;
+                    min-height: 0; overflow-y: auto;
                 }
                 .admin-card { 
                     background-color: var(--card-bg, white); 
@@ -209,15 +216,19 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                 @media (max-width: 768px) {
                     /* 헤더를 절대배치 → 흐름 안(상단 바)으로: 가운데 정렬된 타이틀이 좁은 화면에서 버튼과 겹치지 않게 함 */
                     .top-right-header { position: static; justify-content: flex-end; margin-bottom: 10px; }
-                    /* 위에서부터 흐르게 하고, 카드 그리드가 남는 세로 공간을 채우도록 → 화면 높이에 유연 대응 */
+                    /* 좁은 화면에서는 가운데 정렬 대신 위에서부터 흐르게 한다. */
                     .home-content { justify-content: flex-start; }
                     .admin-title { font-size: 1.6rem; margin: 0 0 20px; }
 
                     .admin-grid {
-                        grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 16px;
-                        flex: 1; align-content: stretch; grid-auto-rows: minmax(110px, 1fr);
+                        grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 0;
+                        flex: 1;
+                        /* 카드 크기는 화면 높이와 무관하게 고정하고, 넘치면 목록처럼 스크롤한다.
+                           148px는 설명이 두 줄인 카드(원가/순익 분석·위생점검)의 자연 높이.
+                           minmax(…, auto)로 둬서 나중에 설명이 더 길어져도 잘리지 않는다.
+                           align-content: start가 없으면 남는 공간만큼 행이 늘어나 고정 높이가 무의미해진다. */
+                        align-content: start; grid-auto-rows: minmax(148px, auto);
                     }
-                    /* 카드가 행 높이(=화면에 따라 가변)에 맞춰 늘어남 */
                     .admin-card { aspect-ratio: auto; justify-content: center; padding: 16px 10px; }
                     .card-icon { font-size: 2.4rem; margin-bottom: 8px; }
                     .card-title { font-size: 1.05rem; margin-bottom: 5px; }
