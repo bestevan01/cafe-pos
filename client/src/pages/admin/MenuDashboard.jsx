@@ -5,6 +5,7 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
 import { useDragSort } from '../../hooks/useDragSort';
+import { MENU_CATEGORIES, categoryLabel } from '../../utils/menuCategories';
 
 /**
  * @param {object} props
@@ -321,9 +322,11 @@ function MenuDashboard({ onBack }) {
                             required
                         />
                         <select name="type" value={formData.type} onChange={handleInputChange} className="menu-input">
-                            <option value="coffee">커피</option>
-                            <option value="tea">티/에이드</option>
-                            <option value="dessert">디저트</option>
+                            {MENU_CATEGORIES.map((c) => (
+                                <option key={c.type} value={c.type}>
+                                    {c.label}
+                                </option>
+                            ))}
                         </select>
 
                         <Button type="submit" full variant={editingId ? 'warning' : 'primary'}>
@@ -382,7 +385,7 @@ function MenuDashboard({ onBack }) {
                                         </td>
                                         <td>{menu.price.toLocaleString()}원</td>
                                         <td>
-                                            <span className="badge-type">{menu.type}</span>
+                                            <span className="badge-type">{categoryLabel(menu.type)}</span>
                                         </td>
                                         <td>
                                             <button
@@ -430,7 +433,7 @@ function MenuDashboard({ onBack }) {
                                             </span>
                                             <div className="menu-card-title">{menu.name}</div>
                                         </div>
-                                        <span className="badge-type">{menu.type}</span>
+                                        <span className="badge-type">{categoryLabel(menu.type)}</span>
                                     </div>
                                     <div className="menu-card-price">{menu.price.toLocaleString()}원</div>
                                 </div>

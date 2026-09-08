@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
+import { groupByCategory } from '../../utils/menuCategories';
+import QuantityKeypad from '../../components/QuantityKeypad';
 
 function Cashier({ onlyOrder = false, isCashier = false }) {
     const { notify, confirm } = useNotification();
@@ -12,6 +14,13 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     const [cart, setCart] = useState(/** @type {import('../../types').CartItem[]} */ ([]));
     const [orderGroups, setOrderGroups] = useState(/** @type {import('../../types').OrderGroup[]} */ ([]));
     const [menuList, setMenuList] = useState(/** @type {import('../../types').Menu[]} */ ([]));
+    // 분류별로 묶어서 그린다. 묶음 안의 차례는 서버가 정렬해 준 sort_order를 그대로 지킨다.
+    const menuGroups = useMemo(() => groupByCategory(menuList), [menuList]);
+    // 숫자를 눌러 키패드를 연다. null이면 닫힌 상태.
+    // slotIndex가 null이면 '잔 수', 숫자면 '그 잔의 추가 샷 수'를 고치는 중이다.
+    const [keypad, setKeypad] = useState(
+        /** @type {{menu: import('../../types').Menu, slotIndex: number|null}|null} */ (null),
+    );
     const [paymentCheckId, setPaymentCheckId] = useState(/** @type {string|null} */ (null));
 
     // 🌟 이벤트 관련 상태 추가
@@ -154,6 +163,67 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     const SHOT_PRICE = 500;
     /** @param {string} name */
     const isCoffee = (name) => name.includes('아메리카노') || name.includes('라떼') || name.includes('아샷추');
+
+    /**
+     * 특정 잔의 추가 샷 수를 절대값으로 맞춘다(키패드 입력용).
+     * handleSlotShotChange는 ±1 단위라 큰 수를 한 번에 넣을 수 없다.
+     *
+     * @param {import('../../types').Menu} menu
+     * @param {number} slotIndex  몇 번째 잔인지(0부터)
+     * @param {number} target     0 이상
+     */
+    const setSlotShots = (menu, slotIndex, target) => {
+        const shots = Math.max(0, Math.floor(Number(target) || 0));
+        setShotConfig((prev) => {
+            const slots = [...(prev[menu.name] || [])];
+            if (slotIndex < 0 || slotIndex >= slots.length) return prev;
+            slots[slotIndex] = shots;
+            return { ...prev, [menu.name]: slots };
+        });
+    };
+
+    /**
+     * 잔 수를 절대값으로 맞춘다. handleTotalChange는 ±1 단위라 키패드 입력을 받을 수 없다.
+     *
+     * 커피는 잔마다 샷 설정이 따로 있어서 배열 길이를 맞춰야 한다. 줄일 때는 뒤에서부터
+     * 자른다(slice) — 앞 잔의 샷 설정이 그대로 남아 예측 가능하다. 잘려나간 잔에 샷이
+     * 들어 있었으면 조용히 사라지지 않도록 알린다.
+     *
+     * @param {import('../../types').Menu} menu
+     * @param {number} target  0 이상
+     */
+    const setMenuTotal = (menu, target) => {
+        const qty = Math.max(0, Math.floor(Number(target) || 0));
+
+        if (isCoffee(menu.name)) {
+            const slots = shotConfig[menu.name] || [];
+            // notify는 setState 안에서 부르면 안 되므로(갱신 중 부수효과) 미리 계산해 둔다.
+            const droppedShots = slots.slice(qty).reduce((a, b) => a + b, 0);
+            setShotConfig((prev) => {
+                const cur = prev[menu.name] || [];
+                const sized = cur.length > qty ? cur.slice(0, qty) : [...cur, ...Array(qty - cur.length).fill(0)];
+                const next = { ...prev };
+                if (sized.length > 0) next[menu.name] = sized;
+                else delete next[menu.name];
+                return next;
+            });
+            if (droppedShots > 0) {
+                notify(`뒤쪽 잔의 샷 ${droppedShots}개가 함께 지워졌습니다.`, { icon: '☕' });
+            }
+            return;
+        }
+
+        setCart((prev) => {
+            const idx = prev.findIndex((i) => i.name === menu.name);
+            if (qty === 0) return idx >= 0 ? prev.filter((_, i) => i !== idx) : prev;
+            if (idx >= 0) {
+                const c = [...prev];
+                c[idx] = { ...c[idx], quantity: qty };
+                return c;
+            }
+            return [...prev, { name: menu.name, price: menu.price, quantity: qty }];
+        });
+    };
 
     // 메뉴의 잔 수(total)와 잔별 샷 배열(slots) 반환.
     // 커피는 잔마다 샷을 따로 두므로 shotConfig에서, 비커피는 cart 수량에서 읽는다.
@@ -431,6 +501,101 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // ---------------------------------------------------------
     // [6] 렌더링 (Render)
     // ---------------------------------------------------------
+    // 메뉴 카드 한 장. 분류별로 묶어 그리느라 map이 두 겹이 돼서 카드 본문은 따로 뺀다.
+    /** @param {import('../../types').Menu} menu */
+    const renderMenuCard = (menu) => {
+        const { total, slots } = getMenuCounts(menu);
+        const isSoldOut = menu.is_soldout === 1;
+        return (
+            <div
+                key={menu.id}
+                className={`menu-card ${total > 0 ? 'selected' : ''} ${isSoldOut ? 'soldout' : ''}`}
+                onClick={() => !isSoldOut && handleTotalChange(menu, 1)}
+            >
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        width: '100%',
+                    }}
+                >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div className="menu-name">
+                            {menu.name}
+                            {isSoldOut && <span style={{ color: 'var(--danger)', marginLeft: '5px' }}>(품절)</span>}
+                        </div>
+                        <div className="menu-price">{menu.price.toLocaleString()}원</div>
+                    </div>
+                    {!isSoldOut && (
+                        <div className="qty-stepper" onClick={(e) => e.stopPropagation()}>
+                            <button className="circle-btn" onClick={() => handleTotalChange(menu, -1)}>
+                                -
+                            </button>
+                            <button
+                                type="button"
+                                className="qty-text"
+                                onClick={() => setKeypad({ menu, slotIndex: null })}
+                                aria-label={`${menu.name} 잔 수 직접 입력`}
+                            >
+                                {total}
+                            </button>
+                            <button className="circle-btn" onClick={() => handleTotalChange(menu, 1)}>
+                                +
+                            </button>
+                        </div>
+                    )}
+                </div>
+                {!isSoldOut && isCoffee(menu.name) && total > 0 && (
+                    <div className="shot-box" onClick={(e) => e.stopPropagation()}>
+                        <button className="shot-toggle" onClick={() => toggleShotPanel(menu.name)}>
+                            <span>
+                                ☕ 샷 추가
+                                {slots.reduce((a, b) => a + b, 0) > 0
+                                    ? ` · 총 ${slots.reduce((a, b) => a + b, 0)}샷`
+                                    : ''}
+                            </span>
+                            <span>{expandedShots[menu.name] ? '▴ 접기' : '▾ 잔별 설정'}</span>
+                        </button>
+                        {expandedShots[menu.name] && (
+                            <div className="shot-slots">
+                                {slots.map((s, i) => (
+                                    <div key={i} className="shot-slot">
+                                        <span className="shot-slot-label">{i + 1}번 잔</span>
+                                        <div className="shot-slot-stepper">
+                                            <button
+                                                className="mini-circle-btn"
+                                                onClick={() => handleSlotShotChange(menu, i, -1)}
+                                                disabled={s === 0}
+                                            >
+                                                -
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="shot-slot-count"
+                                                onClick={() => setKeypad({ menu, slotIndex: i })}
+                                                aria-label={`${i + 1}번 잔 추가 샷 수 직접 입력`}
+                                            >
+                                                {s}
+                                            </button>
+                                            <button
+                                                className="mini-circle-btn"
+                                                onClick={() => handleSlotShotChange(menu, i, 1)}
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                        <span className="shot-slot-price">{s > 0 ? `샷추가 ${s}개` : '기본'}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const OrderGridContent = (
         <div className="order-grid">
             <AnimatePresence>
@@ -554,12 +719,40 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                 .btn-submit { width: 100%; padding: 15px; font-size: 1.5rem; font-weight: bold; background-color: var(--text-primary, #222); color: var(--bg-color, white); border: none; border-radius: var(--radius-md); cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.1s; }
                 .btn-submit:active { transform: scale(0.98); }
                 .menu-card { display: flex; flex-direction: column; justify-content: flex-start; border: 1px solid var(--border-color, #eee); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: all 0.2s; background-color: var(--card-bg, #fff); cursor: pointer; box-sizing: border-box; height: fit-content; }
+                /* 범주 머리글. .menu-list가 그리드라 1/-1로 한 줄을 통째로 차지하게 한다.
+                   (안 그러면 카드 한 칸 자리에 끼어 들어가 나머지 카드가 밀린다) */
+                /* padding-right: macOS/iOS의 오버레이 스크롤바는 자리를 차지하지 않고 내용 위에 그려진다.
+                   개수 숫자가 목록 오른쪽 끝에 붙어 있으면 스크롤바에 가려진다(scrollbar-gutter는
+                   오버레이에는 효과가 없다). 카드는 자체 안쪽 여백이 있어 안전하므로 머리글만 들인다. */
+                .menu-group-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 6px;
+                    padding-right: 12px; }
+                .menu-group-head:first-child { margin-top: 0; }
+                .mg-label { font-size: 0.95rem; font-weight: bold; color: var(--text-secondary, #666); white-space: nowrap; }
+                .mg-line { flex: 1; height: 1px; background-color: var(--border-color, #e5e5e5); }
+                .mg-count { font-size: 0.85rem; color: var(--text-secondary, #999); }
                 .menu-card.selected { border: 2px solid var(--accent); background-color: var(--accent-bg); }
                 .menu-card.soldout { opacity: 0.5; cursor: not-allowed; background-color: var(--border-color, #e0e0e0); }
                 .menu-name { font-size: 1.2rem; font-weight: bold; color: var(--text-primary, #333); margin-bottom: 4px; }
                 .menu-price { color: var(--text-secondary, #666); font-size: 1rem; }
                 .circle-btn { width: 35px; height: 35px; border-radius: 50%; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, #fff); color: var(--text-primary, #333); font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-                .qty-text { font-size: 1.4rem; font-weight: bold; width: 30px; text-align: center; color: var(--text-primary, #333); }
+                /* 마우스는 픽셀 단위로 정확해서 완충이 필요 없다. 넣어 봐야 카드의 '+1' 영역만 깎는다. */
+                .qty-stepper { display: flex; align-items: center; gap: 15px; }
+                /* 손가락은 접촉면이 8~10mm라 −를 조금만 빗나가면, 카드 전체가 '+1'이라 오히려 1이 늘어난다.
+                   패딩으로 판정 영역을 넓히고 같은 크기의 음수 마진으로 상쇄해 보이는 모양은 그대로 둔다.
+                   → 빗나가면 '+1'이 아니라 '아무 일 없음'이 된다(래퍼가 클릭 전파를 끊으므로).
+
+                   화면 폭(max-width)이 아니라 pointer로 나누는 이유: 판단 기준이 '화면 크기'가 아니라
+                   '입력 정밀도'다. 터치스크린 POS 모니터는 넓지만 손으로 쓰고, PC에서 창을 좁혀도
+                   마우스는 여전히 정확하다. coarse = 주 입력 장치가 손가락.
+                   세로는 22px이 한계다 — 버튼 위쪽 카드 여백이 27px이라 더 키우면 완충 지대가
+                   카드 밖 그리드 간격으로 삐져나가 이웃 카드를 덮는다. */
+                @media (pointer: coarse) {
+                    .qty-stepper { padding: 22px 12px 22px 24px; margin: -22px -12px -22px -24px; }
+                }
+                /* 숫자를 눌러 키패드를 연다. 원래 아무 반응이 없던 자리라 단일 탭을 그대로 쓴다. */
+                .qty-text { font-size: 1.4rem; font-weight: bold; width: 30px; text-align: center; color: var(--text-primary, #333);
+                    background: none; border: none; font-family: inherit; padding: 6px 0; cursor: pointer; }
+                .qty-text:active { color: var(--accent); }
                 .shot-box { margin-top: 15px; padding: 10px; background-color: var(--accent-bg); border-radius: var(--radius-sm); border: 1px dashed rgba(66, 165, 245, 0.35); animation: slideDown 0.2s ease-out forwards; transform-origin: top center; }
                 @keyframes slideDown { from { opacity: 0; transform: scaleY(0.8); } to { opacity: 1; transform: scaleY(1); } }
                 .shot-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; color: var(--text-secondary, #555); padding: 2px 0; }
@@ -568,7 +761,10 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                 .shot-slot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
                 .shot-slot-label { font-size: 0.85rem; font-weight: bold; color: var(--text-primary, #333); width: 48px; flex-shrink: 0; }
                 .shot-slot-stepper { display: flex; align-items: center; gap: 10px; }
-                .shot-slot-count { font-size: 1.05rem; font-weight: bold; width: 18px; text-align: center; color: var(--accent); }
+                /* 눌러서 키패드를 연다. 잔 수 숫자와 같은 방식. */
+                .shot-slot-count { font-size: 1.05rem; font-weight: bold; width: 18px; text-align: center; color: var(--accent);
+                    background: none; border: none; font-family: inherit; padding: 6px 0; cursor: pointer; }
+                .shot-slot-count:active { opacity: .6; }
                 .shot-slot-price { font-size: 0.8rem; color: var(--text-secondary, #888); width: 64px; text-align: right; flex-shrink: 0; }
                 .mini-circle-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--accent); background-color: var(--card-bg, #fff); color: var(--accent); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
                 .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(0,0,0,0.5); z-index: 90; backdrop-filter: blur(3px); }
@@ -622,94 +818,39 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                 </div>
 
                 <div className="menu-list">
-                    {menuList.map((menu) => {
-                        const { total, slots } = getMenuCounts(menu);
-                        const isSoldOut = menu.is_soldout === 1;
-                        return (
-                            <div
-                                key={menu.id}
-                                className={`menu-card ${total > 0 ? 'selected' : ''} ${isSoldOut ? 'soldout' : ''}`}
-                                onClick={() => !isSoldOut && handleTotalChange(menu, 1)}
-                            >
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        width: '100%',
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                        <div className="menu-name">
-                                            {menu.name}
-                                            {isSoldOut && (
-                                                <span style={{ color: 'var(--danger)', marginLeft: '5px' }}>
-                                                    (품절)
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="menu-price">{menu.price.toLocaleString()}원</div>
-                                    </div>
-                                    {!isSoldOut && (
-                                        <div
-                                            style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <button className="circle-btn" onClick={() => handleTotalChange(menu, -1)}>
-                                                -
-                                            </button>
-                                            <span className="qty-text">{total}</span>
-                                            <button className="circle-btn" onClick={() => handleTotalChange(menu, 1)}>
-                                                +
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                {!isSoldOut && isCoffee(menu.name) && total > 0 && (
-                                    <div className="shot-box" onClick={(e) => e.stopPropagation()}>
-                                        <button className="shot-toggle" onClick={() => toggleShotPanel(menu.name)}>
-                                            <span>
-                                                ☕ 샷 추가
-                                                {slots.reduce((a, b) => a + b, 0) > 0
-                                                    ? ` · 총 ${slots.reduce((a, b) => a + b, 0)}샷`
-                                                    : ''}
-                                            </span>
-                                            <span>{expandedShots[menu.name] ? '▴ 접기' : '▾ 잔별 설정'}</span>
-                                        </button>
-                                        {expandedShots[menu.name] && (
-                                            <div className="shot-slots">
-                                                {slots.map((s, i) => (
-                                                    <div key={i} className="shot-slot">
-                                                        <span className="shot-slot-label">{i + 1}번 잔</span>
-                                                        <div className="shot-slot-stepper">
-                                                            <button
-                                                                className="mini-circle-btn"
-                                                                onClick={() => handleSlotShotChange(menu, i, -1)}
-                                                                disabled={s === 0}
-                                                            >
-                                                                -
-                                                            </button>
-                                                            <span className="shot-slot-count">{s}</span>
-                                                            <button
-                                                                className="mini-circle-btn"
-                                                                onClick={() => handleSlotShotChange(menu, i, 1)}
-                                                            >
-                                                                +
-                                                            </button>
-                                                        </div>
-                                                        <span className="shot-slot-price">
-                                                            {s > 0 ? `샷추가 ${s}개` : '기본'}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                    {menuGroups.map((group) => (
+                        <Fragment key={group.type}>
+                            <div className="menu-group-head">
+                                <span className="mg-label">{group.label}</span>
+                                <span className="mg-line" />
+                                <span className="mg-count">{group.items.length}</span>
                             </div>
-                        );
-                    })}
+                            {group.items.map(renderMenuCard)}
+                        </Fragment>
+                    ))}
                 </div>
+
+                {keypad && (
+                    <QuantityKeypad
+                        menuName={keypad.menu.name}
+                        hint={
+                            keypad.slotIndex === null
+                                ? '잔 수를 입력하세요'
+                                : `${keypad.slotIndex + 1}번 잔에 추가할 샷 수`
+                        }
+                        current={
+                            keypad.slotIndex === null
+                                ? getMenuCounts(keypad.menu).total
+                                : (shotConfig[keypad.menu.name] || [])[keypad.slotIndex] || 0
+                        }
+                        onSubmit={(next) => {
+                            if (keypad.slotIndex === null) setMenuTotal(keypad.menu, next);
+                            else setSlotShots(keypad.menu, keypad.slotIndex, next);
+                            setKeypad(null);
+                        }}
+                        onClose={() => setKeypad(null)}
+                    />
+                )}
 
                 <div className="cart-bottom">
                     {/* 🌟 이벤트 선택 칩 UI */}
