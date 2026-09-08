@@ -40,6 +40,7 @@ module.exports = (io) => {
                     payload.id,
                 ]);
                 if (rows.length === 0) return next(authError('계정을 찾을 수 없습니다.'));
+                if (rows[0].role === 'pending') return next(authError('승인 대기 상태입니다.'));
                 socket.data.user = rows[0]; // 지금 DB 기준의 신원을 저장
                 next();
             } catch (/** @type {any} */ dbErr) {

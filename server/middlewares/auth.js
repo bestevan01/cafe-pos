@@ -37,6 +37,11 @@ const authenticateToken = (req, res, next) => {
                 // 계정이 지워졌다. 토큰은 아직 안 만료됐지만 더 이상 사용자가 아니다.
                 return res.status(401).json({ message: '계정을 찾을 수 없습니다. 다시 로그인해주세요.' });
             }
+            // 승인 대기로 되돌린 사람은 더 이상 직원이 아니다. 로그인 시점에는 막고 있었지만
+            // 이미 로그인한 사람은 아무도 확인하지 않아, 되돌려도 계속 주문을 받을 수 있었다.
+            if (rows[0].role === 'pending') {
+                return res.status(401).json({ message: '승인 대기 상태입니다. 관리자에게 문의하세요.' });
+            }
             // 토큰에 적힌 role이 아니라 지금 DB의 role을 쓴다. 권한 변경이 즉시 반영된다.
             req.user = rows[0];
             next();
