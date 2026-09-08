@@ -69,11 +69,15 @@ function HygienePhoto({ photoId, onRemove }) {
         tf.current.y = Math.min(maxY, Math.max(-maxY, tf.current.y));
     }, []);
 
-    /**
-     * 기준점(cx, cy)을 붙잡은 채 배율만 바꾼다. 그래야 손가락·커서가 가리키던 지점이 그대로 있다.
-     * @param {number} next @param {number} cx @param {number} cy
-     */
+    // 기준점(cx, cy)을 붙잡은 채 배율만 바꾼다. 그래야 손가락·커서가 가리키던 지점이 그대로 있다.
+    // JSDoc은 useCallback을 감싼 변수가 아니라 안쪽 화살표 함수에 붙여야 매개변수 타입이 잡힌다
+    // (변수에 붙이면 implicit any가 된다). NotificationProvider와 같은 방식.
     const zoomAt = useCallback(
+        /**
+         * @param {number} next  목표 배율
+         * @param {number} cx    화면 기준 기준점 x
+         * @param {number} cy    화면 기준 기준점 y
+         */
         (next, cx, cy) => {
             const box = boxRef.current;
             if (!box) return;
