@@ -212,9 +212,10 @@ function HygieneItems({ onBack }) {
                 /* input과 select의 브라우저 기본 높이가 달라, height로 고정하고 폰트를 상속시킨다. */
                 .hyg-input { height: 34px; padding: 0 10px; font-family: inherit; font-size: .92rem; line-height: normal; border: 1px solid var(--border-color, #ddd); border-radius: 8px; background: var(--bg-color, #fff); color: var(--text-primary, #222); box-sizing: border-box; width: 100%; }
                 .hyg-actions { display: flex; gap: 4px; align-items: center; }
-                .hyg-add { display: grid; grid-template-columns: 26px 108px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-color, #ddd); }
+                /* 추가 줄은 목록 행이 아니라 입력 폼이다. 위 행들의 손잡이 열에 맞추려고 왼쪽을 비워두면
+                   빈 공간만 남고 입력칸이 좁아진다. 점선으로 이미 구분되니 열을 맞추지 않는다. */
+                .hyg-add { display: grid; grid-template-columns: 108px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-color, #ddd); }
                 /* 첫 항목을 만들 때는 위에 맞출 목록이 없다. 손잡이 자리를 빼고 왼쪽으로 붙인다. */
-                .hyg-add.first { grid-template-columns: 108px minmax(0, 1fr) auto; }
                 .hyg-retired { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color, #eee); color: var(--text-secondary, #888); }
                 .hyg-retired:last-child { border-bottom: none; }
                 .hyg-hint { color: var(--text-secondary, #999); font-size: .85rem; line-height: 1.6; margin: 14px 0 0; }
@@ -222,12 +223,9 @@ function HygieneItems({ onBack }) {
                 .hyg-empty p { color: var(--text-secondary, #888); margin: 0 0 16px; line-height: 1.6; }
                 @media (max-width: 620px) {
                     /* 좁은 화면에서는 분류·문구를 세로로 쌓고 버튼 줄을 따로 둔다. */
-                    .hyg-row, .hyg-add { grid-template-columns: 26px minmax(0, 1fr); gap: 6px 10px; }
+                    .hyg-row { grid-template-columns: 26px minmax(0, 1fr); gap: 6px 10px; }
+                    .hyg-add { grid-template-columns: minmax(0, 1fr); gap: 6px; }
                     .hyg-row > .hyg-grip { grid-row: span 3; align-self: center; }
-                    /* 손잡이가 1열을 세 줄 통째로 차지해야 분류·문구·버튼이 2열에 세로로 쌓인다.
-                       span이 없으면 손잡이가 한 칸만 먹어 문구 입력칸이 26px짜리 1열로 떨어진다. */
-                    .hyg-add > .hyg-grip { visibility: hidden; grid-row: span 3; }
-                    .hyg-add.first { grid-template-columns: minmax(0, 1fr); }
                     .hyg-actions { justify-content: flex-end; }
                 }
             `}</style>
@@ -284,8 +282,7 @@ function HygieneItems({ onBack }) {
                     </div>
                 )}
 
-                <div className={`hyg-add ${active.length === 0 ? 'first' : ''}`}>
-                    {active.length > 0 && <div className="hyg-grip" aria-hidden="true" />}
+                <div className="hyg-add">
                     <select
                         className="hyg-input"
                         value={draft.category}
