@@ -29,6 +29,9 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
 
     // 자동 패스키 호출은 화면당 딱 한 번만 판단한다(아래 effect에서 소비).
     const autoTriedRef = useRef(false);
+    // 자동 호출로 띄운 생체인증 창이 아직 떠 있는지. 사용자가 직접 누른 것과 구분해야
+    // 화면을 벗어날 때 '자동으로 뜬 것만' 접을 수 있다.
+    const autoCeremonyRef = useRef(false);
 
     // 모달이 열려 있는 동안 ESC로 닫는다.
     useEffect(() => {
@@ -97,7 +100,18 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
 
         // 폰에서 화면을 껐다 켜거나 앱을 전환했다 돌아오는 경우. 그 사이 흐른 시간은 타이머로 못 메운다.
         const onVisible = () => {
-            if (document.visibilityState === 'visible') void prefetchAuthOptions();
+            if (document.visibilityState === 'visible') {
+                void prefetchAuthOptions();
+                return;
+            }
+            // 화면을 벗어났다. 자동으로 띄운 생체인증 창이 아직 있으면 여기서 접는다.
+            // 접지 않으면 의식이 살아남아, 돌아왔을 때 브라우저가 그 창을 다시 띄운다
+            // (요청한 적 없는데 계속 따라붙어 성가시다). 사용자가 직접 누른 창은 건드리지 않는다 —
+            // 본인이 의도한 것이고, 돌아와서 이어서 인증하는 게 자연스럽다.
+            if (autoCeremonyRef.current) {
+                autoCeremonyRef.current = false;
+                WebAuthnAbortService.cancelCeremony();
+            }
         };
         document.addEventListener('visibilitychange', onVisible);
 
@@ -166,6 +180,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         }
         setPasskeyAuthOptions(null); // 1회용 챌린지 소진
         setSubmitting(true);
+        autoCeremonyRef.current = auto;
 
         let asseResp;
         try {
@@ -173,6 +188,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             asseResp = await startAuthentication({ optionsJSON: options });
         } catch (/** @type {any} */ error) {
             setSubmitting(false);
+            autoCeremonyRef.current = false;
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
             if (error.name === 'NotAllowedError') {
                 // 사용자가 생체인증 창을 취소한 경우. 자동 호출이었다면 더더욱 조용히 넘어간다.
@@ -207,6 +223,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             }
         } finally {
             setSubmitting(false);
+            autoCeremonyRef.current = false;
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
         }
     };
