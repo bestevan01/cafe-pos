@@ -121,14 +121,10 @@ function CashSettlement({ onClose }) {
     useEffect(() => {
         if (step !== 'close') return undefined;
         const refresh = debounce(() => void fetchCalcData());
-        socket.on('new_order', refresh.run);
-        socket.on('order_updated', refresh.run);
-        socket.on('order_deleted', refresh.run);
+        socket.on('sales_updated', refresh.run);
         return () => {
             refresh.cancel();
-            socket.off('new_order', refresh.run);
-            socket.off('order_updated', refresh.run);
-            socket.off('order_deleted', refresh.run);
+            socket.off('sales_updated', refresh.run);
         };
     }, [step, fetchCalcData]);
 

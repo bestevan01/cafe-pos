@@ -107,14 +107,12 @@ function SalesDashboard({ onBack }) {
             void fetchSummary();
             void fetchMonth(selectedYear, selectedMonth, { force: true });
         });
-        socket.on('new_order', refresh.run);
-        socket.on('order_updated', refresh.run);
-        socket.on('order_deleted', refresh.run);
+        // 매출은 결제된 주문만 센다. 주문 생성·주방 완료·전달 완료는 숫자를 바꾸지 않으므로
+        // 그 신호까지 듣지 않는다(주문 하나에 네 번 오던 것이 결제 한 번으로 줄어든다).
+        socket.on('sales_updated', refresh.run);
         return () => {
             refresh.cancel();
-            socket.off('new_order', refresh.run);
-            socket.off('order_updated', refresh.run);
-            socket.off('order_deleted', refresh.run);
+            socket.off('sales_updated', refresh.run);
         };
     }, [fetchSummary, fetchMonth, selectedYear, selectedMonth]);
 
