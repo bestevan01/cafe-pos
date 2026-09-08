@@ -130,9 +130,7 @@ router.delete('/ingredients/:id', async (req, res) => {
 router.get('/recipes', async (req, res) => {
     try {
         // 표시 순서는 관리자가 메뉴 관리에서 정한 것을 따른다(캐셔 화면과 같은 차례로 보이도록).
-        const [menus] = await pool.query(
-            'SELECT id, name, price, cost_override FROM menu ORDER BY sort_order, name',
-        );
+        const [menus] = await pool.query('SELECT id, name, price, cost_override FROM menu ORDER BY sort_order, name');
         const [recipes] = await pool.query('SELECT menu_id, ingredient_id, amount FROM menu_recipes');
 
         /** @type {Record<string, any[]>} */
@@ -230,9 +228,7 @@ router.patch('/menu/:id/cost-override', async (req, res) => {
 router.get('/cost-analysis', async (req, res) => {
     try {
         // 표시 순서는 관리자가 메뉴 관리에서 정한 것을 따른다(캐셔 화면과 같은 차례로 보이도록).
-        const [menus] = await pool.query(
-            'SELECT id, name, price, cost_override FROM menu ORDER BY sort_order, name',
-        );
+        const [menus] = await pool.query('SELECT id, name, price, cost_override FROM menu ORDER BY sort_order, name');
         const [ingredients] = await pool.query('SELECT * FROM ingredients');
         const [recipes] = await pool.query('SELECT menu_id, ingredient_id, amount FROM menu_recipes');
 

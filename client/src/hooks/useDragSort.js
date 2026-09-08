@@ -103,12 +103,10 @@ export function useDragSort({ onReorder, onCommit }) {
         const d = dragRef.current;
         if (!d) return;
         const listTop = d.list.getBoundingClientRect().top;
-        slotsRef.current = /** @type {HTMLElement[]} */ ([...d.list.querySelectorAll('[data-drag-row]')]).map(
-            (row) => {
-                const b = row.getBoundingClientRect();
-                return { top: b.top - listTop, height: b.height };
-            },
-        );
+        slotsRef.current = /** @type {HTMLElement[]} */ ([...d.list.querySelectorAll('[data-drag-row]')]).map((row) => {
+            const b = row.getBoundingClientRect();
+            return { top: b.top - listTop, height: b.height };
+        });
     }, []);
 
     /**
