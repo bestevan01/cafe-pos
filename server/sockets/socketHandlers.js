@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
 
 const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 
@@ -30,10 +31,23 @@ module.exports = (io) => {
         const token = socket.handshake.auth && socket.handshake.auth.token;
         if (!token) return next(authError('인증 토큰이 없습니다.'));
 
-        jwt.verify(token, JWT_SECRET, (/** @type {any} */ err, /** @type {any} */ user) => {
+        jwt.verify(token, JWT_SECRET, async (/** @type {any} */ err, /** @type {any} */ payload) => {
             if (err) return next(authError('유효하지 않은 토큰입니다.'));
-            socket.data.user = user; // 검증된 신원을 소켓에 저장
-            next();
+            try {
+                // HTTP와 같은 이유로 DB를 확인한다. 서명만 보면 계정이 지워졌거나 권한이
+                // 바뀐 사실을 알 수 없다(자세한 배경은 middlewares/auth.js 주석 참고).
+                const [rows] = await pool.query('SELECT id, username, name, role FROM users WHERE id = ?', [
+                    payload.id,
+                ]);
+                if (rows.length === 0) return next(authError('계정을 찾을 수 없습니다.'));
+                socket.data.user = rows[0]; // 지금 DB 기준의 신원을 저장
+                next();
+            } catch (/** @type {any} */ dbErr) {
+                // DB 문제로 연결을 끊되, 인증 실패로는 표시하지 않는다.
+                // type:'auth'를 달면 클라이언트가 재로그인을 요구해 버린다.
+                console.error('[🔥 소켓 인증 중 DB 조회 실패]', dbErr.message);
+                return next(new Error('일시적인 오류입니다.'));
+            }
         });
     });
 
