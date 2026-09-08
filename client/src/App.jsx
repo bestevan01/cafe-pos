@@ -15,6 +15,7 @@ import ForcePasswordChange from './pages/auth/ForcePasswordChange';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import { useTheme } from './hooks/useTheme';
 import { useNotification } from './hooks/useNotification';
+import { suppressAutoPasskeyOnce } from './utils/loginMemory';
 
 function App() {
     // ---------------------------------------------------------
@@ -89,6 +90,10 @@ function App() {
     // 사용자가 직접 로그아웃 버튼을 눌렀을 때 (자동/세션만료 경로와 구분해 성공 안내)
     const handleManualLogout = useCallback(() => {
         notify('로그아웃되었습니다.', { icon: '👋' });
+        // 직접 로그아웃했다면 교대 등으로 다른 사람이 쓸 수 있으니, 로그인 화면에서
+        // 이전 사용자의 패스키를 자동 호출하지 않는다. 자동/세션만료 로그아웃은
+        // 같은 사람이 돌아오는 상황이라 그대로 자동 호출한다.
+        suppressAutoPasskeyOnce();
         handleLogout();
     }, [handleLogout, notify]);
 
