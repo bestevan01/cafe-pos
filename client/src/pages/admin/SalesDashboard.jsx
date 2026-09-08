@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
+import { debounce } from '../../utils/debounce';
 import * as XLSX from 'xlsx';
 import AdvancedStats from './AdvancedStats.jsx';
 import ThemeToggle from '../../components/ThemeToggle';
@@ -95,6 +97,24 @@ function SalesDashboard({ onBack }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void fetchSummary();
     }, [fetchSummary]);
+
+    // 캐셔가 주문을 받는 동안 숫자가 멈춰 있지 않도록 다시 불러온다.
+    // 이 화면은 보기 전용이라(매출 삭제는 단발 동작) 도중에 갱신돼도 입력이 날아갈 게 없다.
+    useEffect(() => {
+        // fetchMonth는 이미 받아 온 달을 캐시해 두고 재요청하지 않는다. force를 주지 않으면
+        // 캐시에 있던 옛 목록을 그대로 다시 꽂아, 합계만 바뀌고 매출 내역은 그대로 남는다.
+        const refresh = debounce(() => {
+            void fetchSummary();
+            void fetchMonth(selectedYear, selectedMonth, { force: true });
+        });
+        // 매출은 결제된 주문만 센다. 주문 생성·주방 완료·전달 완료는 숫자를 바꾸지 않으므로
+        // 그 신호까지 듣지 않는다(주문 하나에 네 번 오던 것이 결제 한 번으로 줄어든다).
+        socket.on('sales_updated', refresh.run);
+        return () => {
+            refresh.cancel();
+            socket.off('sales_updated', refresh.run);
+        };
+    }, [fetchSummary, fetchMonth, selectedYear, selectedMonth]);
 
     useEffect(() => {
         void fetchMonth(selectedYear, selectedMonth);

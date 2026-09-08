@@ -89,6 +89,8 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
                 io.emit('events_updated');
             }
         }
+        // 매출 행을 지웠으니 통계·정산 화면도 다시 받아와야 한다.
+        req.app.get('io').emit('sales_updated');
 
         res.json({ success: true });
     } catch (/** @type {any} */ err) {

@@ -12,6 +12,24 @@ const { isStrongPassword, PASSWORD_POLICY_MESSAGE } = require('../utils/password
 const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 const VALID_ROLES = ['admin', 'staff', 'pending'];
 
+/**
+ * 해당 사용자의 열려 있는 소켓을 즉시 끊는다.
+ *
+ * HTTP는 다음 요청에서 걸러지지만 소켓은 연결할 때 한 번만 확인한다. 이미 붙어 있는
+ * 연결은 계속 살아 있어서, 권한을 잃은 사람이 캐셔 점유 같은 소켓 동작을 이어갈 수 있다.
+ * 끊어 주면 클라이언트가 재연결을 시도하고, 그때 핸드셰이크에서 정상적으로 막힌다.
+ *
+ * @param {import('express').Request} req
+ * @param {string} userId
+ */
+function disconnectUserSockets(req, userId) {
+    const io = req.app.get('io');
+    if (!io) return;
+    for (const socket of io.sockets.sockets.values()) {
+        if (socket.data?.user?.id === userId) socket.disconnect(true);
+    }
+}
+
 router.post('/register', async (req, res) => {
     const { username, password, name } = req.body;
     try {
@@ -176,6 +194,9 @@ router.patch('/admin/users/:id/role', authenticateToken, requireAdmin, async (re
             }
         }
         await pool.query('UPDATE users SET role = ? WHERE id = ?', [role, id]);
+        // 새 권한은 다음 요청부터 자동 적용된다(인증 미들웨어가 매번 DB를 본다).
+        // 소켓은 연결 시 한 번만 확인하므로 여기서 직접 끊는다.
+        disconnectUserSockets(req, String(id));
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/admin/users/${id}/role 에러] 변경 시도 역할: ${role}`, err);
@@ -203,6 +224,7 @@ router.delete('/admin/users/:id', authenticateToken, requireAdmin, async (req, r
             }
         }
         await pool.query('DELETE FROM users WHERE id = ?', [id]);
+        disconnectUserSockets(req, String(id));
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/admin/users/${id} 에러]`, err);

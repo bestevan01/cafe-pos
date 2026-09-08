@@ -57,6 +57,7 @@
  * @property {string} type  'coffee' | 'tea' | 'dessert'
  * @property {number} [is_soldout]  0|1
  * @property {number|null} [cost_override]  수동 지정 원가(없으면 레시피로 계산)
+ * @property {number} [sort_order]  관리자가 정한 표시 순서(캐셔 화면도 이 차례를 따른다)
  */
 
 /**

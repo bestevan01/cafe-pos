@@ -1,9 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
+
+// 서버 챌린지 수명이 15분이라 그보다 넉넉히 앞서 갱신한다.
+const REFRESH_MS = 10 * 60 * 1000;
 import { useSystemTheme } from '../../hooks/useSystemTheme';
 import { useNotification } from '../../hooks/useNotification';
 import { getStoreInfo } from '../../utils/storeInfo';
+import { readLastMethod, writeLastMethod, consumeSkipAuto } from '../../utils/loginMemory';
 import Button from '../../components/ui/Button';
 
 /**
@@ -22,6 +26,12 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
     // → 옵션을 미리 받아 두고 클릭 시 곧바로 startAuthentication()을 호출한다.
     const [passkeyAuthOptions, setPasskeyAuthOptions] = useState(/** @type {any} */ (null));
     const [showHelp, setShowHelp] = useState(false);
+
+    // 자동 패스키 호출은 화면당 딱 한 번만 판단한다(아래 effect에서 소비).
+    const autoTriedRef = useRef(false);
+    // 자동 호출로 띄운 생체인증 창이 아직 떠 있는지. 사용자가 직접 누른 것과 구분해야
+    // 화면을 벗어날 때 '자동으로 뜬 것만' 접을 수 있다.
+    const autoCeremonyRef = useRef(false);
 
     // 모달이 열려 있는 동안 ESC로 닫는다.
     useEffect(() => {
@@ -43,8 +53,11 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
     };
 
     // 로그인 성공 시 공통 처리
-    /** @param {any} data */
-    const handleSuccess = (data) => {
+    /**
+     * @param {any} data
+     * @param {'password'|'passkey'} method  다음 방문의 자동 패스키 호출 여부를 결정한다
+     */
+    const handleSuccess = (data, method) => {
         localStorage.setItem('token', data.token);
         localStorage.setItem(
             'user',
@@ -57,6 +70,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 mustChangePassword: Boolean(data.mustChangePassword),
             }),
         );
+        writeLastMethod(method);
         notify(`${data.name}님, 환영합니다!`, { icon: '✅' });
         onLoginSuccess(data);
     };
@@ -79,8 +93,32 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void prefetchAuthOptions();
 
+        // 미리 받은 챌린지는 서버에서 15분 뒤 만료된다. 로그인 화면을 열어둔 채 방치하면
+        // 지문까지 찍고 나서 서버 검증에서만 실패한다(실제로 58분 된 챌린지로 실패한 사례가 있었다).
+        // 클릭 시점에 새로 받아오면 Safari 제스처가 만료돼 팝업이 안 뜨므로, 미리 갱신해 둔다.
+        const timer = setInterval(() => void prefetchAuthOptions(), REFRESH_MS);
+
+        // 폰에서 화면을 껐다 켜거나 앱을 전환했다 돌아오는 경우. 그 사이 흐른 시간은 타이머로 못 메운다.
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') {
+                void prefetchAuthOptions();
+                return;
+            }
+            // 화면을 벗어났다. 자동으로 띄운 생체인증 창이 아직 있으면 여기서 접는다.
+            // 접지 않으면 의식이 살아남아, 돌아왔을 때 브라우저가 그 창을 다시 띄운다
+            // (요청한 적 없는데 계속 따라붙어 성가시다). 사용자가 직접 누른 창은 건드리지 않는다 —
+            // 본인이 의도한 것이고, 돌아와서 이어서 인증하는 게 자연스럽다.
+            if (autoCeremonyRef.current) {
+                autoCeremonyRef.current = false;
+                WebAuthnAbortService.cancelCeremony();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+
         // 화면을 벗어날 때 진행 중이던 패스키 의식이 있으면 취소(다음 화면의 create()/get() 차단 방지)
         return () => {
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', onVisible);
             WebAuthnAbortService.cancelCeremony();
         };
     }, [prefetchAuthOptions]);
@@ -110,7 +148,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             // 느린 응답 시 로딩 토스트는 전역 인터셉터(NotificationProvider)가 자동 처리
             const res = await axios.post('/api/login', payload);
             if (res.data.success) {
-                handleSuccess(res.data);
+                handleSuccess(res.data, 'password');
             }
         } catch (/** @type {any} */ err) {
             if (err.code === 'ECONNABORTED')
@@ -121,7 +159,12 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         }
     };
 
-    const handlePasskeyLogin = async () => {
+    /**
+     * @param {{auto?: boolean}} [opts]
+     *   auto=true는 사용자가 버튼을 누른 게 아니라 화면 진입 시 스스로 호출한 경우다.
+     *   요청한 적 없는 동작이므로 실패해도 토스트를 띄우지 않고 조용히 버튼 방식으로 물러난다.
+     */
+    const handlePasskeyLogin = async ({ auto = false } = {}) => {
         if (submitting) return;
 
         // 미리 받아 둔 옵션 사용(없으면 폴백으로 즉석에서 받아오지만 Safari에선 팝업이 안 뜰 수 있음)
@@ -131,12 +174,13 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 const resp = await axios.get('/api/passkey/login-options');
                 options = resp.data;
             } catch {
-                notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
+                if (!auto) notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
                 return;
             }
         }
         setPasskeyAuthOptions(null); // 1회용 챌린지 소진
         setSubmitting(true);
+        autoCeremonyRef.current = auto;
 
         let asseResp;
         try {
@@ -144,29 +188,69 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             asseResp = await startAuthentication({ optionsJSON: options });
         } catch (/** @type {any} */ error) {
             setSubmitting(false);
+            autoCeremonyRef.current = false;
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
             if (error.name === 'NotAllowedError') {
-                console.log('패스키 인증 취소됨');
+                // 사용자가 생체인증 창을 취소한 경우. 자동 호출이었다면 더더욱 조용히 넘어간다.
+                console.log(auto ? '자동 패스키 인증 취소됨' : '패스키 인증 취소됨');
                 return;
             }
             console.error(error);
-            notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
+            if (!auto) notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
             return;
         }
 
         try {
             const verificationResp = await axios.post('/api/passkey/login-verify', { body: asseResp });
             if (verificationResp.data.success) {
-                handleSuccess(verificationResp.data);
+                handleSuccess(verificationResp.data, 'passkey');
             }
         } catch (/** @type {any} */ error) {
-            console.error(error);
-            notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
+            // 서버가 사유를 code로 알려준다. 만료는 다시 누르면 되는 상황이라
+            // '등록된 기기가 아니다'로 뭉뚱그리면 직원이 패스키가 지워진 줄 오해한다.
+            const data = error?.response?.data;
+            if (data?.code === 'unknown_passkey') {
+                // 서버에서 패스키가 지워졌다. 기억을 지우지 않으면 방문할 때마다 자동 호출로 실패한다.
+                writeLastMethod(null);
+            }
+            if (data?.code === 'challenge_expired') {
+                notify(data.message, { icon: '⏱️' });
+            } else if (data?.message) {
+                notify(data.message, { icon: '⚠️' });
+            } else {
+                console.error(error);
+                if (!auto) notify('패스키 로그인에 실패했습니다. 잠시 후 다시 시도해주세요.', { icon: '⚠️' });
+            }
         } finally {
             setSubmitting(false);
+            autoCeremonyRef.current = false;
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
         }
     };
+
+    // effect가 최신 handlePasskeyLogin을 보도록 ref에 담아 둔다. 의존성 배열에 함수를 직접
+    // 넣으면 렌더마다 effect가 다시 돌고, 렌더 중 대입은 react-hooks/refs가 막는다.
+    const passkeyLoginRef = useRef(handlePasskeyLogin);
+    useEffect(() => {
+        passkeyLoginRef.current = handlePasskeyLogin;
+    });
+
+    // 직전 로그인이 패스키였으면 옵션이 준비되는 대로 버튼 없이 곧바로 생체인증을 띄운다.
+    // 판단을 effect 안에서 하는 이유: consumeSkipAuto()가 1회용이라 렌더 중에 부르면
+    // StrictMode의 이중 렌더가 값을 두 번 소비해 오판한다.
+    useEffect(() => {
+        if (autoTriedRef.current) return;
+        // 프리페치 완료를 기다린다. 콜드스타트 서버를 깨우는 중이면 수 초 걸린다.
+        if (!passkeyAuthOptions) return;
+        // 백그라운드 탭이면 보지도 않는 생체인증 창이 떠 그대로 취소된다.
+        // 여기서는 판단을 확정하지 않고(ref를 세우지 않고) 다음 갱신 때 다시 본다.
+        if (document.visibilityState !== 'visible') return;
+
+        autoTriedRef.current = true;
+        if (readLastMethod() !== 'passkey') return; // 직전 로그인이 비밀번호였다
+        if (consumeSkipAuto()) return; // 방금 직접 로그아웃했다 → 이번 한 번은 건너뛴다
+        void passkeyLoginRef.current({ auto: true });
+    }, [passkeyAuthOptions]);
 
     return (
         <div className="login-container">
@@ -312,7 +396,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 </div>
 
                 <Button
-                    onClick={handlePasskeyLogin}
+                    onClick={() => handlePasskeyLogin()}
                     variant="secondary"
                     size="lg"
                     full

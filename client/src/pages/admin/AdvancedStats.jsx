@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
+import { debounce } from '../../utils/debounce';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
 import StatsLayout from '../../components/stats/StatsLayout';
@@ -40,7 +42,8 @@ function AdvancedStats({ onBack }) {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 
-    useEffect(() => {
+    // 소켓에서도 다시 부를 수 있게 함수로 뺀다.
+    const fetchStats = useCallback(() => {
         axios
             .get('/api/admin/stats', getAuthHeader())
             .then((res) => {
@@ -53,6 +56,22 @@ function AdvancedStats({ onBack }) {
                 setLoading(false);
             });
     }, [notify]);
+
+    useEffect(() => {
+        fetchStats();
+    }, [fetchStats]);
+
+    // 캐셔가 주문을 받는 동안 숫자가 멈춰 있지 않도록 다시 불러온다. 보기 전용 화면이다.
+    useEffect(() => {
+        const refresh = debounce(fetchStats);
+        // 매출은 결제된 주문만 센다. 주문 생성·주방 완료·전달 완료는 숫자를 바꾸지 않으므로
+        // 그 신호까지 듣지 않는다(주문 하나에 네 번 오던 것이 결제 한 번으로 줄어든다).
+        socket.on('sales_updated', refresh.run);
+        return () => {
+            refresh.cancel();
+            socket.off('sales_updated', refresh.run);
+        };
+    }, [fetchStats]);
 
     const weekSales = WEEK.map((d) => {
         const hit = stats.dowStats.find((/** @type {any} */ r) => Number(r.dow) === d.dow);

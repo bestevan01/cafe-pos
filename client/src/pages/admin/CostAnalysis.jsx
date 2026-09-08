@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
 import StatsLayout from '../../components/stats/StatsLayout';
@@ -69,6 +70,18 @@ function CostAnalysis({ onBack }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void fetchAll();
     }, [fetchAll]);
+
+    // 관리자가 메뉴 가격을 고치면 마진이 달라진다.
+    // 원재료 관리·레시피 편집 화면에서는 듣지 않는다 — 입력 도중에 목록이 갈아엎어지면
+    // 작성 중이던 내용이 날아간다.
+    useEffect(() => {
+        if (view !== 'analysis') return undefined;
+        const refresh = () => void fetchAll();
+        socket.on('menu_updated', refresh);
+        return () => {
+            socket.off('menu_updated', refresh);
+        };
+    }, [view, fetchAll]);
 
     // 단위당 원가 맵 (ingredient_id → 원/단위)
     const unitCostMap = useMemo(() => new Map(ingredients.map((i) => [i.id, unitCostOf(i)])), [ingredients]);

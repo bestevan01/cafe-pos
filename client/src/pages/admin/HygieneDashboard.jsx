@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
 import Button from '../../components/ui/Button';
@@ -75,6 +76,18 @@ function HygieneDashboard({ onBack }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void load();
     }, [load]);
+
+    // 직원이 점검을 제출하면 기록에 바로 나타난다.
+    // 체크리스트 수정 화면(view === 'items')에서는 듣지 않는다 — 편집 도중에 목록이
+    // 갈아엎어지면 드래그·입력이 끊긴다.
+    useEffect(() => {
+        if (view === 'items') return undefined;
+        const refresh = () => void load();
+        socket.on('hygiene_updated', refresh);
+        return () => {
+            socket.off('hygiene_updated', refresh);
+        };
+    }, [view, load]);
 
     /** 행을 펼칠 때만 상세를 받아온다. 목록에서 전부 미리 받으면 기록이 쌓일수록 무거워진다. */
     /** @param {number} id */

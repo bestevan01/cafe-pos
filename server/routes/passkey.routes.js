@@ -161,7 +161,11 @@ router.post('/passkey/login-verify', async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM passkeys WHERE id = ?', [body.id]);
         if (rows.length === 0) {
-            return res.status(400).json({ error: 'Passkey not found' });
+            return res.status(400).json({
+                success: false,
+                code: 'unknown_passkey',
+                message: '이 기기의 패스키가 등록되어 있지 않습니다. 비밀번호로 로그인한 뒤 내 정보에서 등록해주세요.',
+            });
         }
 
         const passkey = rows[0];
@@ -213,12 +217,29 @@ router.post('/passkey/login-verify', async (req, res) => {
                 mustChangePassword: user.must_change_password === 1,
             });
         } else {
-            res.status(400).json({ success: false, message: '패스키 로그인 검증에 실패했습니다.' });
+            res.status(400).json({
+                success: false,
+                code: 'verify_failed',
+                message: '패스키 로그인 검증에 실패했습니다.',
+            });
         }
     } catch (/** @type {any} */ error) {
+        // 챌린지가 만료됐거나 이미 쓰인 경우. expectedChallenge 콜백이 false를 반환하면
+        // @simplewebauthn이 이 문구로 던진다. 사용자 잘못이 아니고 다시 누르면 되는 상황이라
+        // '등록되지 않은 기기' 같은 오해를 주지 않도록 따로 구분한다.
+        const stale = String(error?.message ?? '').includes('Custom challenge verifier returned false');
+        if (stale) {
+            console.warn('[⏱️ 패스키 로그인] 만료·소진된 챌린지로 시도됨 — 재시도하면 됩니다');
+            return res.status(400).json({
+                success: false,
+                code: 'challenge_expired',
+                message: '인증 시간이 만료되었습니다. 한 번 더 눌러주세요.',
+            });
+        }
         console.error('[🔥 POST /api/passkey/login-verify 에러]', error);
         res.status(400).json({
             success: false,
+            code: 'verify_error',
             message: '로그인 검증 중 오류가 발생했습니다.',
             debug_info: debugInfo(error),
         });

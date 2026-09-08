@@ -129,7 +129,8 @@ router.delete('/ingredients/:id', async (req, res) => {
 // 메뉴 목록 + 각 메뉴의 레시피 구성(레시피 편집기에서 사용)
 router.get('/recipes', async (req, res) => {
     try {
-        const [menus] = await pool.query('SELECT id, name, price, cost_override FROM menu ORDER BY id');
+        // 표시 순서는 관리자가 메뉴 관리에서 정한 것을 따른다(캐셔 화면과 같은 차례로 보이도록).
+        const [menus] = await pool.query('SELECT id, name, price, cost_override FROM menu ORDER BY sort_order, name');
         const [recipes] = await pool.query('SELECT menu_id, ingredient_id, amount FROM menu_recipes');
 
         /** @type {Record<string, any[]>} */
@@ -226,7 +227,8 @@ router.patch('/menu/:id/cost-override', async (req, res) => {
 // 메뉴별 적용 원가 = cost_override ?? 레시피 자동계산. 순익/마진율까지 서버에서 계산.
 router.get('/cost-analysis', async (req, res) => {
     try {
-        const [menus] = await pool.query('SELECT id, name, price, cost_override FROM menu ORDER BY id');
+        // 표시 순서는 관리자가 메뉴 관리에서 정한 것을 따른다(캐셔 화면과 같은 차례로 보이도록).
+        const [menus] = await pool.query('SELECT id, name, price, cost_override FROM menu ORDER BY sort_order, name');
         const [ingredients] = await pool.query('SELECT * FROM ingredients');
         const [recipes] = await pool.query('SELECT menu_id, ingredient_id, amount FROM menu_recipes');
 

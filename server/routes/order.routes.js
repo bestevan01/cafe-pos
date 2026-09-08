@@ -289,6 +289,9 @@ router.patch('/:display_id/complete', authenticateToken, async (req, res) => {
             display_id,
         ]);
         io.emit('order_updated', { display_id, is_paid: 1, is_completed: 1 });
+        // 매출은 is_paid=1인 주문만 센다. 결제 여부가 바뀌는 이 순간에만 통계·정산 화면에 알린다.
+        // (주문 생성·주방 완료·전달 완료는 매출을 바꾸지 않으므로 알릴 이유가 없다)
+        io.emit('sales_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/complete 에러]`, err);
@@ -312,6 +315,9 @@ router.patch('/:display_id/pay', authenticateToken, async (req, res) => {
         const [rows] = await pool.query('SELECT is_completed FROM orders WHERE display_id = ? LIMIT 1', [display_id]);
 
         io.emit('order_updated', { display_id, is_paid: 1, is_completed: rows[0]?.is_completed || 0 });
+        // 매출은 is_paid=1인 주문만 센다. 결제 여부가 바뀌는 이 순간에만 통계·정산 화면에 알린다.
+        // (주문 생성·주방 완료·전달 완료는 매출을 바꾸지 않으므로 알릴 이유가 없다)
+        io.emit('sales_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/orders/${display_id}/pay 에러]`, err);
@@ -374,6 +380,8 @@ router.delete('/:display_id', authenticateToken, async (req, res) => {
             io.emit('events_updated');
         }
         io.emit('order_deleted', display_id);
+        // 결제된 주문이 지워졌다면 매출도 줄어든다.
+        io.emit('sales_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/orders/${display_id} 에러]`, err);

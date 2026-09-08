@@ -157,6 +157,8 @@ router.post('/checks', async (req, res) => {
         );
         await attachPhotos(conn, ins.insertId, req.body, req.user.id);
         await conn.commit();
+        // 관리자의 점검 기록 화면이 새로고침 없이 받아보도록 알린다.
+        req.app.get('io').emit('hygiene_updated');
         res.json({ success: true, id: ins.insertId });
     } catch (/** @type {any} */ err) {
         await conn.rollback();
@@ -203,6 +205,8 @@ router.put('/checks/:id', async (req, res) => {
         );
         await attachPhotos(conn, row.id, req.body, req.user.id);
         await conn.commit();
+        // 관리자의 점검 기록 화면이 새로고침 없이 받아보도록 알린다.
+        req.app.get('io').emit('hygiene_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         await conn.rollback();
