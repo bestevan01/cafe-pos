@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
+
+// 서버 챌린지 수명이 15분이라 그보다 넉넉히 앞서 갱신한다.
+const REFRESH_MS = 10 * 60 * 1000;
 import { useSystemTheme } from '../../hooks/useSystemTheme';
 import { useNotification } from '../../hooks/useNotification';
 import { getStoreInfo } from '../../utils/storeInfo';
@@ -79,8 +82,21 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void prefetchAuthOptions();
 
+        // 미리 받은 챌린지는 서버에서 15분 뒤 만료된다. 로그인 화면을 열어둔 채 방치하면
+        // 지문까지 찍고 나서 서버 검증에서만 실패한다(실제로 58분 된 챌린지로 실패한 사례가 있었다).
+        // 클릭 시점에 새로 받아오면 Safari 제스처가 만료돼 팝업이 안 뜨므로, 미리 갱신해 둔다.
+        const timer = setInterval(() => void prefetchAuthOptions(), REFRESH_MS);
+
+        // 폰에서 화면을 껐다 켜거나 앱을 전환했다 돌아오는 경우. 그 사이 흐른 시간은 타이머로 못 메운다.
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') void prefetchAuthOptions();
+        };
+        document.addEventListener('visibilitychange', onVisible);
+
         // 화면을 벗어날 때 진행 중이던 패스키 의식이 있으면 취소(다음 화면의 create()/get() 차단 방지)
         return () => {
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', onVisible);
             WebAuthnAbortService.cancelCeremony();
         };
     }, [prefetchAuthOptions]);
@@ -160,8 +176,17 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 handleSuccess(verificationResp.data);
             }
         } catch (/** @type {any} */ error) {
-            console.error(error);
-            notify('패스키 로그인 실패: 등록된 기기가 아니거나 오류가 발생했습니다.', { icon: '⚠️' });
+            // 서버가 사유를 code로 알려준다. 만료는 다시 누르면 되는 상황이라
+            // '등록된 기기가 아니다'로 뭉뚱그리면 직원이 패스키가 지워진 줄 오해한다.
+            const data = error?.response?.data;
+            if (data?.code === 'challenge_expired') {
+                notify(data.message, { icon: '⏱️' });
+            } else if (data?.message) {
+                notify(data.message, { icon: '⚠️' });
+            } else {
+                console.error(error);
+                notify('패스키 로그인에 실패했습니다. 잠시 후 다시 시도해주세요.', { icon: '⚠️' });
+            }
         } finally {
             setSubmitting(false);
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
