@@ -224,7 +224,9 @@ function HygieneItems({ onBack }) {
                     /* 좁은 화면에서는 분류·문구를 세로로 쌓고 버튼 줄을 따로 둔다. */
                     .hyg-row, .hyg-add { grid-template-columns: 26px minmax(0, 1fr); gap: 6px 10px; }
                     .hyg-row > .hyg-grip { grid-row: span 3; align-self: center; }
-                    .hyg-add > .hyg-grip { visibility: hidden; }
+                    /* 손잡이가 1열을 세 줄 통째로 차지해야 분류·문구·버튼이 2열에 세로로 쌓인다.
+                       span이 없으면 손잡이가 한 칸만 먹어 문구 입력칸이 26px짜리 1열로 떨어진다. */
+                    .hyg-add > .hyg-grip { visibility: hidden; grid-row: span 3; }
                     .hyg-add.first { grid-template-columns: minmax(0, 1fr); }
                     .hyg-actions { justify-content: flex-end; }
                 }
