@@ -5,6 +5,7 @@ import StatCard from '../../components/stats/StatCard';
 import Button from '../../components/ui/Button';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
+import { useDragSort } from '../../hooks/useDragSort';
 
 // axios에 전역 인증 인터셉터가 없어 호출마다 헤더를 붙인다(다른 관리자 화면과 동일).
 // 컴포넌트 밖에 두는 이유: 안에 두면 매 렌더마다 새 함수가 되어 useCallback 의존성이 흔들린다.
@@ -28,7 +29,6 @@ function HygieneItems({ onBack }) {
     const [items, setItems] = useState(/** @type {any[]} */ ([]));
     const [loading, setLoading] = useState(true);
     const [draft, setDraft] = useState({ label: '', category: CATEGORIES[0] });
-    const [dragId, setDragId] = useState(/** @type {number|null} */ (null));
     const { notify, confirm } = useNotification();
 
     // 드래그 중에는 최신 items를 클로저가 아니라 ref로 읽는다(포인터 이벤트가 렌더보다 자주 온다).
@@ -36,10 +36,22 @@ function HygieneItems({ onBack }) {
     useEffect(() => {
         itemsRef.current = items;
     }, [items]);
-    const dragRef = useRef(/** @type {{from: number, moved: boolean}|null} */ (null));
     // effect가 dragId에만 의존하도록 saveOrder는 항상 최신값을 ref로 읽는다.
     const saveOrderRef = useRef(/** @type {(next: any[]) => void} */ (() => {}));
-    const listRef = useRef(/** @type {HTMLDivElement|null} */ (null));
+
+    // 끌어서 순서 바꾸기. 뜨는 행·부드러운 밀림·자동 스크롤은 전부 훅이 담당한다.
+    // 메뉴 관리와 같은 훅을 써서 두 화면의 조작감을 맞춘다.
+    const { dragId, dragStart } = useDragSort({
+        onReorder: (from, to) =>
+            setItems((prev) => {
+                const act = prev.filter((i) => i.is_active);
+                const ret = prev.filter((i) => !i.is_active);
+                const [moved] = act.splice(from, 1);
+                act.splice(to, 0, moved);
+                return [...act, ...ret];
+            }),
+        onCommit: () => saveOrderRef.current(itemsRef.current.filter((i) => i.is_active)),
+    });
 
     const load = useCallback(async () => {
         try {
@@ -78,69 +90,6 @@ function HygieneItems({ onBack }) {
     useEffect(() => {
         saveOrderRef.current = saveOrder;
     });
-
-    // ---- 드래그로 순서 바꾸기 ----
-    // HTML5 드래그 앤 드롭 API 대신 포인터 이벤트를 쓴다. HTML5 쪽은 모바일 사파리에서
-    // 아예 동작하지 않아, 관리자가 태블릿·폰으로 열면 순서를 못 바꾼다.
-    // 손잡이에 touch-action: none을 줘야 터치 드래그가 스크롤에 먹히지 않는다.
-
-    /** @param {import('react').PointerEvent<HTMLElement>} e @param {number} idx @param {number} id */
-    const dragStart = (e, idx, id) => {
-        e.preventDefault();
-        dragRef.current = { from: idx, moved: false };
-        setDragId(id);
-    };
-
-    // 이동·종료는 손잡이가 아니라 window에서 듣는다.
-    // 손잡이가 작아서 끄는 도중 포인터가 금방 벗어나는데, 그때 이벤트가 끊기면 안 된다.
-    // setPointerCapture를 쓰지 않는 이유: 캡처가 실패하면 드래그가 아무 표시 없이 죽는다.
-    useEffect(() => {
-        if (dragId === null) return undefined;
-
-        /** @param {PointerEvent} e */
-        const onMove = (e) => {
-            const d = dragRef.current;
-            if (!d || !listRef.current) return;
-            const rows = /** @type {HTMLElement[]} */ ([...listRef.current.querySelectorAll('.hyg-row')]);
-
-            // 포인터가 어느 행의 중간선을 넘었는지로 목표 위치를 정한다.
-            let to = rows.findIndex((row) => {
-                const b = row.getBoundingClientRect();
-                return e.clientY < b.top + b.height / 2;
-            });
-            if (to === -1) to = rows.length - 1;
-            if (to === d.from) return;
-
-            // 끌고 가는 동안 목록을 실제로 재배열해 보여준다(별도 드롭 표시선이 필요 없다).
-            const from = d.from;
-            setItems((prev) => {
-                const act = prev.filter((i) => i.is_active);
-                const ret = prev.filter((i) => !i.is_active);
-                const [moved] = act.splice(from, 1);
-                act.splice(to, 0, moved);
-                return [...act, ...ret];
-            });
-            d.from = to;
-            d.moved = true;
-        };
-
-        const onEnd = () => {
-            const d = dragRef.current;
-            dragRef.current = null;
-            setDragId(null);
-            // 위치가 실제로 바뀐 경우에만 저장한다(그냥 눌렀다 뗀 것까지 PUT을 보내지 않는다).
-            if (d?.moved) saveOrderRef.current(itemsRef.current.filter((i) => i.is_active));
-        };
-
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onEnd);
-        window.addEventListener('pointercancel', onEnd);
-        return () => {
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onEnd);
-            window.removeEventListener('pointercancel', onEnd);
-        };
-    }, [dragId]);
 
     /** @param {number} id @param {'label'|'category'} field @param {string} value */
     const editField = (id, field, value) => {
@@ -204,7 +153,14 @@ function HygieneItems({ onBack }) {
         <StatsLayout title="📋 체크리스트 수정" onBack={onBack} actions={<ThemeToggle />}>
             <style>{`
                 .hyg-row { display: grid; grid-template-columns: 26px 108px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color, #eee); background: var(--card-bg, #fff); }
-                .hyg-row.dragging { opacity: .55; }
+                /* 잡은 행은 공중에 뜬 것처럼 보여야 어디로 가고 있는지 눈으로 쫓을 수 있다.
+                   변형(translateY)은 훅이 직접 넣는다 — position/z-index가 있어야 다른 행 위로 올라온다. */
+                .hyg-row.dragging {
+                    position: relative; z-index: 5;
+                    box-shadow: 0 8px 20px rgba(0,0,0,.18);
+                    border-radius: 8px;
+                    cursor: grabbing;
+                }
                 /* touch-action: none이 없으면 터치 드래그가 페이지 스크롤에 먹힌다. */
                 .hyg-grip { touch-action: none; cursor: grab; user-select: none; text-align: center; color: var(--text-secondary, #bbb); font-size: 1rem; line-height: 1; padding: 6px 0; }
                 .hyg-grip:active { cursor: grabbing; }
@@ -240,9 +196,14 @@ function HygieneItems({ onBack }) {
                         </p>
                     </div>
                 ) : (
-                    <div ref={listRef}>
+                    <div data-drag-list>
                         {active.map((item, idx) => (
-                            <div className={`hyg-row ${dragId === item.id ? 'dragging' : ''}`} key={item.id}>
+                            <div
+                                className={`hyg-row ${dragId === item.id ? 'dragging' : ''}`}
+                                key={item.id}
+                                data-drag-row
+                                data-drag-id={item.id}
+                            >
                                 <div
                                     className="hyg-grip"
                                     onPointerDown={(e) => dragStart(e, idx, item.id)}

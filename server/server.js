@@ -122,6 +122,16 @@ async function ensureSchema() {
         }
     }
 
+    // menu.sort_order 컬럼 보장 (관리자가 정한 표시 순서, 이미 있으면 무시)
+    // 자세한 설계 의도는 migrations/011_menu_sort_order.sql 참고.
+    try {
+        await pool.query('ALTER TABLE menu ADD COLUMN sort_order INT NOT NULL DEFAULT 0');
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] menu.sort_order 컬럼 추가 실패 (수동 마이그레이션 필요):', err.message);
+        }
+    }
+
     // ingredients.category 컬럼 보장 (식재료/부자재 분류, 이미 있으면 무시)
     try {
         await pool.query("ALTER TABLE ingredients ADD COLUMN category VARCHAR(10) NOT NULL DEFAULT '식재료'");

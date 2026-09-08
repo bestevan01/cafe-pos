@@ -1,9 +1,10 @@
 import axios from 'axios';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
+import { useDragSort } from '../../hooks/useDragSort';
 
 /**
  * @param {object} props
@@ -17,6 +18,26 @@ function MenuDashboard({ onBack }) {
     const [menuList, setMenuList] = useState(/** @type {import('../../types').Menu[]} */ ([]));
     const [editingId, setEditingId] = useState(/** @type {string|null} */ (null));
     const [formData, setFormData] = useState({ name: '', price: '', type: 'coffee' });
+    // 드래그 중에는 최신 목록을 클로저가 아니라 ref로 읽는다(포인터 이벤트가 렌더보다 자주 온다).
+    const menuRef = useRef(menuList);
+    useEffect(() => {
+        menuRef.current = menuList;
+    }, [menuList]);
+    // effect가 최신 saveOrder를 읽도록 ref에 담아 둔다.
+    const saveOrderRef = useRef(/** @type {(next: any[]) => void} */ (() => {}));
+
+    // 끌어서 순서 바꾸기. 뜨는 행·부드러운 밀림·자동 스크롤은 전부 훅이 담당한다.
+    // 위생 점검 체크리스트와 같은 훅을 써서 두 화면의 조작감을 맞춘다.
+    const { dragId, dragStart } = useDragSort({
+        onReorder: (from, to) =>
+            setMenuList((prev) => {
+                const next = [...prev];
+                const [moved] = next.splice(from, 1);
+                next.splice(to, 0, moved);
+                return next;
+            }),
+        onCommit: () => saveOrderRef.current(menuRef.current),
+    });
 
     // API 권한 토큰
     const getAuthHeader = () => ({
@@ -95,9 +116,26 @@ function MenuDashboard({ onBack }) {
         }
     };
 
+    /** 화면에 보이는 순서 그대로 서버에 넘겨 sort_order를 다시 매긴다(화면 반영은 드래그 중에 이미 끝나 있다). */
+    /** @param {import('../../types').Menu[]} next */
+    const saveOrder = async (next) => {
+        try {
+            await axios.put('/api/menu/order', { ids: next.map((m) => m.id) }, getAuthHeader());
+        } catch {
+            notify('순서 저장에 실패했습니다.', { icon: '⚠️' });
+            void fetchMenu(); // 서버가 진짜로 갖고 있는 순서로 되돌린다
+        }
+    };
+
+    // 렌더마다 최신 saveOrder를 ref에 담아 둔다(드래그 effect가 옛 클로저를 붙잡지 않도록).
+    useEffect(() => {
+        saveOrderRef.current = saveOrder;
+    });
+
     // ---------------------------------------------------------
     // [3] 이벤트 핸들러 및 헬퍼
     // ---------------------------------------------------------
+
     /** @param {any} e */
     const handleInputChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -164,6 +202,22 @@ function MenuDashboard({ onBack }) {
                 .menu-table-view td { padding: 15px 10px; color: var(--text-primary, #333); border-bottom: 1px solid var(--border-color, #eee); }
                 .menu-card-view { display: none; }
 
+                /* 순서 변경 손잡이. touch-action: none이 없으면 터치 드래그가 페이지 스크롤에 먹힌다. */
+                .col-grip { width: 34px; }
+                .menu-grip { touch-action: none; cursor: grab; user-select: none; text-align: center; color: var(--text-secondary, #bbb); font-size: 1rem; line-height: 1; padding: 6px 4px; }
+                .menu-grip:active { cursor: grabbing; }
+                /* 잡은 행은 공중에 뜬 것처럼 보여야 어디로 가고 있는지 눈으로 쫓을 수 있다.
+                   border-collapse: collapse에서는 tr에 건 그림자가 그려지지 않으므로 td에 건다.
+                   변형(translateY)은 훅이 tr에 직접 넣는다 — tr에 position/z-index가 있어야
+                   다른 행 위로 올라온다. */
+                .menu-table-view tr.dragging { position: relative; z-index: 5; }
+                .menu-table-view tr.dragging td {
+                    background: var(--card-bg, #fff);
+                    box-shadow: 0 8px 20px rgba(0,0,0,.18);
+                    cursor: grabbing;
+                }
+                .menu-hint { margin: 0 0 10px; font-size: 0.85rem; color: var(--text-secondary, #888); }
+
                 /* 버튼 및 뱃지 스타일 */
                 .badge-type { background-color: var(--accent-bg); color: #1565c0; padding: 4px 10px; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: bold; display: inline-block; }
                 .btn-sale { padding: 6px 12px; background-color: var(--success-bg); color: var(--success); border: 1px solid var(--success); border-radius: var(--radius-sm); cursor: pointer; font-weight: bold; font-size: 0.85rem; transition: all 0.2s; }
@@ -198,14 +252,23 @@ function MenuDashboard({ onBack }) {
                     .form-section { width: 100%; align-self: stretch; max-height: none; overflow: visible; } 
                     .list-section { display: block; }
                     .menu-table-scroll { overflow: visible; } 
-                    .list-section { padding: 0; background-color: transparent; box-shadow: none; border: none; } 
+                    /* 모바일에서는 이 영역이 배경 없는 통로 역할만 한다(카드 외형은 각 .menu-card가 갖는다).
+                       라운딩과 overflow: hidden을 남겨두면 패딩이 0이라 모서리 곡선이 첫 줄 첫 글자를 잘라먹는다. */
+                    .list-section { padding: 0; background-color: transparent; box-shadow: none; border: none; border-radius: 0; overflow: visible; } 
                     
                     .menu-table-view { display: none; } 
                     .menu-card-view { display: flex; flex-direction: column; gap: 15px; } 
                     
                     /* 모바일 카드 뷰 */
                     .menu-card { background-color: var(--card-bg, white); border-radius: var(--radius-lg); padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--border-color, #eee); }
-                    .menu-card-header { display: flex; justify-content: space-between; align-items: center; }
+                    .menu-card.dragging {
+                        position: relative; z-index: 5;
+                        box-shadow: 0 10px 24px rgba(0,0,0,.22);
+                        cursor: grabbing;
+                    }
+                    /* 카드에서는 손잡이를 제목 왼쪽에 둔다. 제목·배지와 한 줄을 나눠 쓴다. */
+                    .menu-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+                    .menu-card-title-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
                     .menu-card-title { font-size: 1.1rem; font-weight: bold; color: var(--text-primary, #333); }
                     .menu-card-price { font-size: 1.05rem; color: var(--text-primary, #555); margin-top: 5px; }
                     .menu-card-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color, #eee); padding-top: 12px; margin-top: 5px; }
@@ -285,11 +348,13 @@ function MenuDashboard({ onBack }) {
 
                 {/* 2. 메뉴 리스트 섹션 */}
                 <Card className="list-section">
+                    <p className="menu-hint">⠿ 를 끌어 순서를 바꾸면 캐셔 화면의 메뉴 차례도 같이 바뀝니다.</p>
                     {/* PC 테이블 뷰 — 머리글은 제자리에 두고 본문만 스크롤한다 */}
                     <div className="menu-table-scroll">
                         <table className="menu-table-view">
                             <thead>
                                 <tr>
+                                    <th className="col-grip" aria-label="순서" />
                                     <th>이름</th>
                                     <th>가격</th>
                                     <th>분류</th>
@@ -297,9 +362,21 @@ function MenuDashboard({ onBack }) {
                                     <th>관리</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {menuList.map((menu) => (
-                                    <tr key={menu.id}>
+                            <tbody data-drag-list>
+                                {menuList.map((menu, idx) => (
+                                    <tr
+                                        key={menu.id}
+                                        data-drag-row
+                                        data-drag-id={menu.id}
+                                        className={dragId === menu.id ? 'dragging' : ''}
+                                    >
+                                        <td
+                                            className="menu-grip"
+                                            onPointerDown={(e) => dragStart(e, idx, menu.id)}
+                                            aria-label="끌어서 순서 변경"
+                                        >
+                                            ⠿
+                                        </td>
                                         <td>
                                             <strong>{menu.name}</strong>
                                         </td>
@@ -333,12 +410,26 @@ function MenuDashboard({ onBack }) {
                     </div>
 
                     {/* 모바일 카드 뷰 */}
-                    <div className="menu-card-view">
-                        {menuList.map((menu) => (
-                            <div key={menu.id} className="menu-card">
+                    <div className="menu-card-view" data-drag-list>
+                        {menuList.map((menu, idx) => (
+                            <div
+                                key={menu.id}
+                                data-drag-row
+                                data-drag-id={menu.id}
+                                className={`menu-card ${dragId === menu.id ? 'dragging' : ''}`}
+                            >
                                 <div>
                                     <div className="menu-card-header">
-                                        <div className="menu-card-title">{menu.name}</div>
+                                        <div className="menu-card-title-wrap">
+                                            <span
+                                                className="menu-grip"
+                                                onPointerDown={(e) => dragStart(e, idx, menu.id)}
+                                                aria-label="끌어서 순서 변경"
+                                            >
+                                                ⠿
+                                            </span>
+                                            <div className="menu-card-title">{menu.name}</div>
+                                        </div>
                                         <span className="badge-type">{menu.type}</span>
                                     </div>
                                     <div className="menu-card-price">{menu.price.toLocaleString()}원</div>
