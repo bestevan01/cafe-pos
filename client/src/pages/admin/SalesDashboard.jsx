@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
 import * as XLSX from 'xlsx';
 import AdvancedStats from './AdvancedStats.jsx';
 import ThemeToggle from '../../components/ThemeToggle';
@@ -95,6 +96,23 @@ function SalesDashboard({ onBack }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void fetchSummary();
     }, [fetchSummary]);
+
+    // 캐셔가 주문을 받는 동안 숫자가 멈춰 있지 않도록 다시 불러온다.
+    // 이 화면은 보기 전용이라(매출 삭제는 단발 동작) 도중에 갱신돼도 입력이 날아갈 게 없다.
+    useEffect(() => {
+        const refresh = () => {
+            void fetchSummary();
+            void fetchMonth(selectedYear, selectedMonth);
+        };
+        socket.on('new_order', refresh);
+        socket.on('order_updated', refresh);
+        socket.on('order_deleted', refresh);
+        return () => {
+            socket.off('new_order', refresh);
+            socket.off('order_updated', refresh);
+            socket.off('order_deleted', refresh);
+        };
+    }, [fetchSummary, fetchMonth, selectedYear, selectedMonth]);
 
     useEffect(() => {
         void fetchMonth(selectedYear, selectedMonth);

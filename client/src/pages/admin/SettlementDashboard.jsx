@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -40,6 +41,21 @@ function SettlementDashboard({ onBack }) {
         // fetchSettlements는 useCallback으로 메모이즈된 비동기 함수라 setState가 await 이후에만 일어남(effect 본문에서 동기 호출 아님) — 규칙 오탐.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void fetchSettlements();
+    }, [fetchSettlements]);
+
+    // 직원이 오픈·마감하면 바로 반영한다. 주문도 듣는 이유: 현금 매출이 정산 금액에 들어간다.
+    useEffect(() => {
+        const refresh = () => void fetchSettlements();
+        socket.on('settlement_updated', refresh);
+        socket.on('new_order', refresh);
+        socket.on('order_updated', refresh);
+        socket.on('order_deleted', refresh);
+        return () => {
+            socket.off('settlement_updated', refresh);
+            socket.off('new_order', refresh);
+            socket.off('order_updated', refresh);
+            socket.off('order_deleted', refresh);
+        };
     }, [fetchSettlements]);
 
     // ---------------------------------------------------------

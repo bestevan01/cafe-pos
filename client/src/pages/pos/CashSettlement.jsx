@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
 
 // 💵 화폐 단위 정의 (5만원 ~ 10원)
@@ -115,9 +116,36 @@ function CashSettlement({ onClose }) {
         }
     };
 
+    // 마감 화면에 머무는 동안 현금 주문이 들어오면 전산 금액을 다시 받아온다.
+    useEffect(() => {
+        if (step !== 'close') return undefined;
+        const refresh = () => void fetchCalcData();
+        socket.on('new_order', refresh);
+        socket.on('order_updated', refresh);
+        socket.on('order_deleted', refresh);
+        return () => {
+            socket.off('new_order', refresh);
+            socket.off('order_updated', refresh);
+            socket.off('order_deleted', refresh);
+        };
+    }, [step, fetchCalcData]);
+
     const handleClose = async () => {
         if (!calcData) return;
-        const expected = calcData.expected;
+
+        // 현금을 세는 동안 들어온 주문이 있을 수 있다. 확인 창을 띄우기 전에 다시 받아와,
+        // 캐셔가 보는 차액과 서버가 기록할 차액을 맞춘다.
+        // (서버도 마감 시 스스로 다시 계산하므로 장부 자체는 이 조회와 무관하게 정확하다)
+        let latest = calcData;
+        try {
+            const res = await axios.get('/api/settlements/calc', getAuthHeader());
+            latest = res.data;
+            setCalcData(res.data);
+        } catch {
+            // 못 받아오면 화면에 있던 값으로 진행한다. 어차피 장부는 서버가 다시 센다.
+        }
+
+        const expected = latest.expected;
         const diff = totalAmount - expected;
 
         if (diff !== 0) {
@@ -136,11 +164,9 @@ function CashSettlement({ onClose }) {
         try {
             await axios.post(
                 '/api/settlements/close',
-                {
-                    closingAmount: totalAmount,
-                    salesCash: calcData.sales,
-                    diff: diff,
-                },
+                // 매출과 차액은 서버가 직접 계산한다. 창을 열어 둔 사이 주문이 더 들어와도
+                // 옛 숫자가 장부에 남지 않는다.
+                { closingAmount: totalAmount },
                 getAuthHeader(),
             );
             notify('마감 처리되었습니다. 수고하셨습니다!', { icon: '🔒' });

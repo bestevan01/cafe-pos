@@ -37,6 +37,8 @@ router.post('', authenticateToken, requireAdmin, async (req, res) => {
             type,
             next,
         ]);
+        // 캐셔 화면이 새로고침 없이 바로 받아보도록 알린다(이벤트 변경과 같은 방식).
+        req.app.get('io').emit('menu_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error('[🔥 POST /api/menu 에러]', err);
@@ -84,6 +86,8 @@ router.patch('/:id', authenticateToken, requireAdmin, async (req, res) => {
                 values,
             );
         }
+        // 품절 토글도 이 경로를 탄다. 캐셔가 품절을 모르고 주문받는 상황을 막는다.
+        req.app.get('io').emit('menu_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 PATCH /api/menu/${id} 에러]`, err);
@@ -110,6 +114,7 @@ router.put('/order', authenticateToken, requireAdmin, async (req, res) => {
             await conn.query('UPDATE menu SET sort_order = ? WHERE id = ?', [i + 1, ids[i]]);
         }
         await conn.commit();
+        req.app.get('io').emit('menu_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         await conn.rollback();
@@ -128,6 +133,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM menu WHERE id = ?', [id]);
+        req.app.get('io').emit('menu_updated');
         res.json({ success: true });
     } catch (/** @type {any} */ err) {
         console.error(`[🔥 DELETE /api/menu/${id} 에러]`, err);

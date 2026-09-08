@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
@@ -65,10 +65,77 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // ---------------------------------------------------------
     // [3] 데이터 조회 (API)
     // ---------------------------------------------------------
+    // 정합성 계산은 setState 밖에서 해야 한다. 갱신 함수 안에서 배열에 담으면
+    // StrictMode의 이중 호출로 같은 메뉴가 두 번 들어간다.
+    const cartRef = useRef(cart);
+    const shotConfigRef = useRef(shotConfig);
+    useEffect(() => {
+        cartRef.current = cart;
+        shotConfigRef.current = shotConfig;
+    }, [cart, shotConfig]);
+
+    /**
+     * 관리자가 메뉴를 고치면 담아 둔 주문과 실제 메뉴가 어긋난다.
+     * 지금까지는 새로고침해야 새 메뉴가 왔고 새로고침이 장바구니를 통째로 비워서 문제가 없었는데,
+     * 실시간 갱신을 넣으면 주문 도중에 어긋날 수 있다. 새 목록에 맞춰 정리하고 캐셔에게 알린다.
+     *
+     * @param {import('../../types').Menu[]} list 방금 받아온 메뉴 목록
+     */
+    const reconcileCart = (list) => {
+        const byName = new Map(list.map((m) => [m.name, m]));
+        /** @type {string[]} */ const removed = [];
+        /** @type {string[]} */ const repriced = [];
+
+        // 비커피: cart가 담을 당시의 가격을 들고 있어 가격이 바뀌면 따로 맞춰 줘야 한다.
+        const nextCart = [];
+        for (const item of cartRef.current) {
+            const menu = byName.get(item.name);
+            if (!menu) {
+                removed.push(item.name); // 삭제된 메뉴는 팔 수 없다
+                continue;
+            }
+            if (menu.price !== item.price) {
+                repriced.push(item.name);
+                nextCart.push({ ...item, price: menu.price });
+            } else {
+                nextCart.push(item);
+            }
+        }
+
+        // 커피: 가격은 menuList에서 그때그때 읽으므로 삭제만 걸러 내면 된다.
+        /** @type {Record<string, number[]>} */ const nextShots = {};
+        for (const [name, slots] of Object.entries(shotConfigRef.current)) {
+            if (!byName.has(name)) {
+                removed.push(name);
+                continue;
+            }
+            nextShots[name] = slots;
+        }
+
+        if (removed.length > 0) {
+            setCart(nextCart);
+            setShotConfig(nextShots);
+            notify(`${removed.join(', ')} 메뉴가 삭제되어 주문에서 빠졌습니다.`, { icon: '⚠️' });
+        } else if (repriced.length > 0) {
+            setCart(nextCart);
+        }
+        if (repriced.length > 0) {
+            notify(`${repriced.join(', ')} 가격이 바뀌어 주문에 반영했습니다.`, { icon: '💰' });
+        }
+    };
+
+    // fetchMenu는 useCallback이라 reconcileCart를 직접 부르면 의존성 때문에 매 렌더 새로 만들어지고,
+    // 그러면 소켓 리스너 effect도 매번 다시 붙는다. 최신본만 ref로 건넨다.
+    const reconcileCartRef = useRef(reconcileCart);
+    useEffect(() => {
+        reconcileCartRef.current = reconcileCart;
+    });
+
     const fetchMenu = useCallback(async () => {
         try {
             const res = await axios.get('/api/menu', getAuthHeader());
             setMenuList(res.data);
+            reconcileCartRef.current(res.data);
         } catch {
             notify('주문 화면 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', {
                 icon: '⚠️',
@@ -147,6 +214,10 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         socket.on('events_updated', () => {
             void fetchActiveEvents();
         });
+        // 관리자가 메뉴를 고치면(추가·수정·삭제·품절·순서) 새로고침 없이 바로 반영한다.
+        socket.on('menu_updated', () => {
+            void fetchMenu();
+        });
 
         return () => {
             window.removeEventListener('resize', handleResize);
@@ -154,6 +225,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
             socket.off('order_updated');
             socket.off('order_deleted');
             socket.off('events_updated');
+            socket.off('menu_updated');
         };
     }, [fetchOrders, fetchMenu, fetchActiveEvents]);
 
@@ -527,7 +599,10 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                         </div>
                         <div className="menu-price">{menu.price.toLocaleString()}원</div>
                     </div>
-                    {!isSoldOut && (
+                    {/* 품절이어도 이미 담아 둔 수량이 있으면 스테퍼를 남긴다. 감추면 줄일 방법이 없어
+                        주문에서 빼지 못한다(관리자가 주문 도중 품절 처리하면 실제로 생긴다).
+                        대신 '+'는 막아 품절 메뉴가 더 담기지 않게 한다. */}
+                    {(!isSoldOut || total > 0) && (
                         <div className="qty-stepper" onClick={(e) => e.stopPropagation()}>
                             <button className="circle-btn" onClick={() => handleTotalChange(menu, -1)}>
                                 -
@@ -540,7 +615,11 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                             >
                                 {total}
                             </button>
-                            <button className="circle-btn" onClick={() => handleTotalChange(menu, 1)}>
+                            <button
+                                className="circle-btn"
+                                onClick={() => handleTotalChange(menu, 1)}
+                                disabled={isSoldOut}
+                            >
                                 +
                             </button>
                         </div>

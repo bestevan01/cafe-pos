@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { socket } from '../../utils/socket';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
 import StatsLayout from '../../components/stats/StatsLayout';
@@ -40,7 +41,8 @@ function AdvancedStats({ onBack }) {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
 
-    useEffect(() => {
+    // 소켓에서도 다시 부를 수 있게 함수로 뺀다.
+    const fetchStats = useCallback(() => {
         axios
             .get('/api/admin/stats', getAuthHeader())
             .then((res) => {
@@ -53,6 +55,22 @@ function AdvancedStats({ onBack }) {
                 setLoading(false);
             });
     }, [notify]);
+
+    useEffect(() => {
+        fetchStats();
+    }, [fetchStats]);
+
+    // 캐셔가 주문을 받는 동안 숫자가 멈춰 있지 않도록 다시 불러온다. 보기 전용 화면이다.
+    useEffect(() => {
+        socket.on('new_order', fetchStats);
+        socket.on('order_updated', fetchStats);
+        socket.on('order_deleted', fetchStats);
+        return () => {
+            socket.off('new_order', fetchStats);
+            socket.off('order_updated', fetchStats);
+            socket.off('order_deleted', fetchStats);
+        };
+    }, [fetchStats]);
 
     const weekSales = WEEK.map((d) => {
         const hit = stats.dowStats.find((/** @type {any} */ r) => Number(r.dow) === d.dow);
