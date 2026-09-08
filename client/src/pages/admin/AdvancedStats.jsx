@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
+import { debounce } from '../../utils/debounce';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
 import StatsLayout from '../../components/stats/StatsLayout';
@@ -62,13 +63,15 @@ function AdvancedStats({ onBack }) {
 
     // 캐셔가 주문을 받는 동안 숫자가 멈춰 있지 않도록 다시 불러온다. 보기 전용 화면이다.
     useEffect(() => {
-        socket.on('new_order', fetchStats);
-        socket.on('order_updated', fetchStats);
-        socket.on('order_deleted', fetchStats);
+        const refresh = debounce(fetchStats);
+        socket.on('new_order', refresh.run);
+        socket.on('order_updated', refresh.run);
+        socket.on('order_deleted', refresh.run);
         return () => {
-            socket.off('new_order', fetchStats);
-            socket.off('order_updated', fetchStats);
-            socket.off('order_deleted', fetchStats);
+            refresh.cancel();
+            socket.off('new_order', refresh.run);
+            socket.off('order_updated', refresh.run);
+            socket.off('order_deleted', refresh.run);
         };
     }, [fetchStats]);
 

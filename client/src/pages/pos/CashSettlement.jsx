@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
+import { debounce } from '../../utils/debounce';
 import { useNotification } from '../../hooks/useNotification';
 
 // 💵 화폐 단위 정의 (5만원 ~ 10원)
@@ -119,14 +120,15 @@ function CashSettlement({ onClose }) {
     // 마감 화면에 머무는 동안 현금 주문이 들어오면 전산 금액을 다시 받아온다.
     useEffect(() => {
         if (step !== 'close') return undefined;
-        const refresh = () => void fetchCalcData();
-        socket.on('new_order', refresh);
-        socket.on('order_updated', refresh);
-        socket.on('order_deleted', refresh);
+        const refresh = debounce(() => void fetchCalcData());
+        socket.on('new_order', refresh.run);
+        socket.on('order_updated', refresh.run);
+        socket.on('order_deleted', refresh.run);
         return () => {
-            socket.off('new_order', refresh);
-            socket.off('order_updated', refresh);
-            socket.off('order_deleted', refresh);
+            refresh.cancel();
+            socket.off('new_order', refresh.run);
+            socket.off('order_updated', refresh.run);
+            socket.off('order_deleted', refresh.run);
         };
     }, [step, fetchCalcData]);
 

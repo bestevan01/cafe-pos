@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
+import { debounce } from '../../utils/debounce';
 import ThemeToggle from '../../components/ThemeToggle';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -45,16 +46,17 @@ function SettlementDashboard({ onBack }) {
 
     // 직원이 오픈·마감하면 바로 반영한다. 주문도 듣는 이유: 현금 매출이 정산 금액에 들어간다.
     useEffect(() => {
-        const refresh = () => void fetchSettlements();
-        socket.on('settlement_updated', refresh);
-        socket.on('new_order', refresh);
-        socket.on('order_updated', refresh);
-        socket.on('order_deleted', refresh);
+        const refresh = debounce(() => void fetchSettlements());
+        socket.on('settlement_updated', refresh.run);
+        socket.on('new_order', refresh.run);
+        socket.on('order_updated', refresh.run);
+        socket.on('order_deleted', refresh.run);
         return () => {
-            socket.off('settlement_updated', refresh);
-            socket.off('new_order', refresh);
-            socket.off('order_updated', refresh);
-            socket.off('order_deleted', refresh);
+            refresh.cancel();
+            socket.off('settlement_updated', refresh.run);
+            socket.off('new_order', refresh.run);
+            socket.off('order_updated', refresh.run);
+            socket.off('order_deleted', refresh.run);
         };
     }, [fetchSettlements]);
 
