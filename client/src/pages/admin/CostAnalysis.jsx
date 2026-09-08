@@ -270,7 +270,12 @@ function CostAnalysis({ onBack }) {
                 .cost-table th, .cost-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-color, #eee); text-align: right; white-space: nowrap; }
                 .cost-table th { color: var(--text-secondary, #888); font-weight: 700; font-size: .82rem; }
                 .cost-table td.l, .cost-table th.l { text-align: left; }
-                .cost-input { width: 92px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border-color, #ddd); border-radius: 8px; background: var(--bg-color, #fff); color: var(--text-primary, #222); text-align: right; box-sizing: border-box; }
+                /* input과 select를 한 클래스로 묶어 쓰는데, 둘은 브라우저 기본 스타일(폰트·내부 여백)이
+                   서로 달라 같은 padding을 줘도 높이가 어긋난다. Safari에서 특히 두드러진다.
+                   그래서 세로 padding 대신 height로 높이를 고정한다 — WebKit은 select의 세로 padding을
+                   일부 무시하므로 padding만으로는 맞출 수 없다.
+                   폰트도 상속시킨다. 폼 요소는 기본적으로 페이지 폰트를 물려받지 않아 글자 크기까지 달라진다. */
+                .cost-input { width: 92px; min-width: 0; height: 32px; padding: 0 8px; font-family: inherit; font-size: .92rem; line-height: normal; border: 1px solid var(--border-color, #ddd); border-radius: 8px; background: var(--bg-color, #fff); color: var(--text-primary, #222); text-align: right; vertical-align: middle; box-sizing: border-box; }
                 .cost-input.name { width: 130px; text-align: left; }
                 .cost-input.unit { width: 64px; text-align: center; }
                 .cost-input.cat { width: 86px; text-align: center; }

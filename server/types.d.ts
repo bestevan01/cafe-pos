@@ -4,7 +4,8 @@ import 'express';
 
 /** authenticateToken이 검증한 JWT 페이로드 */
 export interface JwtUser {
-    id: number;
+    /** users.id는 varchar(36) UUID다. 숫자가 아니다. */
+    id: string;
     username: string;
     name: string;
     role: 'admin' | 'staff' | 'pending';

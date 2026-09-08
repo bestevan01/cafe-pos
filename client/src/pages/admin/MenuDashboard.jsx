@@ -119,7 +119,11 @@ function MenuDashboard({ onBack }) {
             <style>
                 {`
                 /* 전체 레이아웃 */
-                .menu-container { padding: 20px; background-color: var(--bg-color, #f4f6f8); min-height: 100dvh; display: flex; flex-direction: column; box-sizing: border-box; transition: background-color 0.3s ease; }
+                /* 메뉴가 늘어나면 페이지 전체가 스크롤돼 입력 폼과 표 머리글까지 같이 올라간다.
+                   컨테이너를 화면 높이에 가두고 안에서 높이를 나눠, 표 본문만 스크롤하게 한다.
+                   overflow는 걸지 않는다 — 테마 드롭다운 같은 절대배치 요소가 잘릴 수 있고,
+                   flex 배분이 맞으면 넘칠 일도 없다. */
+                .menu-container { padding: 20px; background-color: var(--bg-color, #f4f6f8); height: 100dvh; display: flex; flex-direction: column; box-sizing: border-box; transition: background-color 0.3s ease; }
                 
                 /* 헤더 영역 */
                 .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: nowrap; gap: 15px; }
@@ -136,21 +140,27 @@ function MenuDashboard({ onBack }) {
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (폼 + 리스트) */
-                .menu-content { display: flex; gap: 20px; align-items: flex-start; }
+                /* min-height: 0 이 없으면 flex 자식이 내용 높이 아래로 못 줄어들어 표가 화면 밖으로 넘친다. */
+                .menu-content { display: flex; gap: 20px; align-items: stretch; flex: 1; min-height: 0; }
                 
                 /* 입력 폼 섹션 */
-                .form-section { width: 320px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 20px; } /* 카드 외형은 공용 <Card>가 담당 */
+                /* 부모가 스크롤하지 않으므로 sticky가 불필요하다(기존 top: 20px는 고정 헤더에 가려 잘렸다).
+                   align-self로 세로 늘어남을 막고, 창이 낮을 때를 대비해 폼 자체만 스크롤시킨다. */
+                .form-section { width: 320px; flex-shrink: 0; box-sizing: border-box; align-self: flex-start; max-height: 100%; overflow-y: auto; } /* 카드 외형은 공용 <Card>가 담당 */
                 .form-title { margin-top: 0; margin-bottom: 15px; color: var(--text-primary, #333); }
                 .menu-input { padding: 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color, #ddd); font-size: 1rem; background-color: var(--bg-color, #f4f6f8); color: var(--text-primary, #333); width: 100%; box-sizing: border-box; margin-bottom: 10px; -webkit-appearance: none; }
                 .menu-input:focus { outline: none; border-color: var(--accent); }
                 
 
                 /* 리스트 섹션 */
-                .list-section { flex: 1; overflow: hidden; width: 100%; box-sizing: border-box; } /* 카드 외형은 공용 <Card>가 담당 */
+                .list-section { flex: 1; overflow: hidden; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; } /* 카드 외형은 공용 <Card>가 담당 */
+                .menu-table-scroll { flex: 1; min-height: 0; overflow-y: auto; }
                 
                 /* PC 테이블 뷰 */
                 .menu-table-view { width: 100%; border-collapse: collapse; }
-                .menu-table-view th { padding: 15px 10px; color: var(--text-secondary, #666); text-align: left; border-bottom: 2px solid var(--border-color, #ddd); white-space: nowrap; }
+                /* 머리글 고정. border-collapse: collapse에서는 th의 border가 sticky를 따라오지 않고
+                   제자리에 남아버리므로, 밑줄을 box-shadow로 그린다. 배경도 깔아야 본문이 비쳐 보이지 않는다. */
+                .menu-table-view th { position: sticky; top: 0; z-index: 1; background: var(--card-bg, #fff); padding: 15px 10px; color: var(--text-secondary, #666); text-align: left; box-shadow: inset 0 -2px 0 var(--border-color, #ddd); white-space: nowrap; }
                 .menu-table-view td { padding: 15px 10px; color: var(--text-primary, #333); border-bottom: 1px solid var(--border-color, #eee); }
                 .menu-card-view { display: none; }
 
@@ -182,8 +192,12 @@ function MenuDashboard({ onBack }) {
                        띄워두면 sticky 헤더의 padding 위로 올라가 잘린다. */
                     .theme-wrapper { position: static; flex-shrink: 0; }
                     
-                    .menu-content { flex-direction: column; } 
-                    .form-section { width: 100%; position: static; } 
+                    /* 모바일은 카드 뷰라 내부 스크롤이 필요 없다. 페이지 전체 스크롤로 되돌린다. */
+                    .menu-container { height: auto; min-height: 100dvh; }
+                    .menu-content { flex-direction: column; flex: none; min-height: 0; } 
+                    .form-section { width: 100%; align-self: stretch; max-height: none; overflow: visible; } 
+                    .list-section { display: block; }
+                    .menu-table-scroll { overflow: visible; } 
                     .list-section { padding: 0; background-color: transparent; box-shadow: none; border: none; } 
                     
                     .menu-table-view { display: none; } 
@@ -271,47 +285,52 @@ function MenuDashboard({ onBack }) {
 
                 {/* 2. 메뉴 리스트 섹션 */}
                 <Card className="list-section">
-                    {/* PC 테이블 뷰 */}
-                    <table className="menu-table-view">
-                        <thead>
-                            <tr>
-                                <th>이름</th>
-                                <th>가격</th>
-                                <th>분류</th>
-                                <th>상태 변경</th>
-                                <th>관리</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {menuList.map((menu) => (
-                                <tr key={menu.id}>
-                                    <td>
-                                        <strong>{menu.name}</strong>
-                                    </td>
-                                    <td>{menu.price.toLocaleString()}원</td>
-                                    <td>
-                                        <span className="badge-type">{menu.type}</span>
-                                    </td>
-                                    <td>
-                                        <button
-                                            onClick={() => toggleSoldOut(menu)}
-                                            className={menu.is_soldout ? 'btn-soldout' : 'btn-sale'}
-                                        >
-                                            {menu.is_soldout ? '🚫 품절' : '🟢 판매중'}
-                                        </button>
-                                    </td>
-                                    <td>
-                                        <button onClick={() => startEdit(menu)} className="btn-action btn-edit">
-                                            수정
-                                        </button>
-                                        <button onClick={() => handleDelete(menu.id)} className="btn-action btn-del">
-                                            삭제
-                                        </button>
-                                    </td>
+                    {/* PC 테이블 뷰 — 머리글은 제자리에 두고 본문만 스크롤한다 */}
+                    <div className="menu-table-scroll">
+                        <table className="menu-table-view">
+                            <thead>
+                                <tr>
+                                    <th>이름</th>
+                                    <th>가격</th>
+                                    <th>분류</th>
+                                    <th>상태 변경</th>
+                                    <th>관리</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {menuList.map((menu) => (
+                                    <tr key={menu.id}>
+                                        <td>
+                                            <strong>{menu.name}</strong>
+                                        </td>
+                                        <td>{menu.price.toLocaleString()}원</td>
+                                        <td>
+                                            <span className="badge-type">{menu.type}</span>
+                                        </td>
+                                        <td>
+                                            <button
+                                                onClick={() => toggleSoldOut(menu)}
+                                                className={menu.is_soldout ? 'btn-soldout' : 'btn-sale'}
+                                            >
+                                                {menu.is_soldout ? '🚫 품절' : '🟢 판매중'}
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <button onClick={() => startEdit(menu)} className="btn-action btn-edit">
+                                                수정
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(menu.id)}
+                                                className="btn-action btn-del"
+                                            >
+                                                삭제
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
 
                     {/* 모바일 카드 뷰 */}
                     <div className="menu-card-view">

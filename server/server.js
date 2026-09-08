@@ -20,6 +20,8 @@ const orderRoutes = require('./routes/order.routes');
 const eventRoutes = require('./routes/event.routes');
 const salesRoutes = require('./routes/sales.routes');
 const settlementRoutes = require('./routes/settlement.routes');
+const hygieneRoutes = require('./routes/hygiene.routes');
+const hygieneAdminRoutes = require('./routes/hygieneAdmin.routes');
 const statsRoutes = require('./routes/stats.routes');
 const costRoutes = require('./routes/cost.routes');
 const passkeyRoutes = require('./routes/passkey.routes');
@@ -170,6 +172,76 @@ async function ensureSchema() {
     } catch (/** @type {any} */ err) {
         console.error('⚠️ [DB] login_attempts 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
+
+    // 위생 점검 체크리스트. 자세한 설계 의도는 migrations/009_hygiene_checklist.sql 참고.
+    // 결과 행에 항목 문구를 복사해 두는 것이 핵심 — 관리자가 항목을 고쳐도 과거 기록이 바뀌면 안 된다.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hygiene_items
+            (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                label      VARCHAR(200) NOT NULL,
+                category   VARCHAR(50)  NOT NULL DEFAULT '공통',
+                sort_order INT          NOT NULL DEFAULT 0,
+                is_active  TINYINT      NOT NULL DEFAULT 1,
+                created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY idx_hygiene_items_active (is_active, sort_order, id)
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hygiene_checks
+            (
+                id              INT AUTO_INCREMENT PRIMARY KEY,
+                check_date      DATE         NOT NULL,
+                checked_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                checked_by_id   VARCHAR(36)  NULL,
+                checked_by_name VARCHAR(50)  NOT NULL,
+                memo            VARCHAR(500) NULL,
+                updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_hygiene_checks_date (check_date)
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hygiene_check_results
+            (
+                id            INT AUTO_INCREMENT PRIMARY KEY,
+                check_id      INT          NOT NULL,
+                item_id       INT          NULL,
+                item_label    VARCHAR(200) NOT NULL,
+                item_category VARCHAR(50)  NOT NULL,
+                sort_order    INT          NOT NULL DEFAULT 0,
+                status        VARCHAR(10)  NOT NULL,
+                note          VARCHAR(500) NULL,
+                CONSTRAINT fk_hygiene_result_check FOREIGN KEY (check_id) REFERENCES hygiene_checks (id) ON DELETE CASCADE,
+                CONSTRAINT fk_hygiene_result_item FOREIGN KEY (item_id) REFERENCES hygiene_items (id) ON DELETE SET NULL,
+                KEY idx_hygiene_results_check (check_id)
+            )
+        `);
+        // 사진 첨부. 파일은 R2에 있고 여기엔 위치와 메타데이터만 둔다.
+        // 자세한 흐름은 migrations/010_hygiene_photos.sql 참고.
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hygiene_check_photos
+            (
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                check_id     INT          NULL,
+                item_id      INT          NULL,
+                r2_key       VARCHAR(255) NOT NULL,
+                status       VARCHAR(10)  NOT NULL,
+                bytes        INT          NULL,
+                content_type VARCHAR(100) NULL,
+                width        INT          NULL,
+                height       INT          NULL,
+                uploaded_by  VARCHAR(36)  NULL,
+                created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_hygiene_photo_key (r2_key),
+                KEY idx_hygiene_photos_check (check_id),
+                CONSTRAINT fk_hygiene_photo_check FOREIGN KEY (check_id) REFERENCES hygiene_checks (id) ON DELETE CASCADE
+            )
+        `);
+    } catch (/** @type {any} */ err) {
+        console.error('⚠️ [DB] 위생 점검 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
+    }
 }
 
 // ---------------------------------------------------------
@@ -202,6 +274,8 @@ app.use('/api/admin/sales', salesRoutes);
 app.use('/api/admin/stats', statsRoutes);
 app.use('/api/admin', costRoutes);
 app.use('/api/settlements', settlementRoutes);
+app.use('/api/hygiene', hygieneRoutes);
+app.use('/api/admin/hygiene', hygieneAdminRoutes);
 
 // 상태 확인용 API (Health Check)
 app.use('/ping', healthRoutes);
