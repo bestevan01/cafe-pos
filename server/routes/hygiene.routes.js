@@ -139,10 +139,13 @@ function buildResultRows(items, body) {
         if (!r || !STATUSES.includes(r.status)) {
             return { error: `"${item.label}" 항목을 확인해주세요.` };
         }
-        const note =
-            String(r.note ?? '')
-                .trim()
-                .slice(0, 500) || null;
+        // 사유는 '미흡 사유'다. 미흡이 아니면 버린다.
+        // 화면에서는 미흡일 때만 입력칸이 보이므로, 사유를 적어둔 뒤 양호로 바꾸면
+        // 보이지도 고칠 수도 없는 글이 기록에 남아 관리자 화면에 그대로 뜬다.
+        const text = String(r.note ?? '')
+            .trim()
+            .slice(0, 500);
+        const note = r.status === 'fail' ? text || null : null;
         // 미흡은 왜 미흡인지 남겨야 나중에 조치를 확인할 수 있다.
         if (r.status === 'fail' && !note) {
             return { error: `"${item.label}"은(는) 미흡 사유를 적어주세요.` };

@@ -100,7 +100,11 @@ function HygieneCheck({ onClose }) {
 
     /** @param {number} id @param {string} status */
     const pick = (id, status) => {
-        setAnswers((a) => ({ ...a, [id]: { status, note: a[id]?.note ?? '' } }));
+        // 사유 입력칸은 미흡일 때만 보인다. 다른 상태로 바꾸면 적어둔 사유도 함께 비운다 —
+        // 남겨두면 화면에 보이지 않는 채로 저장돼 관리자 기록에만 남는다.
+        // 서버도 같은 규칙으로 한 번 더 거르지만, 여기서 비워야 수정 이력의 전후 비교가
+        // 실제로 저장되는 값과 맞는다.
+        setAnswers((a) => ({ ...a, [id]: { status, note: status === 'fail' ? (a[id]?.note ?? '') : '' } }));
     };
 
     /** @param {number} id @param {string} note */
@@ -275,21 +279,28 @@ function HygieneCheck({ onClose }) {
                                                 ))}
                                             </div>
                                             {a?.status === 'fail' && (
-                                                <>
-                                                    <textarea
-                                                        className="hc-note"
-                                                        placeholder="무엇이 문제였고 어떻게 조치했는지 적어주세요 (필수)"
-                                                        value={a.note}
-                                                        onChange={(e) => setNote(item.id, e.target.value)}
-                                                    />
-                                                    <div className="hc-photos">
-                                                        {(photos[item.id] ?? []).map((pid) => (
-                                                            <HygienePhoto
-                                                                key={pid}
-                                                                photoId={pid}
-                                                                onRemove={() => removePhoto(item.id, pid)}
-                                                            />
-                                                        ))}
+                                                <textarea
+                                                    className="hc-note"
+                                                    placeholder="무엇이 문제였고 어떻게 조치했는지 적어주세요 (필수)"
+                                                    value={a.note}
+                                                    onChange={(e) => setNote(item.id, e.target.value)}
+                                                />
+                                            )}
+                                            {/* 이미 붙은 사진은 상태와 무관하게 보여준다. 미흡일 때만 보이게 하면
+                                                양호로 바꾼 순간 사진이 화면에서 사라지는데, 기록에는 그대로 남아
+                                                관리자 화면에만 뜬다. 사진은 조용히 지우지 않는 것이 원칙이라
+                                                (지워도 삭제 기록으로 남긴다) 감추는 대신 보이게 두고 직접 지우게 한다.
+                                                새로 붙이는 것은 미흡일 때만 — 사진은 문제를 남기기 위한 것이다. */}
+                                            {(a?.status === 'fail' || (photos[item.id] ?? []).length > 0) && (
+                                                <div className="hc-photos">
+                                                    {(photos[item.id] ?? []).map((pid) => (
+                                                        <HygienePhoto
+                                                            key={pid}
+                                                            photoId={pid}
+                                                            onRemove={() => removePhoto(item.id, pid)}
+                                                        />
+                                                    ))}
+                                                    {a?.status === 'fail' && (
                                                         <label
                                                             className={`hc-add-photo ${uploading === item.id ? 'busy' : ''}`}
                                                         >
@@ -308,8 +319,8 @@ function HygieneCheck({ onClose }) {
                                                                 }}
                                                             />
                                                         </label>
-                                                    </div>
-                                                </>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     );
