@@ -252,6 +252,75 @@ async function ensureSchema() {
     } catch (/** @type {any} */ err) {
         console.error('⚠️ [DB] 위생 점검 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
+
+    // 위생 점검 기록의 수정 이력. 자세한 배경은 migrations/013_hygiene_check_edits.sql 참고.
+    // 수정은 결과를 통째로 지우고 다시 쓰므로, 남기지 않으면 누가 무엇을 고쳤는지 알 수 없다.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hygiene_check_edits
+            (
+                id             INT AUTO_INCREMENT PRIMARY KEY,
+                check_id       INT         NOT NULL,
+                edited_by_id   VARCHAR(36) NULL,
+                edited_by_name VARCHAR(50) NOT NULL,
+                edited_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                changes        TEXT        NOT NULL,
+                CONSTRAINT fk_hygiene_edit_check FOREIGN KEY (check_id) REFERENCES hygiene_checks (id) ON DELETE CASCADE,
+                KEY idx_hygiene_edits_check (check_id, edited_at)
+            )
+        `);
+    } catch (/** @type {any} */ err) {
+        console.error('⚠️ [DB] hygiene_check_edits 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
+    }
+
+    // 제출된 점검의 사진은 지워도 실제로 지우지 않는다. 자세한 배경은 migrations/014_hygiene_photo_soft_delete.sql 참고.
+    try {
+        await pool.query(`ALTER TABLE hygiene_check_photos
+            ADD COLUMN removed_at      DATETIME    NULL,
+            ADD COLUMN removed_by_id   VARCHAR(36) NULL,
+            ADD COLUMN removed_by_name VARCHAR(50) NULL`);
+        console.log('✅ [DB] 위생 점검 사진 삭제 기록 컬럼 추가');
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] hygiene_check_photos 삭제 기록 컬럼 추가 실패:', err.message);
+        }
+    }
+
+    // 위생 점검을 하루 2회(오전·오후)로 나눈다. 자세한 배경은 migrations/012_hygiene_check_slot.sql 참고.
+    // 컬럼 추가와 달리 인덱스를 갈아끼우는 작업이라 단계를 나누고 각각 결과를 확인한다.
+    try {
+        await pool.query("ALTER TABLE hygiene_checks ADD COLUMN slot VARCHAR(10) NOT NULL DEFAULT 'am'");
+        // 컬럼을 방금 만들었을 때만 실제 제출 시각으로 칸을 바로잡는다.
+        // 전부 아침일 거라 여겼지만 16:29, 13:22처럼 오후에 낸 기록도 있어, 그대로 두면
+        // 보고서에 '오전 · 16:29'처럼 앞뒤가 안 맞는 줄이 남는다.
+        // 부팅마다 돌리면 안 된다 — 아침 점검을 늦게 낸 경우처럼 사람이 일부러 고른 칸을 덮어쓴다.
+        // 경계는 정오. routes/hygiene.routes.js의 PM_FROM_HOUR와 같아야 한다 —
+        // 다르면 과거 기록과 앞으로 쌓일 기록의 기준이 달라진다.
+        const [fixed] = await pool.query("UPDATE hygiene_checks SET slot = 'pm' WHERE HOUR(checked_at) >= 12");
+        console.log(`✅ [DB] 위생 점검 칸 컬럼 추가 — 오후 제출 ${fixed.affectedRows}건을 pm으로 보정`);
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] hygiene_checks.slot 컬럼 추가 실패:', err.message);
+        }
+    }
+    try {
+        // 새 키를 먼저 만든다. 옛 키를 먼저 지웠다가 이게 실패하면 중복 방지가 사라진다.
+        await pool.query('ALTER TABLE hygiene_checks ADD UNIQUE KEY uq_hygiene_checks_date_slot (check_date, slot)');
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_KEYNAME') {
+            console.error('⚠️ [DB] hygiene_checks 복합 유니크 키 추가 실패:', err.message);
+        }
+    }
+    try {
+        // 옛 키가 남아 있으면 날짜당 1건 제약이 유지되어 오후 점검이 막힌다. 반드시 지워야 한다.
+        await pool.query('ALTER TABLE hygiene_checks DROP INDEX uq_hygiene_checks_date');
+        console.log('✅ [DB] 위생 점검 하루 1건 제약 해제 (오전·오후 2회 가능)');
+    } catch (/** @type {any} */ err) {
+        // 이미 지워진 경우가 정상 경로다. 그 외 사유는 오후 점검이 막히므로 크게 알린다.
+        if (err.code !== 'ER_CANT_DROP_FIELD_OR_KEY') {
+            console.error('🔥 [DB] 옛 유니크 키 제거 실패 — 오후 점검이 막힙니다:', err.message);
+        }
+    }
 }
 
 // ---------------------------------------------------------

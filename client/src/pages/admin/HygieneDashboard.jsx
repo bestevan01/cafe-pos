@@ -27,6 +27,14 @@ const monthRange = (/** @type {number} */ offset) => {
     return { from: ymd(first), to: ymd(offset === 0 && last > now ? now : last) };
 };
 
+/** 결과 상태를 사람이 읽는 말로. 수정 이력에 'ok → fail'처럼 코드가 그대로 나오면 읽기 어렵다. */
+const STATUS_NAME = /** @type {Record<string, string>} */ ({ ok: '양호', fail: '미흡', na: '해당 없음' });
+
+/** 보고서는 하루를 항상 이 두 줄로 그린다. 실제로 한 칸만 했더라도 나머지 칸을 남겨야
+ *  '무엇을 걸렀는지'가 보인다. 서버의 SLOTS와 같은 순서여야 한다. */
+const REPORT_SLOTS = ['am', 'pm'];
+const SLOT_NAME = /** @type {Record<string, string>} */ ({ am: '오전', pm: '오후' });
+
 /** 상세 응답에서 그 항목에 붙은 사진만 고른다. 항목이 지워진 과거 기록은 item_id가 없을 수 있다. */
 const photosOf = (/** @type {any} */ detail, /** @type {any} */ itemId) =>
     itemId == null ? [] : (detail.photos ?? []).filter((/** @type {any} */ p) => p.item_id === itemId);
@@ -36,6 +44,97 @@ const weekdayOf = (/** @type {string} */ ds) => {
     const [y, m, d] = ds.split('-').map(Number);
     return WEEKDAYS[new Date(y, m - 1, d).getDay()];
 };
+
+/**
+ * 어떤 항목의 사진을 지웠는지. 지운 사진 자체는 위 결과 목록에 '삭제됨'으로 그대로 남아 있으므로,
+ * 이력에는 어느 항목이었는지만 적어 그쪽을 찾아보게 한다.
+ * 항목이 은퇴해 문구를 못 찾은 경우(label이 null)는 세지 않는다.
+ */
+const removedLabels = (/** @type {any} */ ch) => {
+    const labels = (ch.removedPhotos ?? []).map((/** @type {any} */ p) => p.label).filter(Boolean);
+    return labels.length > 0 ? [...new Set(labels)].join(', ') : '';
+};
+
+/** 시:분. 날짜는 점검 기록 자체가 이미 갖고 있어 이력에는 시각만 적는다. */
+const hhmm = (/** @type {string} */ v) => {
+    const d = new Date(v);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+/** 빈 글은 '(없음)'으로 보여준다. 아무것도 안 뜨면 지워진 것인지 원래 없던 것인지 알 수 없다. */
+const textOr = (/** @type {string|null|undefined} */ v) => (v && v.trim() ? v : '(없음)');
+
+/**
+ * 한 번의 수정으로 무엇이 바뀌었는지.
+ *
+ * 사유·특이사항은 '변경됨'이 아니라 바뀌기 전후의 글을 그대로 보여준다. 상태는 '미흡 → 양호'로
+ * 남는데 글만 뭉개면 무엇이 어떻게 고쳐졌는지 알 수 없어 감사 기록으로 쓸모가 없다.
+ *
+ * 화면(EditLog)과 인쇄 보고서가 같은 것을 쓴다. 따로 만들면 한쪽만 고쳐져 서로 달라진다.
+ *
+ * @param {{changes: any}} props
+ */
+function EditChanges({ changes: ch }) {
+    if (!ch) return <span className="hyg-edit-what">수정함</span>;
+    return (
+        <span className="hyg-edit-what">
+            {(ch.items ?? []).map((/** @type {any} */ it, /** @type {number} */ j) => {
+                const noteChanged = (it.noteFrom ?? '') !== (it.noteTo ?? '');
+                return (
+                    <span key={j} className="hyg-edit-item">
+                        {it.label}
+                        {it.from !== it.to && (
+                            <b>
+                                {' '}
+                                {STATUS_NAME[it.from] ?? it.from} → {STATUS_NAME[it.to] ?? it.to}
+                            </b>
+                        )}
+                        {noteChanged && (
+                            <span className="hyg-edit-text">
+                                사유 <s>{textOr(it.noteFrom)}</s> → {textOr(it.noteTo)}
+                            </span>
+                        )}
+                    </span>
+                );
+            })}
+            {ch.memoChanged && (
+                <span className="hyg-edit-item">
+                    <span className="hyg-edit-text">
+                        특이사항 <s>{textOr(ch.memoFrom)}</s> → {textOr(ch.memoTo)}
+                    </span>
+                </span>
+            )}
+            {ch.photos?.added > 0 && <span className="hyg-edit-item">사진 {ch.photos.added}장 추가</span>}
+            {ch.photos?.removed > 0 && (
+                <span className="hyg-edit-item">
+                    사진 {ch.photos.removed}장 삭제
+                    {removedLabels(ch) && <span className="hyg-edit-text">{removedLabels(ch)}</span>}
+                </span>
+            )}
+        </span>
+    );
+}
+
+/**
+ * 점검 기록의 수정 이력(화면용). 펼친 점검 상세의 맨 아래에 붙는다.
+ * @param {{edits: any[]}} props
+ */
+function EditLog({ edits }) {
+    if (!edits || edits.length === 0) return null;
+    return (
+        <div className="hyg-edits">
+            <p className="hyg-group-name">수정 이력</p>
+            {edits.map((/** @type {any} */ e, /** @type {number} */ i) => (
+                <div className="hyg-edit" key={i}>
+                    <span className="hyg-edit-who">
+                        {e.edited_by_name} · {hhmm(e.edited_at)}
+                    </span>
+                    <EditChanges changes={e.changes} />
+                </div>
+            ))}
+        </div>
+    );
+}
 
 /**
  * 위생 점검 — 관리자 진입점.
@@ -111,12 +210,20 @@ function HygieneDashboard({ onBack }) {
 
     // ---- 인쇄용 보고서에 쓰는 계산 ----
     const store = getStoreInfo();
-    const byDate = new Map(checks.map((c) => [c.check_date, c]));
+    // 하루 2회(오전·오후)가 되면서 날짜당 여러 건이다.
+    // 예전처럼 Map<날짜, 기록 하나>로 담으면 나중 건이 앞 건을 덮어써 보고서에서 한 건이 사라진다.
+    /** @type {Map<string, any[]>} */
+    const byDate = new Map();
+    for (const c of checks) {
+        const list = byDate.get(c.check_date);
+        if (list) list.push(c);
+        else byDate.set(c.check_date, [c]);
+    }
 
     // 구간의 평일을 모두 늘어놓고 기록 유무를 붙인다.
     // 빠진 날을 감추면 준수 여부를 볼 수 없어 보고서로서 의미가 없다.
     // 다만 휴무일도 '기록 없음'으로 나오므로 보고서에 그 취지를 한 줄 적어둔다.
-    /** @type {{date: string, check: any}[]} */
+    /** @type {{date: string, checks: any[]}[]} */
     const rows = [];
     {
         const [fy, fm, fd] = range.from.split('-').map(Number);
@@ -126,16 +233,39 @@ function HygieneDashboard({ onBack }) {
             const day = d.getDay();
             const key = ymd(d);
             if (day === 0 || day === 6) {
-                if (byDate.has(key)) rows.push({ date: key, check: byDate.get(key) }); // 주말 점검은 있으면 싣는다
+                if (byDate.has(key)) rows.push({ date: key, checks: byDate.get(key) ?? [] }); // 주말 점검은 있으면 싣는다
                 continue;
             }
-            rows.push({ date: key, check: byDate.get(key) ?? null });
+            rows.push({ date: key, checks: byDate.get(key) ?? [] });
         }
     }
 
+    // 수정 이력은 보고서 맨 아래에 따로 싣는다. 일자별 현황 표에 섞으면 '그날 무엇을 점검했나'가
+    // 읽히지 않는다. 여러 점검에 흩어져 있으므로 한 줄씩 펴서 시간순으로 늘어놓는다.
+    const editRows = checks
+        .flatMap((c) =>
+            (c.edits ?? []).map((/** @type {any} */ e) => ({
+                date: c.check_date,
+                slot: c.slot,
+                editor: e.edited_by_name,
+                at: e.edited_at,
+                changes: e.changes,
+            })),
+        )
+        .sort((a, b) => (a.date === b.date ? String(a.at).localeCompare(String(b.at)) : a.date.localeCompare(b.date)));
+
+    // 일자 칸을 몇 줄에 걸쳐 합칠지. 날짜순 정렬이라 같은 날 줄은 붙어 있다.
+    /** @type {Map<string, number>} */
+    const editSpan = new Map();
+    for (const e of editRows) editSpan.set(e.date, (editSpan.get(e.date) ?? 0) + 1);
+
     const totalFails = checks.reduce((n, c) => n + Number(c.fail_count), 0);
-    // '오전 중 완료'가 목표라 12시 전 제출을 따로 센다.
-    const beforeNoon = checks.filter((c) => new Date(c.checked_at).getHours() < 12).length;
+    // 운영 지침이 하루 2회(오전·오후)라, 두 칸을 모두 채운 날을 센다.
+    // 예전에는 '오전 중 완료'(12시 전 제출)를 셌는데 하루 1회 시절의 기준이라 더는 맞지 않는다.
+    const bothDone = [...byDate.values()].filter(
+        (list) => list.some((c) => c.slot === 'am') && list.some((c) => c.slot === 'pm'),
+    ).length;
+    const checkedDays = byDate.size;
     const printedAt = new Date();
 
     return (
@@ -183,6 +313,15 @@ function HygieneDashboard({ onBack }) {
                 .hyg-check:last-child { border-bottom: none; }
                 .hyg-check-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 4px; background: none; border: none; cursor: pointer; text-align: left; color: var(--text-primary, #222); font-family: inherit; }
                 .hyg-check-head:active { background: var(--border-color, #f2f2f2); }
+                .hyg-edits { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border-color, #ddd); }
+                .hyg-edit { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; font-size: .84rem; flex-wrap: wrap; }
+                .hyg-edit-who { color: var(--text-secondary, #888); white-space: nowrap; font-weight: 700; }
+                .hyg-edit-what { display: flex; flex-direction: column; gap: 2px; color: var(--text-primary, #333); }
+                .hyg-edit-item { word-break: keep-all; }
+                /* 지워진 글은 취소선으로. 무엇이 무엇으로 바뀌었는지 한눈에 읽혀야 한다. */
+                .hyg-edit-text { display: block; color: var(--text-secondary, #888); font-size: .82rem; margin-top: 1px; }
+                .hyg-edit-text s { color: var(--text-secondary, #aaa); }
+                .hyg-slot { font-size: .78rem; font-weight: 700; color: var(--accent); background: var(--accent-bg); padding: 1px 6px; border-radius: 6px; margin-left: 4px; }
                 .hyg-date-cell { font-weight: 800; font-size: .98rem; white-space: nowrap; }
                 .hyg-who { color: var(--text-secondary, #888); font-size: .88rem; white-space: nowrap; }
                 .hyg-spacer { flex: 1; }
@@ -237,11 +376,22 @@ function HygieneDashboard({ onBack }) {
                     .rp-table td.c { text-align: center; }
                     /* 날짜가 좁은 칸에서 세 줄로 접히는 것을 막는다. */
                     .rp-table td:first-child, .rp-table th { white-space: nowrap; }
+                    /* 오전·오후 두 줄에 걸쳐 합쳐진 일자 칸은 가운데에 놓아야 두 줄 모두의 것으로 읽힌다.
+                       나머지 칸은 윗줄에 맞춰 둔다 — 수정 내용처럼 여러 줄이 되는 칸이 있어서다. */
+                    .rp-table td { vertical-align: top; }
+                    .rp-table td:first-child { vertical-align: middle; }
                     .rp-none { color: #777; }
                     /* 행이 페이지 경계에서 두 쪽으로 갈라지지 않게, 표 머리글은 매 쪽 반복 */
                     .rp-table tr { break-inside: avoid; }
                     .rp-table thead { display: table-header-group; }
                     .rp-note { margin-top: 10px; font-size: 8.5pt; color: #666; line-height: 1.5; }
+                    /* 수정 내용은 화면과 같은 컴포넌트를 쓴다. 다만 색을 변수로 받으므로 다크 모드면
+                       흰 글씨가 그대로 인쇄된다. 보고서 안에서는 종이용 색으로 덮어쓴다. */
+                    .rp-table .hyg-edit-what { display: block; color: #000; }
+                    .rp-table .hyg-edit-item { display: block; }
+                    .rp-table .hyg-edit-item + .hyg-edit-item { margin-top: 2px; }
+                    .rp-table .hyg-edit-text { display: block; color: #444; font-size: 9pt; margin-top: 0; }
+                    .rp-table .hyg-edit-text s { color: #777; }
                 }
             `}</style>
 
@@ -260,7 +410,8 @@ function HygieneDashboard({ onBack }) {
                         <div className="hyg-check" key={c.id}>
                             <button className="hyg-check-head" onClick={() => toggle(c.id)}>
                                 <span className="hyg-date-cell">
-                                    {c.check_date.slice(5)} ({weekdayOf(c.check_date)})
+                                    {c.check_date.slice(5)} ({weekdayOf(c.check_date)}){' '}
+                                    <span className="hyg-slot">{c.slot === 'pm' ? '오후' : '오전'}</span>
                                 </span>
                                 <span className="hyg-who">
                                     {c.checked_by_name} · {String(at.getHours()).padStart(2, '0')}:
@@ -309,6 +460,13 @@ function HygieneDashboard({ onBack }) {
                                                                                     <HygienePhoto
                                                                                         key={ph.id}
                                                                                         photoId={ph.id}
+                                                                                        removedBy={
+                                                                                            ph.status === 'removed'
+                                                                                                ? (ph.removed_by_name ??
+                                                                                                  '알 수 없음')
+                                                                                                : undefined
+                                                                                        }
+                                                                                        removedAt={ph.removed_at}
                                                                                     />
                                                                                 ),
                                                                             )}
@@ -320,6 +478,7 @@ function HygieneDashboard({ onBack }) {
                                                 </div>
                                             ))}
                                             {detail.memo && <div className="hyg-memo">특이사항: {detail.memo}</div>}
+                                            <EditLog edits={detail.edits} />
                                         </>
                                     )}
                                 </div>
@@ -347,7 +506,7 @@ function HygieneDashboard({ onBack }) {
                         미흡 <b>{totalFails}</b>건 ({failDays}일)
                     </span>
                     <span>
-                        오전 중 완료 <b>{beforeNoon}</b> / {checks.length}일
+                        오전·오후 모두 완료 <b>{bothDone}</b> / {checkedDays}일
                     </span>
                 </div>
 
@@ -355,36 +514,57 @@ function HygieneDashboard({ onBack }) {
                 <table className="rp-table">
                     <thead>
                         <tr>
-                            <th style={{ width: '18%' }}>일자</th>
-                            <th style={{ width: '16%' }}>점검자</th>
+                            <th style={{ width: '16%' }}>일자</th>
+                            <th style={{ width: '8%' }}>구분</th>
+                            <th style={{ width: '14%' }}>점검자</th>
                             <th style={{ width: '12%' }}>점검 시각</th>
                             <th style={{ width: '12%' }}>미흡</th>
                             <th>특이사항</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map(({ date, check }) => (
-                            <tr key={date}>
-                                <td>
-                                    {date} ({weekdayOf(date)})
-                                </td>
-                                {check ? (
-                                    <>
-                                        <td>{check.checked_by_name}</td>
-                                        <td className="c">
-                                            {String(new Date(check.checked_at).getHours()).padStart(2, '0')}:
-                                            {String(new Date(check.checked_at).getMinutes()).padStart(2, '0')}
-                                        </td>
-                                        <td className="c">{Number(check.fail_count) || '-'}</td>
-                                        <td>{check.memo || ''}</td>
-                                    </>
-                                ) : (
-                                    <td className="rp-none" colSpan={4}>
-                                        기록 없음
-                                    </td>
-                                )}
-                            </tr>
-                        ))}
+                        {rows.flatMap(({ date, checks: dayChecks }) =>
+                            dayChecks.length === 0
+                                ? [
+                                      <tr key={date}>
+                                          <td>
+                                              {date} ({weekdayOf(date)})
+                                          </td>
+                                          <td className="rp-none" colSpan={5}>
+                                              기록 없음
+                                          </td>
+                                      </tr>,
+                                  ]
+                                : // 하루 두 번이 원칙이므로 한 번만 했어도 두 줄을 모두 그린다.
+                                  // 안 한 칸을 빼버리면 '오후를 걸렀다'가 표에서 보이지 않는다.
+                                  REPORT_SLOTS.map((slot, i) => {
+                                      const check = dayChecks.find((c) => c.slot === slot);
+                                      return (
+                                          <tr key={`${date}-${slot}`}>
+                                              {/* 오전·오후 두 줄의 일자 칸을 하나로 합친다. 빈 칸으로 두면
+                                                  어느 날에 딸린 줄인지 표에서 읽어내기 어렵다. */}
+                                              {i === 0 && (
+                                                  <td rowSpan={REPORT_SLOTS.length}>
+                                                      {date} ({weekdayOf(date)})
+                                                  </td>
+                                              )}
+                                              <td className="c">{SLOT_NAME[slot]}</td>
+                                              {check ? (
+                                                  <>
+                                                      <td>{check.checked_by_name}</td>
+                                                      <td className="c">{hhmm(check.checked_at)}</td>
+                                                      <td className="c">{Number(check.fail_count) || '-'}</td>
+                                                      <td>{check.memo || ''}</td>
+                                                  </>
+                                              ) : (
+                                                  <td className="rp-none" colSpan={4}>
+                                                      기록 없음
+                                                  </td>
+                                              )}
+                                          </tr>
+                                      );
+                                  }),
+                        )}
                     </tbody>
                 </table>
 
@@ -417,9 +597,50 @@ function HygieneDashboard({ onBack }) {
                     </>
                 )}
 
+                {editRows.length > 0 && (
+                    <>
+                        <p className="rp-h2">점검 기록 수정 이력</p>
+                        <table className="rp-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: '16%' }}>일자</th>
+                                    <th style={{ width: '8%' }}>구분</th>
+                                    <th style={{ width: '14%' }}>수정자</th>
+                                    <th style={{ width: '12%' }}>수정 시각</th>
+                                    <th>수정 내용</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {editRows.map((e, i) => (
+                                    <tr key={i}>
+                                        {/* 일자 칸 병합. 위 표와 같은 방식 — 날짜순으로 정렬돼 있어
+                                            같은 날 줄은 반드시 붙어 있다. */}
+                                        {(i === 0 || editRows[i - 1].date !== e.date) && (
+                                            <td rowSpan={editSpan.get(e.date)}>
+                                                {e.date} ({weekdayOf(e.date)})
+                                            </td>
+                                        )}
+                                        <td className="c">{SLOT_NAME[e.slot]}</td>
+                                        <td>{e.editor}</td>
+                                        <td className="c">{hhmm(e.at)}</td>
+                                        <td>
+                                            <EditChanges changes={e.changes} />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </>
+                )}
+
                 <p className="rp-note">
                     · 점검 항목의 문구는 점검 당시 기록된 그대로이며, 이후 체크리스트가 변경되어도 바뀌지 않습니다.
                     <br />· 평일 중 점검 기록이 없는 날은 &lsquo;기록 없음&rsquo;으로 표시됩니다(휴무일 포함).
+                    {editRows.length > 0 && (
+                        <>
+                            <br />· 수정 이력은 제출 후 같은 날 안에 고친 내역이며, 취소선은 고치기 전의 내용입니다.
+                        </>
+                    )}
                 </p>
             </div>
         </StatsLayout>
