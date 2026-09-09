@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
+const { kstDate } = require('../utils/kstDate');
 const { HYGIENE_CATEGORIES } = require('../utils/hygieneCategories');
 
 // 위생 점검 관리자 API — 체크리스트 항목 편집. 이 라우터는 전부 관리자 전용.
@@ -128,8 +129,10 @@ const asDate = (/** @type {any} */ v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ??
 
 router.get('/checks', async (req, res) => {
     // 기본 구간은 최근 30일. 범위를 안 주면 전체를 긁어와 점점 느려진다.
-    const to = asDate(req.query.to) ?? new Date().toISOString().slice(0, 10);
-    const from = asDate(req.query.from) ?? new Date(Date.now() - 29 * 864e5).toISOString().slice(0, 10);
+    // 한국 날짜로 잡는다 — 프로세스 시간대(배포 서버는 UTC)로 뽑으면 오전 9시 전에는
+    // 전날이 나와, 그날 아침에 낸 점검이 기본 구간에서 빠진다.
+    const to = asDate(req.query.to) ?? kstDate();
+    const from = asDate(req.query.from) ?? kstDate(-29);
     try {
         const [rows] = await pool.query(
             // check_date는 '순간'이 아니라 달력 날짜다. Date 객체로 내보내면 JSON에서 UTC 순간이 되고,

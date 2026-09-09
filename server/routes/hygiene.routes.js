@@ -5,6 +5,7 @@ const { authenticateToken } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
 const crypto = require('crypto');
 const r2 = require('../config/r2');
+const { kstDate } = require('../utils/kstDate');
 
 // 직원용 위생 점검 API. 로그인만 하면 누구나 쓴다(역할 무관).
 // 항목 편집·기록 조회는 관리자 전용이라 hygieneAdmin.routes.js에 따로 있다.
@@ -29,17 +30,27 @@ const SLOTS = ['am', 'pm'];
  */
 const PM_FROM_HOUR = 12;
 
+/** 지금이 어느 칸인지 DB에게 묻는 SQL 조각. HOUR(NOW())는 +09:00 세션이라 한국 시각이다. */
+const SLOT_SQL = "IF(HOUR(NOW()) >= ?, 'pm', 'am')";
+
 /**
- * 지금이 어느 칸인지 서버 시계로 정한다.
+ * 지금이 어느 칸인지 정한다.
  *
  * 클라이언트가 고르게 하지 않는 이유:
  *  - 칸과 실제 제출 시각(checked_at)이 어긋날 수 없다. 둘 다 같은 시계에서 나온다.
  *    (칸을 사람이 고르던 때 '오전 · 16:29' 같은 앞뒤 안 맞는 기록이 실제로 남았다)
  *  - 기기 시계가 틀어져 있어도 기록은 서버 기준으로 일관된다.
  *  - 직원이 누를 것이 하나 줄어든다. 바쁜 시간대에 고민거리를 만들지 않는다.
+ *
+ * 그 '같은 시계'는 Node가 아니라 DB다. 처음에는 new Date().getHours()로 정했는데 그건
+ * 프로세스의 시간대이고, 배포 서버(Render)는 UTC로 돈다. 한국 시각 16시가 7시로 읽혀
+ * 오후 점검이 오전 칸으로 들어갔다. check_date(CURDATE)와 checked_at은 DB가 한국 기준으로
+ * 찍는데 칸만 UTC로 정해져, 위에 적은 전제 자체가 깨져 있었다.
+ * 주문번호의 날짜 접두사를 DB에서 뽑는 것도 같은 이유다(order.routes.js).
  */
-function currentSlot() {
-    return new Date().getHours() >= PM_FROM_HOUR ? 'pm' : 'am';
+async function currentSlot() {
+    const [[row]] = await pool.query(`SELECT ${SLOT_SQL} AS slot`, [PM_FROM_HOUR]);
+    return row.slot;
 }
 
 // 오늘 점검할 체크리스트. 은퇴한 항목(is_active=0)은 내려주지 않는다.
@@ -95,7 +106,7 @@ router.get('/today', async (req, res) => {
         }
         // 지금 채울 칸도 함께 알려준다. 클라이언트가 자기 시계로 따로 판단하면
         // 서버가 실제로 기록할 칸과 어긋날 수 있다.
-        res.json({ slots: bySlot, current_slot: currentSlot() });
+        res.json({ slots: bySlot, current_slot: await currentSlot() });
     } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/hygiene/today 에러]', err);
         res.status(500).json({
@@ -192,9 +203,11 @@ router.post('/checks', async (req, res) => {
         // 점검과 결과가 따로 저장되면 항목 없는 빈 기록이 남는다. 한 트랜잭션으로 묶는다.
         await conn.beginTransaction();
         const [ins] = await conn.query(
-            'INSERT INTO hygiene_checks (check_date, slot, checked_by_id, checked_by_name, memo) VALUES (CURDATE(), ?, ?, ?, ?)',
-            // 클라이언트가 보낸 칸은 쓰지 않는다. 서버 시계로 정해야 checked_at과 항상 맞는다.
-            [currentSlot(), req.user.id, req.user.name, memo],
+            `INSERT INTO hygiene_checks (check_date, slot, checked_by_id, checked_by_name, memo)
+             VALUES (CURDATE(), ${SLOT_SQL}, ?, ?, ?)`,
+            // 클라이언트가 보낸 칸은 쓰지 않는다. 칸을 CURDATE()와 같은 문장에서 정해야
+            // 정오 경계에 걸쳐도 날짜·칸·checked_at이 서로 어긋나지 않는다.
+            [PM_FROM_HOUR, req.user.id, req.user.name, memo],
         );
         await conn.query(
             'INSERT INTO hygiene_check_results (check_id, item_id, item_label, item_category, sort_order, status, note) VALUES ?',
@@ -367,8 +380,9 @@ router.post('/uploads/sign', async (req, res) => {
     }
 
     // 키에 날짜를 넣어 나중에 사람이 보기 쉽게 한다. 파일명은 UUID라 충돌·추측이 불가능하다.
-    const now = new Date();
-    const ym = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // 한국 날짜로 넣는다 — 프로세스 시간대(배포 서버는 UTC)로 뽑으면 매달 1일 오전 9시 전에
+    // 올린 사진만 지난달 폴더에 들어간다.
+    const ym = kstDate().slice(0, 7).replace('-', '/');
     const key = `hygiene/${ym}/${crypto.randomUUID()}.${extOf(contentType)}`;
 
     try {
