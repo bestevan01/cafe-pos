@@ -217,10 +217,13 @@ router.post('/checks', async (req, res) => {
             [built.rows.map((r) => [ins.insertId, ...r])],
         );
         await attachPhotos(conn, ins.insertId, req.body, req.user.id);
+        // 실제로 기록된 칸을 다시 읽어 돌려준다. 화면이 열릴 때 받은 칸과 다를 수 있다 —
+        // 정오 직전에 열어 정오를 넘겨 제출하면 서버는 오후로 적는데 화면은 오전이라고 안내한다.
+        const [[saved]] = await conn.query('SELECT slot FROM hygiene_checks WHERE id = ?', [ins.insertId]);
         await conn.commit();
         // 관리자의 점검 기록 화면이 새로고침 없이 받아보도록 알린다.
         req.app.get('io').emit('hygiene_updated');
-        res.json({ success: true, id: ins.insertId });
+        res.json({ success: true, id: ins.insertId, slot: saved.slot });
     } catch (/** @type {any} */ err) {
         await conn.rollback();
         // 두 사람이 동시에 제출하면 UNIQUE가 막는다. 이미 있다고 알려주고 클라이언트가 다시 불러오게 한다.

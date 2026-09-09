@@ -159,9 +159,15 @@ function HygieneCheck({ onClose }) {
             })),
         };
         try {
+            let savedSlot = slot;
             if (existing) await axios.put(`/api/hygiene/checks/${existing.id}`, body, authCfg());
-            else await axios.post('/api/hygiene/checks', body, authCfg());
-            notify(existing ? '점검 기록을 수정했습니다.' : `${SLOT_NAME[slot]} 위생 점검을 제출했습니다.`, {
+            else {
+                // 어느 칸으로 기록됐는지는 서버가 알려준다. 화면을 정오 직전에 열어 정오를 넘겨
+                // 제출하면 화면이 들고 있던 칸과 실제로 기록된 칸이 다르다.
+                const res = await axios.post('/api/hygiene/checks', body, authCfg());
+                savedSlot = res.data?.slot ?? slot;
+            }
+            notify(existing ? '점검 기록을 수정했습니다.' : `${SLOT_NAME[savedSlot]} 위생 점검을 제출했습니다.`, {
                 icon: '✅',
             });
             onClose();

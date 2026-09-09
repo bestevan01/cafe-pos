@@ -206,7 +206,9 @@ function HygieneDashboard({ onBack }) {
         return <HygieneItems onBack={() => setView('records')} />;
     }
 
-    const failDays = checks.filter((c) => Number(c.fail_count) > 0).length;
+    // 미흡이 나온 '날' 수. 하루 두 번이 되면서 기록 수와 날 수가 갈렸다 —
+    // 오전·오후가 모두 미흡이면 기록은 둘이지만 날은 하루다.
+    const failDays = new Set(checks.filter((c) => Number(c.fail_count) > 0).map((c) => c.check_date)).size;
 
     // ---- 인쇄용 보고서에 쓰는 계산 ----
     const store = getStoreInfo();
@@ -500,7 +502,7 @@ function HygieneDashboard({ onBack }) {
 
                 <div className="rp-sum">
                     <span>
-                        점검 실시 <b>{checks.length}</b>일
+                        점검 실시 <b>{checkedDays}</b>일 ({checks.length}건)
                     </span>
                     <span>
                         미흡 <b>{totalFails}</b>건 ({failDays}일)
