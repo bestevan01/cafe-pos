@@ -94,6 +94,20 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     }
 });
 
+/**
+ * 토큰이 지금도 유효한지 확인하는 용도. 소켓 핸드셰이크가 인증 실패로 거부됐을 때,
+ * 정말 세션이 죽은 것인지 소켓만 일시적으로 막힌 것인지 클라이언트가 여기로 되묻는다.
+ *
+ * 소켓 거부 하나로 곧바로 로그아웃시키면, 네트워크가 불안정한 매장에서 근무 중에
+ * 튕겨 나간다. 토큰의 생사는 HTTP가 권위 있게 답한다 — 같은 authenticateToken을 타므로
+ * 소켓이 내렸을 판단과 정확히 같은 결론이 나온다.
+ *
+ * 응답은 최소한만 담는다. 재연결 때마다 불릴 수 있어 가벼워야 한다.
+ */
+router.get('/me', authenticateToken, (req, res) => {
+    res.json({ success: true, role: req.user.role, username: req.user.username });
+});
+
 router.patch('/users/:id/password', authenticateToken, async (req, res) => {
     // 본인 비밀번호만 변경 가능. URL의 :id가 아닌 인증된 사용자 ID를 사용해 타인 비번 변경(IDOR)을 차단한다.
     // 현재 비밀번호 확인은 '내 정보' 진입 시 ProfileAuth(비밀번호/패스키 재인증)로 이미 대체되었다.
