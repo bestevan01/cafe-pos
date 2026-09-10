@@ -60,7 +60,21 @@ const io = new Server(server, {
 // ---------------------------------------------------------
 // [4] 데이터베이스 연결 확인 (DB Connection)
 // ---------------------------------------------------------
-pool.getConnection()
+/**
+ * 스키마 준비가 끝나야 요청을 받는다. 이 약속이 지켜질 때까지 listen하지 않는다.
+ *
+ * 예전에는 연결 확인과 listen이 서로를 기다리지 않아, 스키마를 고치는 배포마다 몇 초짜리
+ * 창이 생겼다. 실제로 위생 점검을 하루 2회로 바꾸던 배포에서 'Your service is live'가
+ * 유니크 키 교체보다 먼저 찍혔다. 그 사이에 들어온 요청은 옛 제약에 걸린다.
+ *
+ * 실패해도 listen은 한다. DB가 잠깐 안 붙는다고 배포가 통째로 멈추면 더 나쁘다 —
+ * TiDB Serverless는 잠들었다 깨느라 늦을 때가 있고, 그때 옛 인스턴스가 계속 살아 있는
+ * 것보다 새 인스턴스가 떠서 오류를 알려주는 편이 낫다. 대신 크게 로그를 남긴다.
+ */
+const SCHEMA_READY_TIMEOUT_MS = 60000;
+
+const schemaReady = pool
+    .getConnection()
     .then(async (/** @type {any} */ conn) => {
         console.log('✅ [DB] 데이터베이스 연결 성공!');
         conn.release();
@@ -69,6 +83,25 @@ pool.getConnection()
     .catch((/** @type {any} */ err) => {
         console.error('❌ [DB] 데이터베이스 연결 실패:', err);
     });
+
+/** 스키마 준비를 기다리되, 무한정 붙들려 배포가 멈추지는 않게 한다. */
+function waitForSchema() {
+    /** @type {any} */
+    let timer;
+    const giveUp = new Promise((resolve) => {
+        timer = setTimeout(() => {
+            console.error(
+                `🔥 [DB] 스키마 준비가 ${SCHEMA_READY_TIMEOUT_MS / 1000}초 안에 끝나지 않았습니다. ` +
+                    '그대로 요청을 받기 시작합니다 — 스키마가 옛 상태일 수 있습니다.',
+            );
+            resolve(undefined);
+        }, SCHEMA_READY_TIMEOUT_MS);
+        timer.unref(); // 이 타이머 하나 때문에 프로세스가 안 죽는 일이 없도록
+    });
+    // race에서 진 쪽은 저절로 멈추지 않는다. 타이머를 지우지 않으면 스키마가 제때 끝나도
+    // 60초 뒤에 위 경고가 그대로 찍혀, 정작 진짜 문제일 때 구분할 수 없게 된다.
+    return Promise.race([schemaReady, giveUp]).finally(() => clearTimeout(timer));
+}
 
 // 주문번호 카운터 테이블 보장 (없으면 생성). 권한이 없으면 경고만 남기고 진행.
 async function ensureSchema() {
@@ -373,12 +406,14 @@ setupSocketHandlers(io);
 // ---------------------------------------------------------
 // [8] 서버 실행 (Listen)
 // ---------------------------------------------------------
-server.listen(PORT, () => {
-    const serverUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-    const env = IS_PRODUCTION ? '☁️ 운영(Production)' : '💻 개발(Local)';
+waitForSchema().then(() => {
+    server.listen(PORT, () => {
+        const serverUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+        const env = IS_PRODUCTION ? '☁️ 운영(Production)' : '💻 개발(Local)';
 
-    console.log(`=================================`);
-    console.log(`🚀 [서버 실행됨] ${env}`);
-    console.log(`🔗 주소: ${serverUrl}`);
-    console.log(`=================================`);
+        console.log(`=================================`);
+        console.log(`🚀 [서버 실행됨] ${env}`);
+        console.log(`🔗 주소: ${serverUrl}`);
+        console.log(`=================================`);
+    });
 });
