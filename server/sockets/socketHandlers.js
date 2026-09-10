@@ -32,15 +32,24 @@ module.exports = (io) => {
         if (!token) return next(authError('인증 토큰이 없습니다.'));
 
         jwt.verify(token, JWT_SECRET, async (/** @type {any} */ err, /** @type {any} */ payload) => {
-            if (err) return next(authError('유효하지 않은 토큰입니다.'));
+            if (err) {
+                console.warn(`[🔒 소켓 인증 거부] ${err.name}: ${err.message}`);
+                return next(authError('유효하지 않은 토큰입니다.'));
+            }
             try {
                 // HTTP와 같은 이유로 DB를 확인한다. 서명만 보면 계정이 지워졌거나 권한이
                 // 바뀐 사실을 알 수 없다(자세한 배경은 middlewares/auth.js 주석 참고).
                 const [rows] = await pool.query('SELECT id, username, name, role FROM users WHERE id = ?', [
                     payload.id,
                 ]);
-                if (rows.length === 0) return next(authError('계정을 찾을 수 없습니다.'));
-                if (rows[0].role === 'pending') return next(authError('승인 대기 상태입니다.'));
+                if (rows.length === 0) {
+                    console.warn(`[🔒 소켓 인증 거부] 계정 없음 — id=${payload.id} username=${payload.username}`);
+                    return next(authError('계정을 찾을 수 없습니다.'));
+                }
+                if (rows[0].role === 'pending') {
+                    console.warn(`[🔒 소켓 인증 거부] 승인 대기 — username=${rows[0].username}`);
+                    return next(authError('승인 대기 상태입니다.'));
+                }
                 socket.data.user = rows[0]; // 지금 DB 기준의 신원을 저장
                 next();
             } catch (/** @type {any} */ dbErr) {

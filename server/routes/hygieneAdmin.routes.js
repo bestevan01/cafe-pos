@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/db');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
+const { kstDate } = require('../utils/kstDate');
 const { HYGIENE_CATEGORIES } = require('../utils/hygieneCategories');
 
 // 위생 점검 관리자 API — 체크리스트 항목 편집. 이 라우터는 전부 관리자 전용.
@@ -128,14 +129,17 @@ const asDate = (/** @type {any} */ v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ??
 
 router.get('/checks', async (req, res) => {
     // 기본 구간은 최근 30일. 범위를 안 주면 전체를 긁어와 점점 느려진다.
-    const to = asDate(req.query.to) ?? new Date().toISOString().slice(0, 10);
-    const from = asDate(req.query.from) ?? new Date(Date.now() - 29 * 864e5).toISOString().slice(0, 10);
+    // 한국 날짜로 잡는다 — 프로세스 시간대(배포 서버는 UTC)로 뽑으면 오전 9시 전에는
+    // 전날이 나와, 그날 아침에 낸 점검이 기본 구간에서 빠진다.
+    const to = asDate(req.query.to) ?? kstDate();
+    const from = asDate(req.query.from) ?? kstDate(-29);
     try {
         const [rows] = await pool.query(
             // check_date는 '순간'이 아니라 달력 날짜다. Date 객체로 내보내면 JSON에서 UTC 순간이 되고,
             // 보는 쪽 타임존에 따라 하루 어긋난다. 문자열로 고정해 타임존을 아예 개입시키지 않는다.
             `SELECT c.id,
                     DATE_FORMAT(c.check_date, '%Y-%m-%d') AS check_date,
+                    c.slot,
                     c.checked_at,
                     c.checked_by_name,
                     c.memo,
@@ -147,7 +151,8 @@ router.get('/checks', async (req, res) => {
                       LEFT JOIN hygiene_check_results r ON r.check_id = c.id
              WHERE c.check_date BETWEEN ? AND ?
              GROUP BY c.id
-             ORDER BY c.check_date DESC`,
+             -- 같은 날은 오전(am)이 먼저 오도록. 화면이 날짜로 묶어 보여준다.
+             ORDER BY c.check_date DESC, c.slot ASC`,
             [from, to],
         );
         // 미흡 내역은 보고서에 반드시 들어간다. 기록마다 상세를 따로 부르면 한 달치에 수십 번 왕복하므로
@@ -169,10 +174,43 @@ router.get('/checks', async (req, res) => {
             else byCheck.set(f.check_id, [f]);
         }
 
+        // 수정 이력도 보고서에 들어간다. 미흡 내역과 같은 이유로 한 번에 가져와 붙인다 —
+        // 기록마다 상세를 부르면 한 달치에 수십 번 왕복한다. 수정은 드물어 통째로 실어도 가볍다.
+        const [edits] = await pool.query(
+            `SELECT e.check_id, e.edited_by_name, e.edited_at, e.changes
+             FROM hygiene_check_edits e
+                      JOIN hygiene_checks c ON c.id = e.check_id
+             WHERE c.check_date BETWEEN ? AND ?
+             ORDER BY e.edited_at, e.id`,
+            [from, to],
+        );
+        /** @type {Map<number, any[]>} */
+        const editsByCheck = new Map();
+        for (const e of edits) {
+            const row = {
+                edited_by_name: e.edited_by_name,
+                edited_at: e.edited_at,
+                changes: (() => {
+                    try {
+                        return JSON.parse(e.changes);
+                    } catch {
+                        return null; // 형식이 깨졌어도 '누가 언제 고쳤는지'는 살려 보낸다
+                    }
+                })(),
+            };
+            const list = editsByCheck.get(e.check_id);
+            if (list) list.push(row);
+            else editsByCheck.set(e.check_id, [row]);
+        }
+
         res.json({
             from,
             to,
-            checks: rows.map((/** @type {any} */ r) => ({ ...r, fails: byCheck.get(r.id) ?? [] })),
+            checks: rows.map((/** @type {any} */ r) => ({
+                ...r,
+                fails: byCheck.get(r.id) ?? [],
+                edits: editsByCheck.get(r.id) ?? [],
+            })),
         });
     } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/admin/hygiene/checks 에러]', err);
@@ -187,13 +225,34 @@ router.get('/checks', async (req, res) => {
 router.get('/checks/:id', async (req, res) => {
     try {
         const [[check]] = await pool.query(
-            `SELECT id, DATE_FORMAT(check_date, '%Y-%m-%d') AS check_date, checked_at,
+            `SELECT id, slot, DATE_FORMAT(check_date, '%Y-%m-%d') AS check_date, checked_at,
                     checked_by_id, checked_by_name, memo
              FROM hygiene_checks
              WHERE id = ?`,
             [req.params.id],
         );
         if (!check) return res.status(404).json({ success: false, message: '해당 점검 기록이 없습니다.' });
+
+        // 수정 이력. 고친 사실이 남아야 감사 기록으로 의미가 있다.
+        const [edits] = await pool.query(
+            `SELECT edited_by_name, edited_at, changes
+             FROM hygiene_check_edits
+             WHERE check_id = ?
+             ORDER BY edited_at`,
+            [req.params.id],
+        );
+        // changes는 TEXT에 담긴 JSON이다. 화면이 그리기 쉽도록 여기서 풀어서 내보낸다.
+        check.edits = edits.map((/** @type {any} */ e) => ({
+            edited_by_name: e.edited_by_name,
+            edited_at: e.edited_at,
+            changes: (() => {
+                try {
+                    return JSON.parse(e.changes);
+                } catch {
+                    return null; // 형식이 깨졌어도 '누가 언제 고쳤는지'는 살려 보낸다
+                }
+            })(),
+        }));
         // 항목 문구는 결과 행에 복사돼 있다. hygiene_items를 조인하지 않는 이유가 이것 —
         // 그날 점검한 문구 그대로 보여야 하고, 이후 항목이 바뀌어도 영향받으면 안 된다.
         const [results] = await pool.query(
@@ -204,8 +263,13 @@ router.get('/checks/:id', async (req, res) => {
             [req.params.id],
         );
         // 사진은 목록이 아니라 상세에서만 붙인다. 목록에 실으면 안 볼 기록의 사진까지 조회하게 된다.
+        // 지운 사진('removed')도 함께 내려보낸다 — 직원 화면에서는 사라지지만
+        // 관리자에게는 '누가 언제 지웠는지'와 함께 남아야 감사 기록이 된다.
         const [photos] = await pool.query(
-            "SELECT id, item_id, bytes, content_type, width, height FROM hygiene_check_photos WHERE check_id = ? AND status = 'ready' ORDER BY id",
+            `SELECT id, item_id, bytes, content_type, width, height, status, removed_at, removed_by_name
+             FROM hygiene_check_photos
+             WHERE check_id = ? AND status IN ('ready', 'removed')
+             ORDER BY id`,
             [req.params.id],
         );
         res.json({ ...check, results, photos });

@@ -3,6 +3,12 @@ import { getHygienePhotoUrl } from '../utils/hygienePhotos';
 
 const MAX_SCALE = 6;
 
+/** 삭제 시각은 시:분까지만 보여준다. 날짜는 점검 기록 자체가 이미 갖고 있다. */
+const hhmm = (/** @type {string} */ iso) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 /**
  * 저장된 위생 점검 사진 한 장. 누르면 크게 볼 수 있고, 확대 화면에서 확대·이동이 된다.
  *
@@ -12,11 +18,17 @@ const MAX_SCALE = 6;
  * 보관 기간(2년)이 지난 사진은 R2에서 이미 지워졌으므로 서버가 URL을 주지 않는다 —
  * 깨진 이미지 대신 만료 안내를 보여준다.
  *
+ * 지워진 사진(removedBy가 있는 경우)은 흐리게 깔고 '삭제됨'을 겹쳐 보여준다. 감춰버리면
+ * 관리자가 무엇이 지워졌는지 확인할 수 없어, 삭제 기록을 남긴 의미가 사라진다.
+ * 확대해서 보는 것은 그대로 된다 — 지워진 사진일수록 실제로 무엇이었는지가 중요하다.
+ *
  * @param {object} props
  * @param {number} props.photoId
  * @param {() => void} [props.onRemove] 있으면 삭제 버튼이 나온다
+ * @param {string} [props.removedBy] 지운 사람 이름. 있으면 삭제된 사진으로 표시한다
+ * @param {string} [props.removedAt] 지운 시각(ISO 문자열)
  */
-function HygienePhoto({ photoId, onRemove }) {
+function HygienePhoto({ photoId, onRemove, removedBy, removedAt }) {
     const [state, setState] = useState(/** @type {'loading'|'ready'|'expired'|'error'} */ ('loading'));
     const [url, setUrl] = useState('');
     const [zoomed, setZoomed] = useState(false);
@@ -214,6 +226,12 @@ function HygienePhoto({ photoId, onRemove }) {
                 /* 44px 터치 영역을 지키면서도 썸네일을 가리지 않도록 우상단에 겹쳐 둔다. */
                 .hp-del { position: absolute; top: 0; right: 0; width: 28px; height: 28px; border: none; border-radius: 0 0 0 10px; background: rgba(0,0,0,.55); color: #fff; font-size: .8rem; line-height: 1; cursor: pointer; }
 
+                /* 지워진 사진. 흐리게 깔고 아래에 삭제 기록을 겹친다.
+                   테두리를 붉게 두어 사진 무더기 속에서도 한눈에 구분되게 한다. */
+                .hp-wrap.removed { border-color: var(--danger-color, #d9534f); }
+                .hp-wrap.removed .hp-img { opacity: .38; filter: grayscale(1); }
+                .hp-tag { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 4px; background: rgba(217,83,79,.9); color: #fff; font-size: .58rem; line-height: 1.25; text-align: center; letter-spacing: -.02em; pointer-events: none; }
+
                 /* 확대 화면. 점검 모달(10000) 위, 알림 토스트(12000) 아래에 둔다 —
                    확대 중에도 오류 알림은 보여야 한다.
                    touch-action: none이 있어야 브라우저가 제 방식대로 확대·스크롤하지 않고
@@ -225,7 +243,7 @@ function HygienePhoto({ photoId, onRemove }) {
                 @media print { .hp-light { display: none !important; } }
             `}</style>
 
-            <div className="hp-wrap">
+            <div className={`hp-wrap ${removedBy ? 'removed' : ''}`}>
                 {state === 'loading' && <div className="hp-msg">불러오는 중…</div>}
                 {state === 'expired' && <div className="hp-msg">보관 기간 만료</div>}
                 {state === 'error' && <div className="hp-msg">불러올 수 없음</div>}
@@ -233,6 +251,13 @@ function HygienePhoto({ photoId, onRemove }) {
                     <button className="hp-btn" onClick={() => setZoomed(true)} aria-label="사진 크게 보기">
                         <img className="hp-img" src={url} alt="점검 사진" />
                     </button>
+                )}
+
+                {removedBy && (
+                    <span className="hp-tag">
+                        삭제됨 · {removedBy}
+                        {removedAt ? ` · ${hhmm(removedAt)}` : ''}
+                    </span>
                 )}
 
                 {onRemove && (

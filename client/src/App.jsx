@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
 import { socket } from './utils/socket';
 
 // Pages & Components
@@ -16,6 +17,10 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import { useTheme } from './hooks/useTheme';
 import { useNotification } from './hooks/useNotification';
 import { suppressAutoPasskeyOnce } from './utils/loginMemory';
+
+// 토큰은 멀쩡한데 소켓 핸드셰이크만 계속 거부당할 때 재연결을 몇 번까지 시도할지.
+// 상한이 없으면 '거부 → 확인 → 재연결 → 거부'가 끝없이 돈다.
+const SOCKET_AUTH_MAX_RETRY = 3;
 
 function App() {
     // ---------------------------------------------------------
@@ -60,6 +65,12 @@ function App() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const { theme, setTheme } = useTheme(); // 모바일 드롭다운의 테마 선택용
     const [isThemeSubOpen, setIsThemeSubOpen] = useState(false); // 테마 하위 메뉴(왼쪽 플라이아웃)
+
+    // 소켓 인증 거부를 HTTP로 되묻는 중인지. 재연결이 몰아칠 때 확인 요청이 겹치는 것을 막는다.
+    const authCheckingRef = useRef(false);
+    // 토큰은 멀쩡한데 소켓만 계속 거부당하는 경우를 대비한 재시도 상한.
+    // 없으면 '거부 → 확인 → 재연결 → 거부'가 끝없이 돈다.
+    const socketAuthRetryRef = useRef(0);
 
     // 역할(화면) 전환 시 사용자 드롭다운/테마 서브메뉴 닫기 (effect 대신 렌더링 중 조정 — react.dev 권장 패턴)
     if (myRole !== prevRole) {
@@ -157,17 +168,48 @@ function App() {
             );
         };
 
-        // 인증 실패(만료/위조 토큰)로 연결이 거부된 경우에만 재로그인 유도.
-        // 일시적 네트워크 오류는 type 표시가 없으므로 무시 → socket.io가 자동 재시도.
+        // 소켓 핸드셰이크가 인증 실패로 거부됐을 때.
+        //
+        // 예전에는 여기서 곧바로 로그아웃시켰는데, 매장 네트워크가 불안정해 재연결이 잦으면
+        // 거부 한 번에 근무 중인 직원이 튕겨 나갔다. 소켓 거부는 네트워크·서버 사정으로도
+        // 얼마든지 난다. 토큰이 정말 죽었는지는 HTTP가 권위 있게 답하므로 거기에 물어본다.
+        //   - HTTP도 401  → axios 인터셉터가 app:session-expired를 쏴 로그아웃된다(아래 effect)
+        //   - HTTP는 정상 → 소켓만 일시적으로 막힌 것. 다시 붙인다
+        //   - 그 밖(네트워크·503) → 판단 보류. 다시 붙여 보고 다음 기회를 노린다
+        //
+        // 일시적 네트워크 오류는 type 표시가 없으므로 여기까지 오지 않는다(socket.io가 자동 재시도).
         /** @param {any} err */
-        const handleAuthError = (err) => {
-            if (err?.data?.type === 'auth') {
-                socket.disconnect(); // 무한 재시도 중단
-                notify('세션이 만료되었습니다. 다시 로그인해주세요.', { icon: '🔒' });
-                handleLogout();
+        const handleAuthError = async (err) => {
+            if (err?.data?.type !== 'auth') return;
+            if (authCheckingRef.current) return; // 재연결이 몰아쳐도 확인은 한 번만
+            authCheckingRef.current = true;
+            socket.disconnect(); // 확인하는 동안 재시도를 멈춘다
+
+            try {
+                await axios.get('/api/me', {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                });
+                // 토큰은 살아 있다. 상한 안에서만 다시 붙인다.
+                if (socketAuthRetryRef.current < SOCKET_AUTH_MAX_RETRY) {
+                    socketAuthRetryRef.current += 1;
+                    socket.connect();
+                } else {
+                    // 계속 거부당한다. 로그아웃시키지는 않는다 — 주문·조회는 HTTP로 계속 된다.
+                    notify('실시간 연결이 불안정합니다. 화면을 새로고침해주세요.', {
+                        icon: '📡',
+                        dedupeKey: 'socket-auth',
+                    });
+                }
+            } catch (/** @type {any} */ httpErr) {
+                // 401이면 인터셉터가 이미 로그아웃 절차를 밟는다. 여기서 또 하지 않는다.
+                if (httpErr.response?.status !== 401) socket.connect();
+            } finally {
+                authCheckingRef.current = false;
             }
         };
 
+        // 한 번이라도 정상 연결되면 재시도 카운터를 되돌린다.
+        socketAuthRetryRef.current = 0;
         if (socket.connected) registerMyUser();
         else socket.connect(); // 로그인 상태면 소켓 연결 시작 (핸드셰이크에 토큰 전송)
         socket.on('connect', registerMyUser);

@@ -29,17 +29,29 @@ const authenticateToken = (req, res, next) => {
 
     jwt.verify(token, JWT_SECRET, async (/** @type {any} */ err, /** @type {any} */ payload) => {
         // 만료·무효 토큰은 401(인증 실패) — 클라이언트가 권한부족(403)과 구분해 재로그인을 유도한다.
-        if (err) return res.status(401).json({ message: '유효하지 않은 토큰입니다.' });
+        if (err) {
+            // 만료(TokenExpiredError)와 위조(JsonWebTokenError)를 구분해 남긴다.
+            console.warn(`[🔒 인증 거부] ${err.name}: ${err.message} — ${req.method} ${req.originalUrl}`);
+            return res.status(401).json({ message: '유효하지 않은 토큰입니다.' });
+        }
 
         try {
             const [rows] = await pool.query('SELECT id, username, name, role FROM users WHERE id = ?', [payload.id]);
             if (rows.length === 0) {
                 // 계정이 지워졌다. 토큰은 아직 안 만료됐지만 더 이상 사용자가 아니다.
+                // 로그를 남기는 이유: 사용자에게는 '세션 만료'로만 보여서, 남기지 않으면
+                // 왜 튕겼는지 사후에 알 방법이 없다.
+                console.warn(
+                    `[🔒 인증 거부] 계정 없음 — id=${payload.id} username=${payload.username} ${req.method} ${req.originalUrl}`,
+                );
                 return res.status(401).json({ message: '계정을 찾을 수 없습니다. 다시 로그인해주세요.' });
             }
             // 승인 대기로 되돌린 사람은 더 이상 직원이 아니다. 로그인 시점에는 막고 있었지만
             // 이미 로그인한 사람은 아무도 확인하지 않아, 되돌려도 계속 주문을 받을 수 있었다.
             if (rows[0].role === 'pending') {
+                console.warn(
+                    `[🔒 인증 거부] 승인 대기 — username=${rows[0].username} ${req.method} ${req.originalUrl}`,
+                );
                 return res.status(401).json({ message: '승인 대기 상태입니다. 관리자에게 문의하세요.' });
             }
             // 토큰에 적힌 role이 아니라 지금 DB의 role을 쓴다. 권한 변경이 즉시 반영된다.
