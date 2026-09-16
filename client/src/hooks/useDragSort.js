@@ -252,7 +252,21 @@ export function useDragSort({ onReorder, onCommit }) {
             e.preventDefault();
             const list = /** @type {HTMLElement|null} */ (e.currentTarget.closest('[data-drag-list]'));
             const row = /** @type {HTMLElement|null} */ (e.currentTarget.closest('[data-drag-row]'));
-            if (!list || !row) return;
+            if (!list || !row) {
+                // 마크업 약속(파일 맨 위 주석)을 안 지키면 여기서 끝난다. 예전에는 조용히 끝나서
+                // '손잡이를 잡아도 아무 일도 없다'는 증상만 남고 원인을 찾기 어려웠다
+                // (재고 품목 관리에서 data-drag-list·data-drag-row를 빠뜨렸던 일).
+                // 개발 중에만 알린다 — 운영에서 콘솔을 어지럽힐 이유는 없다.
+                if (import.meta.env.DEV) {
+                    console.warn(
+                        `[useDragSort] 드래그를 시작하지 못했습니다: ${!list ? 'data-drag-list' : ''}${
+                            !list && !row ? ', ' : ''
+                        }${!row ? 'data-drag-row' : ''} 속성을 가진 조상 요소가 없습니다.`,
+                        e.currentTarget,
+                    );
+                }
+                return;
+            }
 
             dragRef.current = {
                 id,
