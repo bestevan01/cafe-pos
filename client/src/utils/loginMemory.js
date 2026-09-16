@@ -59,6 +59,24 @@ export function suppressAutoPasskeyOnce() {
 }
 
 /**
+ * 이번 로그인 화면에서 패스키 창이 자동으로 뜰 예정인지 — 값을 소비하지 않고 본다.
+ *
+ * 아이디칸에 커서를 넣을지 정하는 데 쓴다. 자동 호출은 옵션 프리페치가 끝나야 하므로
+ * (콜드스타트면 수 초~1분) 그때까지 기다리지 않고 화면이 뜨는 즉시 판단해야 한다.
+ * consumeSkipAuto()는 1회용이라 여기서 부르면 실제 판단 때 값이 사라진다.
+ *
+ * @returns {boolean}
+ */
+export function willAutoPasskey() {
+    if (readLastMethod() !== 'passkey') return false;
+    try {
+        return sessionStorage.getItem(SKIP_AUTO_KEY) !== '1';
+    } catch {
+        return true;
+    }
+}
+
+/**
  * 건너뛰기 표시를 읽고 즉시 지운다(1회용).
  * @returns {boolean} true면 이번 한 번은 자동 호출하지 않는다
  */
