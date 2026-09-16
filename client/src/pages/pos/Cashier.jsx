@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useEmptyAfterExit } from '../../hooks/useEmptyAfterExit';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
@@ -13,6 +14,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // ---------------------------------------------------------
     const [cart, setCart] = useState(/** @type {import('../../types').CartItem[]} */ ([]));
     const [orderGroups, setOrderGroups] = useState(/** @type {import('../../types').OrderGroup[]} */ ([]));
+    const { showEmpty, onExitComplete: onEmptyExitComplete } = useEmptyAfterExit(orderGroups.length);
     const [menuList, setMenuList] = useState(/** @type {import('../../types').Menu[]} */ ([]));
     // 분류별로 묶어서 그린다. 묶음 안의 차례는 서버가 정렬해 준 sort_order를 그대로 지킨다.
     const menuGroups = useMemo(() => groupByCategory(menuList), [menuList]);
@@ -677,103 +679,104 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
 
     const OrderGridContent = (
         <div className="order-grid">
-            <AnimatePresence>
-                <>
-                    {orderGroups.map((group) => {
-                        const groupTotal = group.items.reduce((acc, item) => acc + item.price, 0);
-                        return (
-                            <motion.div
-                                key={group.daily_number}
-                                className="receipt-card"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-                                layout
-                            >
-                                <div className="receipt-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
-                                        {group.is_completed === 1 ? (
-                                            <span className="badge badge-done">조리 완료 🍳</span>
-                                        ) : (
-                                            <span className="badge badge-cooking">조리 중 ⏳</span>
-                                        )}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <AnimatePresence onExitComplete={onEmptyExitComplete}>
+                {orderGroups.map((group) => {
+                    const groupTotal = group.items.reduce((acc, item) => acc + item.price, 0);
+                    return (
+                        <motion.div
+                            key={group.daily_number}
+                            className="receipt-card"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
+                            layout
+                        >
+                            <div className="receipt-header">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
+                                    {group.is_completed === 1 ? (
+                                        <span className="badge badge-done">조리 완료 🍳</span>
+                                    ) : (
+                                        <span className="badge badge-cooking">조리 중 ⏳</span>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <button
+                                        onClick={() => handleDelete(group.display_id)}
+                                        className="btn-action btn-cancel"
+                                    >
+                                        주문 취소
+                                    </button>
+                                    {group.is_paid === 0 ? (
                                         <button
-                                            onClick={() => handleDelete(group.display_id)}
-                                            className="btn-action btn-cancel"
+                                            onClick={() => {
+                                                // 🌟 핵심: 총액이 0원이면 팝업 없이 즉시 'event' 결제 완료! 0원이 아니면 팝업 띄우기
+                                                if (groupTotal === 0) {
+                                                    void handleConfirmPayment('event', group.display_id);
+                                                } else {
+                                                    setPaymentCheckId(group.display_id);
+                                                }
+                                            }}
+                                            className="btn-action btn-pay"
                                         >
-                                            주문 취소
+                                            결제 확인
                                         </button>
-                                        {group.is_paid === 0 ? (
-                                            <button
-                                                onClick={() => {
-                                                    // 🌟 핵심: 총액이 0원이면 팝업 없이 즉시 'event' 결제 완료! 0원이 아니면 팝업 띄우기
-                                                    if (groupTotal === 0) {
-                                                        void handleConfirmPayment('event', group.display_id);
-                                                    } else {
-                                                        setPaymentCheckId(group.display_id);
-                                                    }
-                                                }}
-                                                className="btn-action btn-pay"
-                                            >
-                                                결제 확인
-                                            </button>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                                                <span className="badge badge-paid">입금 완료 💰</span>
-                                                {group.is_completed === 1 && (
-                                                    <button
-                                                        onClick={() => handleDeliver(group.display_id)}
-                                                        className="btn-action btn-deliver"
-                                                    >
-                                                        전달 완료 🤲
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div style={{ flex: 1, overflowY: 'auto', marginBottom: '10px' }}>
-                                    {group.items.map((item, idx) => (
-                                        <div key={idx} className="receipt-item">
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span
-                                                    style={{
-                                                        color: item.menu_name.includes('(샷')
-                                                            ? 'var(--accent)'
-                                                            : 'inherit',
-                                                    }}
+                                    ) : (
+                                        <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                                            <span className="badge badge-paid">입금 완료 💰</span>
+                                            {group.is_completed === 1 && (
+                                                <button
+                                                    onClick={() => handleDeliver(group.display_id)}
+                                                    className="btn-action btn-deliver"
                                                 >
-                                                    {item.menu_name}
-                                                </span>
-                                                <span
-                                                    style={{
-                                                        fontSize: '0.85rem',
-                                                        color: 'var(--text-secondary, #888)',
-                                                    }}
-                                                >
-                                                    {(item.price / item.quantity).toLocaleString()}원
-                                                </span>
-                                            </div>
-                                            <div style={{ fontWeight: 'bold' }}>{item.quantity}</div>
+                                                    전달 완료 🤲
+                                                </button>
+                                            )}
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                                <div className="receipt-total">
-                                    <span>합계</span>
-                                    <span style={{ color: 'var(--danger)' }}>{groupTotal.toLocaleString()}원</span>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </>
+                            </div>
+                            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '10px' }}>
+                                {group.items.map((item, idx) => (
+                                    <div key={idx} className="receipt-item">
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span
+                                                style={{
+                                                    color: item.menu_name.includes('(샷') ? 'var(--accent)' : 'inherit',
+                                                }}
+                                            >
+                                                {item.menu_name}
+                                            </span>
+                                            <span
+                                                style={{
+                                                    fontSize: '0.85rem',
+                                                    color: 'var(--text-secondary, #888)',
+                                                }}
+                                            >
+                                                {(item.price / item.quantity).toLocaleString()}원
+                                            </span>
+                                        </div>
+                                        <div style={{ fontWeight: 'bold' }}>{item.quantity}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="receipt-total">
+                                <span>합계</span>
+                                <span style={{ color: 'var(--danger)' }}>{groupTotal.toLocaleString()}원</span>
+                            </div>
+                        </motion.div>
+                    );
+                })}
             </AnimatePresence>
-            {orderGroups.length === 0 && (
-                <p style={{ textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px' }}>
+            {showEmpty && (
+                <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.25 }}
+                    style={{ textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px' }}
+                >
                     진행 중인 주문이 없습니다.
-                </p>
+                </motion.p>
             )}
         </div>
     );

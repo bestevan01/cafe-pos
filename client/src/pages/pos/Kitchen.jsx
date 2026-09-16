@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useEmptyAfterExit } from '../../hooks/useEmptyAfterExit';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
@@ -18,6 +19,7 @@ function Kitchen() {
     // [1] 상태 관리 (State)
     // ---------------------------------------------------------
     const [orderGroups, setOrderGroups] = useState(/** @type {import('../../types').OrderGroup[]} */ ([]));
+    const { showEmpty, onExitComplete: onEmptyExitComplete } = useEmptyAfterExit(orderGroups.length);
 
     // ---------------------------------------------------------
     // [2] API 및 소켓 통신
@@ -243,83 +245,84 @@ function Kitchen() {
             </div>
 
             <div className="order-grid">
-                <AnimatePresence>
-                    <>
-                        {orderGroups.map((group) => (
-                            <motion.div
-                                key={group.daily_number}
-                                className="receipt-card"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-                                layout
-                            >
-                                <div className="receipt-header">
-                                    <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
-                                    <div>
-                                        {group.is_paid === 1 ? (
-                                            <span className="badge-paid">입금 완료 💰</span>
-                                        ) : (
-                                            <span className="badge-unpaid">미입금 ⚠️</span>
-                                        )}
-                                    </div>
+                <AnimatePresence onExitComplete={onEmptyExitComplete}>
+                    {orderGroups.map((group) => (
+                        <motion.div
+                            key={group.daily_number}
+                            className="receipt-card"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
+                            layout
+                        >
+                            <div className="receipt-header">
+                                <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
+                                <div>
+                                    {group.is_paid === 1 ? (
+                                        <span className="badge-paid">입금 완료 💰</span>
+                                    ) : (
+                                        <span className="badge-unpaid">미입금 ⚠️</span>
+                                    )}
                                 </div>
+                            </div>
 
-                                <div style={{ flex: 1, overflowY: 'auto', marginBottom: '5px' }}>
-                                    {group.items.map((item, idx) => {
-                                        const made = item.is_made === 1;
-                                        // 서버가 아직 옛 버전이면 항목 id가 없다(배포 시차). 그때는 체크만 막고
-                                        // 목록은 그대로 보여준다 — 주문을 못 보는 것보다 낫다.
-                                        const itemId = item.id;
-                                        return (
-                                            <button
-                                                key={itemId ?? idx}
-                                                type="button"
-                                                className={`receipt-item${made ? ' made' : ''}`}
-                                                aria-pressed={made}
-                                                disabled={!itemId}
-                                                onClick={() =>
-                                                    itemId && handleToggleMade(group.display_id, itemId, made ? 0 : 1)
-                                                }
+                            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '5px' }}>
+                                {group.items.map((item, idx) => {
+                                    const made = item.is_made === 1;
+                                    // 서버가 아직 옛 버전이면 항목 id가 없다(배포 시차). 그때는 체크만 막고
+                                    // 목록은 그대로 보여준다 — 주문을 못 보는 것보다 낫다.
+                                    const itemId = item.id;
+                                    return (
+                                        <button
+                                            key={itemId ?? idx}
+                                            type="button"
+                                            className={`receipt-item${made ? ' made' : ''}`}
+                                            aria-pressed={made}
+                                            disabled={!itemId}
+                                            onClick={() =>
+                                                itemId && handleToggleMade(group.display_id, itemId, made ? 0 : 1)
+                                            }
+                                        >
+                                            <span className="item-check" aria-hidden="true">
+                                                {made ? '✓' : ''}
+                                            </span>
+                                            <span
+                                                className="item-name"
+                                                style={{
+                                                    color:
+                                                        !made && item.menu_name.includes('(샷')
+                                                            ? 'var(--accent)'
+                                                            : undefined,
+                                                }}
                                             >
-                                                <span className="item-check" aria-hidden="true">
-                                                    {made ? '✓' : ''}
-                                                </span>
-                                                <span
-                                                    className="item-name"
-                                                    style={{
-                                                        color:
-                                                            !made && item.menu_name.includes('(샷')
-                                                                ? 'var(--accent)'
-                                                                : undefined,
-                                                    }}
-                                                >
-                                                    {item.menu_name}
-                                                </span>
-                                                <span className="item-qty">{item.quantity}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                                {item.menu_name}
+                                            </span>
+                                            <span className="item-qty">{item.quantity}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
 
-                                <div className="btn-group">
-                                    <button onClick={() => handleDelete(group.display_id)} className="btn-cancel">
-                                        취소
-                                    </button>
-                                    <button
-                                        onClick={() => handleComplete(group.display_id)}
-                                        className={`btn-complete${allMade(group) ? ' ready' : ''}`}
-                                    >
-                                        조리 완료 ✅
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </>
+                            <div className="btn-group">
+                                <button onClick={() => handleDelete(group.display_id)} className="btn-cancel">
+                                    취소
+                                </button>
+                                <button
+                                    onClick={() => handleComplete(group.display_id)}
+                                    className={`btn-complete${allMade(group) ? ' ready' : ''}`}
+                                >
+                                    조리 완료 ✅
+                                </button>
+                            </div>
+                        </motion.div>
+                    ))}
                 </AnimatePresence>
 
-                {orderGroups.length === 0 && (
-                    <p
+                {showEmpty && (
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.25 }}
                         style={{
                             textAlign: 'center',
                             color: 'var(--text-secondary, #888)',
@@ -329,7 +332,7 @@ function Kitchen() {
                         }}
                     >
                         현재 대기 중인 주문이 없습니다. ☕
-                    </p>
+                    </motion.p>
                 )}
             </div>
         </div>
