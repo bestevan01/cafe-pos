@@ -13,7 +13,47 @@ const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 /** @type {string|null} */
 let currentCashierId = null;
 const connectedUsers = new Map();
-const kitchenUsers = new Set();
+
+/**
+ * 주방 담당자 '세션'. 소켓이 아니라 계정 단위로 센다.
+ *
+ * 예전에는 주방 화면을 연 소켓 id를 모아 세었는데, 그러면 태블릿 화면이 꺼지거나 매장
+ * 네트워크가 한 번 끊기는 순간 주방이 '아무도 없음'이 된다. 그 상태에서 캐셔가 결제완료를
+ * 누르면 조리완료까지 한 번에 처리되어(=혼자 근무할 때의 동작) 주문이 주방 목록에 아예
+ * 뜨지 않는다. 실제로 그렇게 주문을 놓쳤다.
+ *
+ * 그래서 연결이 아니라 '근무 중인가'로 본다. 소켓이 모두 끊겨도 유예 시간 동안은 자리를
+ * 지키는 것으로 보고, 역할을 바꾸거나 로그아웃하면 즉시 비운다.
+ * 유예는 1시간 — 앱의 무활동 자동 로그아웃과 같은 기준이라 '로그인된 세션'과 사실상 일치한다.
+ *
+ * 무한정 유지하지 않는 이유: 주방 담당이 그냥 탭을 닫고 가버리면 캐셔가 계속 주문을
+ * 주방 몫으로 남겨두고 아무도 만들지 않는, 반대 방향의 사고가 난다.
+ *
+ * @type {Map<string, {sockets: Set<string>, leftAt: number|null}>} username → 세션
+ */
+const kitchenSessions = new Map();
+const KITCHEN_GRACE_MS = 60 * 60 * 1000;
+const KITCHEN_SWEEP_MS = 60 * 1000;
+
+/** 유예가 끝난 세션을 정리한다. 실제로 지운 게 있으면 true. */
+function pruneKitchenSessions() {
+    const now = Date.now();
+    let removed = false;
+    for (const [username, session] of kitchenSessions) {
+        if (session.sockets.size === 0 && session.leftAt !== null && now - session.leftAt >= KITCHEN_GRACE_MS) {
+            kitchenSessions.delete(username);
+            removed = true;
+            console.log(`[🍳 주방 세션 만료] ${username} (${KITCHEN_GRACE_MS / 60000}분 무연결)`);
+        }
+    }
+    return removed;
+}
+
+/** 지금 주방을 맡고 있는 사람 수. 연결이 끊겨 유예 중인 사람도 포함한다. */
+function kitchenCount() {
+    pruneKitchenSessions();
+    return kitchenSessions.size;
+}
 
 /** @param {import('socket.io').Server} io */
 module.exports = (io) => {
@@ -128,7 +168,7 @@ module.exports = (io) => {
 
         socket.on('request_state', () => {
             socket.emit('cashier_status', cashierStatusPayload());
-            socket.emit('kitchen_status', kitchenUsers.size);
+            socket.emit('kitchen_status', kitchenCount());
         });
 
         socket.on('join_kitchen', () => {
@@ -137,20 +177,26 @@ module.exports = (io) => {
                 console.log(`[🍳 주방 입장(관리자, 카운트 제외)] ID: ${socket.id}`);
                 return;
             }
-            kitchenUsers.add(socket.id);
-            io.emit('kitchen_status', kitchenUsers.size);
-            console.log(`[🍳 주방 입장] ID: ${socket.id} (현재 주방 인원: ${kitchenUsers.size}명)`);
+            const username = socket.data.user.username;
+            const session = kitchenSessions.get(username) ?? { sockets: new Set(), leftAt: null };
+            session.sockets.add(socket.id);
+            session.leftAt = null; // 다시 붙었으니 유예 종료
+            kitchenSessions.set(username, session);
+            io.emit('kitchen_status', kitchenCount());
+            console.log(`[🍳 주방 입장] ${username} (ID: ${socket.id}, 현재 주방 인원: ${kitchenSessions.size}명)`);
         });
 
+        // 역할 변경처럼 사람이 직접 나간 경우다. 유예 없이 즉시 비운다 —
+        // 자리를 뜬다고 스스로 알린 것이므로 붙잡아 둘 이유가 없다.
         socket.on('leave_kitchen', () => {
-            kitchenUsers.delete(socket.id);
-            io.emit('kitchen_status', kitchenUsers.size);
+            releaseKitchen(socket, { immediate: true });
         });
 
         socket.on('logout', () => {
             const user = connectedUsers.get(socket.id);
             console.log(`[👋 로그아웃] ${user?.username || '알 수 없음'} (ID: ${socket.id})`);
             connectedUsers.delete(socket.id);
+            releaseKitchen(socket, { immediate: true });
             broadcastUserCount();
         });
 
@@ -166,16 +212,37 @@ module.exports = (io) => {
                 io.emit('cashier_status', cashierStatusPayload());
             }
 
-            if (kitchenUsers.has(socket.id)) {
-                kitchenUsers.delete(socket.id);
-                io.emit('kitchen_status', kitchenUsers.size);
-                console.log(`[🍳 주방 퇴장 (연결 끊김)] 남은 주방 인원: ${kitchenUsers.size}명`);
-            }
+            // 연결이 끊긴 것만으로는 자리를 비우지 않는다. 화면이 꺼졌거나 순단일 수 있다.
+            releaseKitchen(socket, { immediate: false });
         });
 
         socket.on('error', (/** @type {any} */ err) => {
             console.error(`[❌ Socket 에러] ID: ${socket.id}, 에러 상세:`, err);
         });
+
+        /**
+         * 이 소켓을 주방 세션에서 뗀다.
+         * immediate면 세션까지 지우고, 아니면 유예를 시작한다(마지막 소켓이었을 때).
+         * @param {import('socket.io').Socket} sock
+         * @param {{immediate: boolean}} opts
+         */
+        function releaseKitchen(sock, { immediate }) {
+            const username = sock.data.user?.username;
+            const session = username ? kitchenSessions.get(username) : null;
+            if (!session) return;
+
+            session.sockets.delete(sock.id);
+            if (session.sockets.size > 0) return; // 다른 기기가 아직 주방 화면을 열고 있다
+
+            if (immediate) {
+                kitchenSessions.delete(username);
+                console.log(`[🍳 주방 퇴장] ${username} (남은 주방 인원: ${kitchenSessions.size}명)`);
+            } else {
+                session.leftAt = Date.now();
+                console.log(`[🍳 주방 연결 끊김] ${username} — ${KITCHEN_GRACE_MS / 60000}분간 자리 유지`);
+            }
+            io.emit('kitchen_status', kitchenCount());
+        }
 
         function broadcastUserCount() {
             const staffUsers = Array.from(connectedUsers.values()).filter((user) => user.role !== 'admin');
@@ -183,4 +250,10 @@ module.exports = (io) => {
             io.emit('user_count', uniqueStaffCount);
         }
     });
+
+    // 유예가 끝나는 순간에는 아무 이벤트도 일어나지 않는다. 주기적으로 훑어 정리하고,
+    // 실제로 줄어들었을 때만 알린다 — 그래야 캐셔 화면이 뒤늦게라도 '주방 없음'으로 바뀐다.
+    setInterval(() => {
+        if (pruneKitchenSessions()) io.emit('kitchen_status', kitchenSessions.size);
+    }, KITCHEN_SWEEP_MS).unref();
 };

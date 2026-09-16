@@ -255,6 +255,20 @@ function App() {
         };
     }, [myRole, notify]);
 
+    // 주방도 같은 이유로 재연결 때 다시 알린다.
+    // join_kitchen은 역할을 고르는 순간에만 보냈는데, 순단 후 재연결되면 소켓 ID가 바뀌어
+    // 서버는 이 사람을 주방에서 뗀 상태가 된다. 화면은 주방인데 서버상으로는 아무도 없어,
+    // 캐셔가 결제완료를 누르면 조리완료까지 넘어가 주문이 주방 목록에서 사라졌다.
+    useEffect(() => {
+        if (myRole !== 'kitchen') return;
+
+        const rejoinKitchen = () => socket.emit('join_kitchen');
+        socket.on('connect', rejoinKitchen);
+        return () => {
+            socket.off('connect', rejoinKitchen);
+        };
+    }, [myRole]);
+
     // ---------------------------------------------------------
     // [4] 렌더링 로직 (Render Logic)
     // ---------------------------------------------------------
