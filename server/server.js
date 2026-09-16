@@ -306,6 +306,16 @@ async function ensureSchema() {
         console.error('⚠️ [DB] hygiene_check_edits 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 
+    // 주방의 항목별 중간 체크. 자세한 배경은 migrations/015_order_item_made.sql 참고.
+    try {
+        await pool.query('ALTER TABLE orders ADD COLUMN is_made TINYINT(1) NOT NULL DEFAULT 0');
+        console.log('✅ [DB] 주문 항목별 조리 체크 컬럼 추가');
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] orders.is_made 컬럼 추가 실패:', err.message);
+        }
+    }
+
     // 제출된 점검의 사진은 지워도 실제로 지우지 않는다. 자세한 배경은 migrations/014_hygiene_photo_soft_delete.sql 참고.
     try {
         await pool.query(`ALTER TABLE hygiene_check_photos

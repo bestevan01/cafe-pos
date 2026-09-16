@@ -4,6 +4,14 @@ import axios from 'axios';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
 
+/**
+ * 한 주문의 항목이 모두 체크됐는지. 전부 체크되면 '조리 완료' 버튼을 눈에 띄게 바꾼다.
+ * 자동으로 완료 처리하지는 않는다 — 잘못 체크했을 때 되돌릴 수 있어야 하고,
+ * 컵에 담아 내보내는 마지막 확인은 사람이 한 번 하는 게 맞다.
+ * @param {import('../../types').OrderGroup} group
+ */
+const allMade = (group) => group.items.length > 0 && group.items.every((it) => it.is_made === 1);
+
 function Kitchen() {
     const { notify, confirm } = useNotification();
     // ---------------------------------------------------------
@@ -36,9 +44,11 @@ function Kitchen() {
                 };
             }
             map[id].items.push({
+                id: item.id,
                 menu_name: item.menu_name,
                 quantity: item.quantity,
                 price: item.total_price,
+                is_made: item.is_made ?? 0,
             });
         });
         return Object.values(map).sort((a, b) => b.daily_number - a.daily_number);
@@ -85,6 +95,20 @@ function Kitchen() {
             }
         });
 
+        // 다른 기기에서 누른 항목 체크. 같은 주문을 나눠 만들 때 서로 어디까지 했는지 보인다.
+        socket.on('order_item_made', ({ display_id, id, is_made }) => {
+            setOrderGroups((prev) =>
+                prev.map((group) =>
+                    group.display_id === display_id
+                        ? {
+                              ...group,
+                              items: group.items.map((it) => (it.id === id ? { ...it, is_made } : it)),
+                          }
+                        : group,
+                ),
+            );
+        });
+
         // 주문 취소/삭제 수신
         socket.on('order_deleted', (deletedId) => {
             setOrderGroups((prev) => prev.filter((group) => group.display_id !== deletedId));
@@ -93,6 +117,7 @@ function Kitchen() {
         return () => {
             socket.off('new_order');
             socket.off('order_updated');
+            socket.off('order_item_made');
             socket.off('order_deleted');
         };
     }, [fetchOrders]);
@@ -100,6 +125,34 @@ function Kitchen() {
     // ---------------------------------------------------------
     // [3] 이벤트 핸들러
     // ---------------------------------------------------------
+    /**
+     * 항목 하나를 만들었다/아니다로 표시한다.
+     * 화면을 먼저 바꾸고 요청을 보낸다 — 만드는 중에 한 박자 기다리게 하고 싶지 않다.
+     * 실패하면 되돌리고 알린다. 성공하면 서버가 보낸 order_item_made가 모든 기기를 맞춘다.
+     * @param {string} displayId @param {string} itemId @param {number} next 0|1
+     */
+    const handleToggleMade = async (displayId, itemId, next) => {
+        const apply = (/** @type {number} */ value) =>
+            setOrderGroups((prev) =>
+                prev.map((group) =>
+                    group.display_id === displayId
+                        ? {
+                              ...group,
+                              items: group.items.map((it) => (it.id === itemId ? { ...it, is_made: value } : it)),
+                          }
+                        : group,
+                ),
+            );
+
+        apply(next);
+        try {
+            await axios.patch(`/api/orders/items/${itemId}/made`, { made: next === 1 }, getAuthHeader());
+        } catch {
+            apply(next === 1 ? 0 : 1);
+            notify('체크를 저장하지 못했습니다.', { icon: '⚠️', dedupeKey: 'item-made' });
+        }
+    };
+
     /** @param {string} displayId */
     const handleComplete = async (displayId) => {
         if (!(await confirm('조리를 완료 처리하시겠습니까?', { confirmText: '완료' }))) return;
@@ -154,14 +207,25 @@ function Kitchen() {
                 /* 뱃지 및 리스트 아이템 */
                 .badge-paid { color: var(--success); border: 2px solid var(--success); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: var(--success-bg); }
                 .badge-unpaid { color: var(--warning); border: 2px solid var(--warning); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: bold; background-color: var(--warning-bg); }
-                .receipt-item { display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; margin-bottom: 8px; border-bottom: 1px solid var(--border-color, #f0f0f0); padding-bottom: 5px; color: var(--text-primary, #333); }
+                /* 항목 자체가 체크 버튼이다. 만들면서 누르는 것이라 손가락이 닿는 면을 넓게 잡는다. */
+                .receipt-item { display: flex; align-items: center; gap: 10px; width: 100%; font-size: 1.2rem; margin-bottom: 8px; border: none; border-bottom: 1px solid var(--border-color, #f0f0f0); border-radius: var(--radius-sm); padding: 10px 6px; background: none; color: var(--text-primary, #333); font-family: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+                .receipt-item:active { background-color: var(--bg-color, #f4f6f8); }
+                .item-name { flex: 1; }
                 .item-qty { font-weight: bold; color: var(--text-primary, #111); font-size: 1.3rem; }
+                /* 빈 네모를 늘 띄워 둔다. 체크했을 때만 자리가 생기면 글자가 밀려 읽기 어렵다. */
+                .item-check { flex-shrink: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--border-color, #ccc); border-radius: var(--radius-sm); color: #fff; font-size: 1.1rem; font-weight: 800; }
+                .receipt-item.made { color: var(--text-secondary, #999); }
+                .receipt-item.made .item-name { text-decoration: line-through; }
+                .receipt-item.made .item-qty { color: var(--text-secondary, #999); }
+                .receipt-item.made .item-check { background-color: var(--success); border-color: var(--success); }
                 
                 /* 액션 버튼 그룹 */
                 .btn-group { display: flex; gap: 10px; margin-top: 15px; }
                 .btn-cancel { flex: 1; padding: 15px; font-size: 1.1rem; background-color: var(--danger); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
                 .btn-complete { flex: 2; padding: 15px; font-size: 1.2rem; background-color: var(--success); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
                 .btn-cancel:active, .btn-complete:active { opacity: 0.8; }
+                /* 전부 체크되면 버튼을 키워 '이제 내보내도 된다'를 알린다. 처리는 여전히 직접 누른다. */
+                .btn-complete.ready { box-shadow: 0 0 0 3px var(--success-bg), 0 4px 12px rgba(0,0,0,.18); transform: scale(1.02); }
 
                 /* 모바일 반응형 */
                 @media (max-width: 768px) {
@@ -202,25 +266,50 @@ function Kitchen() {
                                 </div>
 
                                 <div style={{ flex: 1, overflowY: 'auto', marginBottom: '5px' }}>
-                                    {group.items.map((item, idx) => (
-                                        <div key={idx} className="receipt-item">
-                                            <span
-                                                style={{
-                                                    color: item.menu_name.includes('(샷') ? 'var(--accent)' : 'inherit',
-                                                }}
+                                    {group.items.map((item, idx) => {
+                                        const made = item.is_made === 1;
+                                        // 서버가 아직 옛 버전이면 항목 id가 없다(배포 시차). 그때는 체크만 막고
+                                        // 목록은 그대로 보여준다 — 주문을 못 보는 것보다 낫다.
+                                        const itemId = item.id;
+                                        return (
+                                            <button
+                                                key={itemId ?? idx}
+                                                type="button"
+                                                className={`receipt-item${made ? ' made' : ''}`}
+                                                aria-pressed={made}
+                                                disabled={!itemId}
+                                                onClick={() =>
+                                                    itemId && handleToggleMade(group.display_id, itemId, made ? 0 : 1)
+                                                }
                                             >
-                                                {item.menu_name}
-                                            </span>
-                                            <span className="item-qty">{item.quantity}</span>
-                                        </div>
-                                    ))}
+                                                <span className="item-check" aria-hidden="true">
+                                                    {made ? '✓' : ''}
+                                                </span>
+                                                <span
+                                                    className="item-name"
+                                                    style={{
+                                                        color:
+                                                            !made && item.menu_name.includes('(샷')
+                                                                ? 'var(--accent)'
+                                                                : undefined,
+                                                    }}
+                                                >
+                                                    {item.menu_name}
+                                                </span>
+                                                <span className="item-qty">{item.quantity}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
                                 <div className="btn-group">
                                     <button onClick={() => handleDelete(group.display_id)} className="btn-cancel">
                                         취소
                                     </button>
-                                    <button onClick={() => handleComplete(group.display_id)} className="btn-complete">
+                                    <button
+                                        onClick={() => handleComplete(group.display_id)}
+                                        className={`btn-complete${allMade(group) ? ' ready' : ''}`}
+                                    >
                                         조리 완료 ✅
                                     </button>
                                 </div>

@@ -205,6 +205,13 @@ router.post('', authenticateToken, async (req, res) => {
             );
         }
 
+        // 방금 넣은 행을 다시 읽어 id를 얻는다. orders.id는 DB가 만드는 UUID라 insertId로는 알 수 없고,
+        // 주방이 항목별로 체크하려면 행마다 식별자가 있어야 한다. 커밋 전 같은 커넥션에서 읽는다.
+        const [insertedRows] = await conn.query(
+            'SELECT id, menu_name, quantity, total_price FROM orders WHERE display_id = ? ORDER BY created_at, id',
+            [formattedID],
+        );
+
         await conn.commit();
 
         if (isEventUpdated) {
@@ -214,7 +221,13 @@ router.post('', authenticateToken, async (req, res) => {
         io.emit('new_order', {
             display_id: formattedID,
             daily_number: String(nextDailyNum).padStart(3, '0'),
-            items: computedItems.map((i) => ({ menu_name: i.menu_name, quantity: i.quantity, price: i.total_price })),
+            items: insertedRows.map((/** @type {any} */ r) => ({
+                id: r.id,
+                menu_name: r.menu_name,
+                quantity: r.quantity,
+                price: r.total_price,
+                is_made: 0,
+            })),
             created_at: new Date(),
             payment_method: paymentMethod || 'cash',
             staff_name: staff_name || '키오스크',
@@ -324,6 +337,36 @@ router.patch('/:display_id/pay', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '결제 처리에 실패했습니다.',
+            debug_info: debugInfo(err),
+        });
+    }
+});
+
+// 주방의 항목별 중간 체크. 한 사람이 체크하면 다른 기기에서도 체크된 것으로 보이도록 알린다.
+// 주문 단위(display_id)가 아니라 품목 행(orders.id) 하나를 바꾼다.
+router.patch('/items/:id/made', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const io = req.app.get('io');
+    const made = req.body.made ? 1 : 0;
+
+    try {
+        const [[row]] = await pool.query('SELECT display_id, is_completed FROM orders WHERE id = ? LIMIT 1', [id]);
+        if (!row) {
+            return res.status(404).json({ success: false, message: '주문 항목을 찾을 수 없습니다.' });
+        }
+        // 이미 끝난 주문은 주방 목록에 없다. 뒤늦게 도착한 체크로 지난 기록을 건드리지 않는다.
+        if (row.is_completed === 1) {
+            return res.status(409).json({ success: false, message: '이미 조리가 완료된 주문입니다.' });
+        }
+
+        await pool.query('UPDATE orders SET is_made = ? WHERE id = ?', [made, id]);
+        io.emit('order_item_made', { id, display_id: row.display_id, is_made: made });
+        res.json({ success: true });
+    } catch (/** @type {any} */ err) {
+        console.error(`[🔥 PATCH /api/orders/items/${id}/made 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '조리 체크에 실패했습니다.',
             debug_info: debugInfo(err),
         });
     }
