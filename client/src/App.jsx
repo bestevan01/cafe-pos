@@ -402,6 +402,9 @@ function App() {
 
                 .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
                 .dropdown-item:last-child { border-bottom: none; }
+                /* 테마 변경은 하위 메뉴를 담는 div 안에 들어 있어서 그 div의 마지막 자식이 된다.
+                   실제로는 메뉴의 첫 줄이므로 위 규칙에 걸려 사라진 아래 선을 되살린다. */
+                .dropdown-theme-wrap > .dropdown-item { border-bottom: 1px solid var(--border-color, #eee); }
                 .dropdown-item.logout { color: var(--danger); }
                 .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
                 .dropdown-item.active { color: var(--accent); font-weight: 800; }

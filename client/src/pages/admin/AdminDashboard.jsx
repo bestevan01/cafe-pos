@@ -182,6 +182,10 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
 
                 .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
                 .dropdown-item:last-child { border-bottom: none; }
+                /* 테마 변경은 하위 메뉴를 담는 div 안에 들어 있다. 하위 메뉴가 접혀 있으면 그 div의
+                   유일한 자식이라 위 :last-child 규칙에 걸려 아래 선이 사라진다(펼치면 다시 생긴다).
+                   실제로는 메뉴의 첫 줄이므로 선을 되살린다. */
+                .dropdown-theme-wrap > .dropdown-item { border-bottom: 1px solid var(--border-color, #eee); }
                 .dropdown-item.logout, .dropdown-item.danger { color: var(--danger); }
                 .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
                 .dropdown-item.active { color: var(--accent); font-weight: 800; }
