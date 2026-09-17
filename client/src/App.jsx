@@ -8,6 +8,14 @@ import Cashier from './pages/pos/Cashier';
 import Kitchen from './pages/pos/Kitchen';
 import CashSettlement from './pages/pos/CashSettlement.jsx';
 import HygieneCheck from './pages/pos/HygieneCheck.jsx';
+import InventoryCount from './pages/pos/InventoryCount.jsx';
+import {
+    show as showBrowserAlert,
+    runAlertAction,
+    registerAlertAction,
+    listenForAlertActions,
+} from './utils/browserNotify';
+import NotificationSettings from './pages/auth/NotificationSettings.jsx';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ProfileAuth from './pages/auth/ProfileAuth.jsx';
@@ -60,6 +68,11 @@ function App() {
     // 모달 상태
     const [showSettlement, setShowSettlement] = useState(false);
     const [showHygiene, setShowHygiene] = useState(false);
+    const [showInventory, setShowInventory] = useState(false);
+    const [showAlerts, setShowAlerts] = useState(false);
+    // 관리자 대시보드에서 바로 열 화면(알림을 눌러 들어온 경우). 대시보드가 받아서 쓰고 비운다.
+    // 이벤트로 알리면 대시보드가 아직 안 떠 있을 때(알림 설정 화면에서 누른 경우 등) 사라진다.
+    const [adminJump, setAdminJump] = useState(/** @type {string|null} */ (null));
     const [showProfile, setShowProfile] = useState(false);
     const [isProfileVerified, setIsProfileVerified] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -220,6 +233,21 @@ function App() {
             setCashierUserName(status.name);
         });
         socket.on('kitchen_status', (count) => setKitchenUserCount(count));
+
+        // 정해진 시각 알림(공통). 서버가 대상을 방으로 가려서 보내므로 여기서는 그냥 띄운다.
+        // 브라우저 알림이 막혀 있으면 앱 안 토스트로라도 보여준다 — 내용을 잃지 않는 게 먼저다.
+        socket.on('app_alert', (alert) => {
+            if (!showBrowserAlert(alert)) {
+                notify(alert.body ? `${alert.title} — ${alert.body}` : alert.title, {
+                    icon: '🔔',
+                    duration: 0,
+                    dedupeKey: `alert-${alert.key}`,
+                    // 브라우저 알림 대신 뜬 토스트도 누르면 같은 화면으로 간다.
+                    onClick: alert.action ? () => runAlertAction(alert.action) : undefined,
+                });
+            }
+        });
+
         socket.emit('request_state'); // 현재 상태 요청
 
         return () => {
@@ -228,8 +256,36 @@ function App() {
             socket.off('user_count');
             socket.off('cashier_status');
             socket.off('kitchen_status');
+            socket.off('app_alert');
         };
     }, [auth.isLoggedIn, auth.user, handleLogout, notify]);
+
+    // 알림을 눌렀을 때 열 화면. 이름과 실제 동작을 여기서 잇는다(utils/browserNotify 참고).
+    // 전체 화면(알림 설정·내 정보)이 떠 있으면 그 뒤에 모달이 가려지므로 먼저 닫는다.
+    useEffect(() => {
+        if (!auth.isLoggedIn) return undefined;
+        const toMain = () => {
+            setShowAlerts(false);
+            setShowProfile(false);
+            setIsProfileVerified(false);
+        };
+        const offs = [
+            registerAlertAction('open_inventory_count', () => {
+                toMain();
+                setShowInventory(true);
+            }),
+            registerAlertAction('open_inventory_status', () => {
+                toMain();
+                setAdminStaffMode(false);
+                setAdminJump('inventory');
+            }),
+        ];
+        return () => offs.forEach((off) => off());
+    }, [auth.isLoggedIn]);
+
+    // 서비스 워커를 통해 들어온 동작을 받는다(탭이 닫혀 있을 때 온 푸시를 누른 경우).
+    // 로그인 여부와 상관없이 한 번 연결한다 — 받은 동작은 위에서 등록될 때까지 맡아둔다.
+    useEffect(() => listenForAlertActions(), []);
 
     // 캐셔 사용 중 순단(재연결) 시 자리 자동 재선점.
     // 재연결되면 소켓 ID가 바뀌어 서버가 이전 소켓 기준으로 자리를 비워버리므로,
@@ -306,6 +362,11 @@ function App() {
         );
     }
 
+    // 알림 설정은 역할과 무관하다. 각자 자기 기기에서 켜는 것이라 관리자·직원 모두 들어온다.
+    if (showAlerts) {
+        return <NotificationSettings onBack={() => setShowAlerts(false)} isAdmin={auth.user.role === 'admin'} />;
+    }
+
     // 관리자 대시보드 (직원 모드로 전환하지 않은 동안만)
     if (auth.user.role === 'admin' && !adminStaffMode) {
         // 본인 확인 통과 후엔 EditProfile 전체 페이지로 전환
@@ -328,6 +389,9 @@ function App() {
                     onLogout={handleManualLogout}
                     onEditProfile={() => setShowProfile(true)}
                     onEnterStaffMode={() => setAdminStaffMode(true)}
+                    onOpenAlerts={() => setShowAlerts(true)}
+                    jumpTo={adminJump}
+                    onJumped={() => setAdminJump(null)}
                 />
                 {showProfile && (
                     <ProfileAuth
@@ -391,6 +455,7 @@ function App() {
                 .btn-global-action:active { transform: scale(0.95); }
                 .btn-settle { background-color: var(--success); }
                 .btn-hygiene { background-color: var(--accent); }
+                .btn-inventory { background-color: var(--neutral); }
                 .btn-back-role { background-color: var(--neutral); margin-right: auto; }
 
                 /* 이름 드롭다운 — PC/모바일 공통(화면 크기와 무관하게 동일한 형태) */
@@ -447,6 +512,13 @@ function App() {
                     {!myRole && (
                         <button onClick={() => setShowHygiene(true)} className="btn-global-action btn-hygiene">
                             🧼 위생 점검
+                        </button>
+                    )}
+
+                    {/* 재고 조사도 역할과 무관하다. 위생 점검과 같은 자리에 둔다. */}
+                    {!myRole && (
+                        <button onClick={() => setShowInventory(true)} className="btn-global-action btn-inventory">
+                            📦 재고 조사
                         </button>
                     )}
 
@@ -521,6 +593,15 @@ function App() {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        setShowAlerts(true);
+                                        setIsDropdownOpen(false);
+                                    }}
+                                    className="dropdown-item"
+                                >
+                                    🔔 알림 설정
+                                </button>
+                                <button
+                                    onClick={() => {
                                         handleManualLogout();
                                         setIsDropdownOpen(false);
                                     }}
@@ -539,6 +620,7 @@ function App() {
 
             {/* 위생 점검 모달 */}
             {showHygiene && <HygieneCheck onClose={() => setShowHygiene(false)} />}
+            {showInventory && <InventoryCount onClose={() => setShowInventory(false)} />}
 
             {/* 메인 화면 렌더링 */}
             {renderContent()}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SalesDashboard from './SalesDashboard';
 import SettlementDashboard from './SettlementDashboard';
 import MenuDashboard from './MenuDashboard';
@@ -6,6 +6,7 @@ import EventDashboard from './EventDashboard';
 import UsersDashboard from './UsersDashboard';
 import CostAnalysis from './CostAnalysis';
 import HygieneDashboard from './HygieneDashboard';
+import InventoryDashboard from './InventoryDashboard';
 import { socket } from '../../utils/socket';
 import { useTheme } from '../../hooks/useTheme';
 import { useNotification } from '../../hooks/useNotification';
@@ -17,9 +18,21 @@ import StoreBadge from '../../components/StoreBadge';
  * @param {() => void} props.onLogout
  * @param {() => void} props.onEditProfile
  * @param {() => void} props.onEnterStaffMode  캐셔/주방 화면으로 전환
+ * @param {() => void} props.onOpenAlerts  알림 설정 열기
+ * @param {string|null} [props.jumpTo]  바로 열 화면(알림을 눌러 들어온 경우)
+ * @param {() => void} [props.onJumped]  jumpTo를 받아 쓴 뒤 부른다
  */
-function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode }) {
+function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode, onOpenAlerts, jumpTo, onJumped }) {
     const [view, setView] = useState('home');
+
+    // 알림을 눌러 들어온 경우 해당 화면을 연다(App.jsx의 open_inventory_status).
+    // 받은 뒤에는 비운다 — 남겨두면 홈으로 돌아올 때마다 다시 그 화면으로 튄다.
+    useEffect(() => {
+        if (!jumpTo) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 바깥에서 들어온 요청을 화면 상태로 옮기는 한 번뿐인 동기화
+        setView(jumpTo);
+        onJumped?.();
+    }, [jumpTo, onJumped]);
     const { notify, confirm } = useNotification();
     const { theme, setTheme } = useTheme();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -52,6 +65,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
     if (view === 'users') return <UsersDashboard onBack={() => setView('home')} />;
     if (view === 'cost') return <CostAnalysis onBack={() => setView('home')} />;
     if (view === 'hygiene') return <HygieneDashboard onBack={() => setView('home')} />;
+    if (view === 'inventory') return <InventoryDashboard onBack={() => setView('home')} />;
 
     // 메인(Home) 화면 렌더링
     return (
@@ -119,6 +133,15 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                                 className="dropdown-item"
                             >
                                 ⚙️ 내 정보
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsDropdownOpen(false);
+                                    onOpenAlerts();
+                                }}
+                                className="dropdown-item"
+                            >
+                                🔔 알림 설정
                             </button>
                             <button
                                 onClick={() => {
@@ -282,6 +305,11 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode })
                         <div className="card-icon">🧼</div>
                         <div className="card-title">위생 점검</div>
                         <div className="card-desc">점검 기록 확인 및 체크리스트 관리</div>
+                    </button>
+                    <button onClick={() => setView('inventory')} className="admin-card">
+                        <div className="card-icon">📦</div>
+                        <div className="card-title">재고 현황</div>
+                        <div className="card-desc">주문 필요 품목 확인 및 품목 관리</div>
                     </button>
                 </div>
             </div>

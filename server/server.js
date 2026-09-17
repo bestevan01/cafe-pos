@@ -22,6 +22,11 @@ const salesRoutes = require('./routes/sales.routes');
 const settlementRoutes = require('./routes/settlement.routes');
 const hygieneRoutes = require('./routes/hygiene.routes');
 const hygieneAdminRoutes = require('./routes/hygieneAdmin.routes');
+const inventoryRoutes = require('./routes/inventory.routes');
+const inventoryAdminRoutes = require('./routes/inventoryAdmin.routes');
+const alertRoutes = require('./routes/alerts.routes');
+const pushRoutes = require('./routes/push.routes');
+const myAlertsRoutes = require('./routes/myAlerts.routes');
 const statsRoutes = require('./routes/stats.routes');
 const costRoutes = require('./routes/cost.routes');
 const passkeyRoutes = require('./routes/passkey.routes');
@@ -306,6 +311,160 @@ async function ensureSchema() {
         console.error('⚠️ [DB] hygiene_check_edits 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
     }
 
+    // 웹 푸시 구독. 자세한 배경은 migrations/018_push_subscriptions.sql 참고.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS push_subscriptions
+            (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                endpoint   VARCHAR(500) NOT NULL,
+                p256dh     VARCHAR(255) NOT NULL,
+                auth_key   VARCHAR(255) NOT NULL,
+                -- users.id와 같은 collation이어야 조인된다. 자세한 배경은 migrations/018 주석 참고.
+                user_id    VARCHAR(36) COLLATE utf8mb4_general_ci NULL,
+                user_agent VARCHAR(255) NULL,
+                created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_sent  DATETIME     NULL,
+                UNIQUE KEY uq_push_endpoint (endpoint(255)),
+                KEY idx_push_user (user_id)
+            )
+        `);
+    } catch (/** @type {any} */ err) {
+        console.error('⚠️ [DB] push_subscriptions 생성 실패:', err.message);
+    }
+
+    // 정해진 시각에 브라우저 알림을 띄우는 공통 장치. 자세한 배경은 migrations/017_alert_schedules.sql 참고.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS alert_schedules
+            (
+                id              INT AUTO_INCREMENT PRIMARY KEY,
+                alert_key       VARCHAR(50) NOT NULL,
+                run_at          TIME        NOT NULL,
+                is_enabled      TINYINT(1)  NOT NULL DEFAULT 1,
+                last_fired_date DATE        NULL,
+                created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_alert_key_time (alert_key, run_at),
+                KEY idx_alert_enabled (is_enabled, run_at)
+            )
+        `);
+    } catch (/** @type {any} */ err) {
+        console.error('⚠️ [DB] alert_schedules 생성 실패:', err.message);
+    }
+
+    // 재고 현황 조사. 자세한 배경은 migrations/016_inventory_counts.sql 참고.
+    // 원가·순익 분석(ingredients)과 엮지 않는다 — 두 매장 모두 안 쓰는 기능이라,
+    // 매일 쓰는 재고가 그 데이터 상태에 묶이면 안 된다.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS inventory_items
+            (
+                id             INT AUTO_INCREMENT PRIMARY KEY,
+                name           VARCHAR(100)   NOT NULL,
+                measure_mode   VARCHAR(10)    NOT NULL DEFAULT 'pack',
+                count_unit     VARCHAR(10)    NOT NULL DEFAULT '개',
+                count_per_pack DECIMAL(10, 2) NULL,
+                base_unit      VARCHAR(10)    NOT NULL DEFAULT '개',
+                tare_g         DECIMAL(10, 2) NULL,
+                low_threshold  DECIMAL(10, 2) NULL,
+                is_active      TINYINT(1)     NOT NULL DEFAULT 1,
+                sort_order     INT            NOT NULL DEFAULT 0,
+                updated_at     TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS inventory_units
+            (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                name       VARCHAR(10) NOT NULL,
+                sort_order INT         NOT NULL DEFAULT 0,
+                UNIQUE KEY uq_inventory_units_name (name)
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS inventory_counts
+            (
+                id              INT AUTO_INCREMENT PRIMARY KEY,
+                count_date      DATE         NOT NULL,
+                slot            VARCHAR(10)  NOT NULL,
+                slot_label      VARCHAR(20)  NULL,
+                counted_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                counted_by_id   VARCHAR(36)  NULL,
+                counted_by_name VARCHAR(50)  NOT NULL,
+                memo            VARCHAR(500) NULL,
+                updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_inventory_counts_date_slot (count_date, slot)
+            )
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS inventory_count_items
+            (
+                id             INT AUTO_INCREMENT PRIMARY KEY,
+                count_id       INT            NOT NULL,
+                item_id        INT            NULL,
+                item_label     VARCHAR(100)   NOT NULL,
+                measure_mode   VARCHAR(10)    NOT NULL,
+                count_unit     VARCHAR(10)    NOT NULL,
+                count_per_pack DECIMAL(10, 2) NULL,
+                base_unit      VARCHAR(10)    NOT NULL,
+                tare_g         DECIMAL(10, 2) NULL,
+                low_threshold  DECIMAL(10, 2) NULL,
+                quantity       DECIMAL(10, 2) NOT NULL,
+                spare_count    DECIMAL(10, 2) NOT NULL DEFAULT 0,
+                sort_order     INT            NOT NULL DEFAULT 0,
+                CONSTRAINT fk_inventory_item_count FOREIGN KEY (count_id) REFERENCES inventory_counts (id) ON DELETE CASCADE,
+                CONSTRAINT fk_inventory_item_ref FOREIGN KEY (item_id) REFERENCES inventory_items (id) ON DELETE SET NULL,
+                KEY idx_inventory_items_count (count_id)
+            )
+        `);
+        // 조사 회차. 매장마다 다르므로 표로 둔다. 자세한 배경은 migrations/019_inventory_slots.sql 참고.
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS inventory_slots
+            (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                slot_key   VARCHAR(10) NOT NULL,
+                label      VARCHAR(20) NOT NULL,
+                run_at     TIME        NOT NULL,
+                sort_order INT         NOT NULL DEFAULT 0,
+                UNIQUE KEY uq_inventory_slots_key (slot_key)
+            )
+        `);
+        // 회차는 기본값을 깔지 않는다. 코드는 매장끼리 공유하는데 조사 시각은 매장마다 달라서,
+        // 어느 한 매장 시각을 넣어 두면 다른 매장에는 틀린 값이 조용히 들어간다.
+        // 비어 있는 동안에는 하루 한 번('조사')으로 기록된다(utils/inventorySlots.js FALLBACK).
+        // 품목도 비어서 시작하므로, 관리자가 품목을 넣을 때 회차도 함께 정하면 된다.
+
+        // 처음 한 번만 흔한 단위를 넣어준다. 비어 있는 화면에서 시작하면 뭘 적어야 할지 막막하다.
+        const [[u]] = await pool.query('SELECT COUNT(*) AS n FROM inventory_units');
+        if (u.n === 0) {
+            await pool.query('INSERT INTO inventory_units (name, sort_order) VALUES ?', [
+                // 같은 뜻인 이름을 둘 다 넣지 않는다. '봉'과 '봉지'를 나란히 두면
+                // 사람마다 다른 쪽을 골라 같은 물건이 두 이름으로 갈린다 —
+                // 단위 목록을 만든 이유가 그걸 막기 위해서다. 필요하면 관리자가 추가하면 된다.
+                [
+                    ['줄', 1],
+                    ['봉', 2],
+                    ['통', 3],
+                    ['개', 4],
+                    ['박스', 5],
+                    ['g', 6],
+                ],
+            ]);
+            console.log('✅ [DB] 재고 단위 기본값 6개 생성');
+        }
+    } catch (/** @type {any} */ err) {
+        console.error('⚠️ [DB] 재고 조사 테이블 생성 실패 (수동 마이그레이션 필요):', err.message);
+    }
+
+    // 회차 이름 스냅샷. 관리자가 시각을 바꿔도 지난 기록은 그날 부르던 이름 그대로여야 한다.
+    try {
+        await pool.query('ALTER TABLE inventory_counts ADD COLUMN slot_label VARCHAR(20) NULL');
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] inventory_counts.slot_label 추가 실패:', err.message);
+        }
+    }
+
     // 주방의 항목별 중간 체크. 자세한 배경은 migrations/015_order_item_made.sql 참고.
     try {
         await pool.query('ALTER TABLE orders ADD COLUMN is_made TINYINT(1) NOT NULL DEFAULT 0');
@@ -398,6 +557,11 @@ app.use('/api/admin', costRoutes);
 app.use('/api/settlements', settlementRoutes);
 app.use('/api/hygiene', hygieneRoutes);
 app.use('/api/admin/hygiene', hygieneAdminRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/admin/inventory', inventoryAdminRoutes);
+app.use('/api/admin/alerts', alertRoutes);
+app.use('/api/push', pushRoutes);
+app.use('/api/alerts/mine', myAlertsRoutes);
 
 // 상태 확인용 API (Health Check)
 app.use('/ping', healthRoutes);
@@ -412,6 +576,75 @@ app.use(errorHandler);
 // [7] Socket.IO 이벤트 관리 (WebSockets)
 // ---------------------------------------------------------
 setupSocketHandlers(io);
+
+// ---------------------------------------------------------
+// [7-1] 정해진 시각 알림 (Scheduled alerts)
+// ---------------------------------------------------------
+// 알림 장치는 공통이고(utils/alerts.js), 기능이 '무엇을 알릴지'를 등록한다.
+// 다른 기능도 여기에 한 줄씩 더하면 된다.
+const { registerAlert, startAlertScheduler } = require('./utils/alerts');
+const { loadSlots, currentSlot, syncInventoryReminders } = require('./utils/inventorySlots');
+const { latestStatus, lowAlertText } = require('./services/inventoryStatus');
+
+registerAlert('inventory_low', {
+    label: '재고 주문 필요',
+    description: '주문 기준을 넘긴 품목이 있으면 알려드립니다. 누르면 재고 현황 화면이 열립니다.',
+    audience: 'admin',
+    // 누르면 관리자 재고 현황 화면으로 간다.
+    action: 'open_inventory_status',
+    build: async () => {
+        const status = await latestStatus();
+        // 기록이 없거나 부족한 품목이 없으면 굳이 알리지 않는다.
+        // '이상 없음' 알림이 매일 뜨면 사람은 곧 무시하게 된다.
+        if (!status.count || status.low.length === 0) return null;
+        return lowAlertText(status);
+    },
+});
+
+// 재고 조사 시각 알림 — 지금 접속해 있는 근무자에게 '조사할 시간'이라고 알린다.
+// 시각은 따로 입력받지 않고 재고 조사 회차를 그대로 따라간다(managed). 두 곳에 입력하게 하면
+// 언젠가 어긋난다. 회차가 바뀌면 inventoryAdmin.routes.js가 syncInventoryReminders()를 부른다.
+registerAlert('inventory_count_reminder', {
+    label: '재고 조사 시각 알림',
+    description: '조사할 시간이 되면 알려드립니다. 누르면 재고 조사 화면이 바로 열립니다.',
+    audience: 'staff',
+    // 소켓으로만 보낸다. 푸시는 탭을 닫은 사람의 개인 폰까지 울리므로, 쉬는 날 근무자에게
+    // '재고 조사하세요'가 가게 된다. 지금 접속해 일하고 있는 사람에게만 가면 된다.
+    channels: ['socket'],
+    // 늦게 가면 쓸모가 없다. 30분이 지나면 다음 회차가 가까워 오히려 헷갈린다.
+    graceMinutes: 30,
+    managed: true,
+    // 누르면 재고 조사 화면이 바로 열린다.
+    action: 'open_inventory_count',
+    build: async ({ runAt }) => {
+        // 스케줄러는 예정 시각을 넘겨준다. '지금 보내보기'처럼 시각 없이 불리면 지금 회차로 본다.
+        let slot;
+        if (runAt) {
+            slot = (await loadSlots()).find((s) => s.run_at === runAt);
+            if (!slot) return null; // 그사이 회차가 바뀌었다
+        } else {
+            const now = await currentSlot();
+            slot = now.slots.find((s) => s.slot_key === now.key);
+            if (!slot) return null;
+        }
+        // 이미 누가 냈으면 알리지 않는다. 할 일이 없는데 울리면 알림을 무시하는 버릇만 생긴다.
+        const [[done]] = await pool.query(
+            'SELECT counted_by_name FROM inventory_counts WHERE count_date = CURDATE() AND slot = ? LIMIT 1',
+            [slot.slot_key],
+        );
+        if (done) return null;
+        return {
+            title: `${slot.label} 재고 조사 시간입니다`,
+            body: '눌러서 바로 기록할 수 있습니다.',
+        };
+    },
+});
+
+startAlertScheduler(io);
+// 기동 때 한 번 맞춘다. 회차는 있는데 알림 시각이 비어 있는 상태(처음 배포 등)를 메운다.
+void syncInventoryReminders().catch((/** @type {any} */ err) =>
+    console.error('⚠️ [알림] 재고 조사 시각 동기화 실패:', err.message),
+);
 
 // ---------------------------------------------------------
 // [8] 서버 실행 (Listen)
