@@ -13,11 +13,9 @@ const STATUS = [
     { key: 'na', label: '해당 없음' },
 ];
 
-/** 점검 칸 이름. 어느 칸인지는 서버가 자기 시계로 정하고, 여기서는 보여주기만 한다. */
-const SLOT_NAME = /** @type {Record<string, string>} */ ({ am: '오전', pm: '오후' });
-
 /**
- * 직원용 위생 점검 화면. 운영 지침에 따라 하루 두 번(오전·오후) 하고, 같은 칸이면 다시 열어 고칠 수 있다.
+ * 직원용 위생 점검 화면. 매장 관리자가 정한 회차마다 하고, 같은 회차면 다시 열어 고칠 수 있다.
+ * 회차를 정하기 전에는 오전·오후 두 번이다.
  *
  * 제출한 문구는 서버가 DB의 항목에서 다시 읽어 기록에 복사한다(클라이언트가 보낸 문구는 쓰지 않는다).
  * 그래서 나중에 관리자가 항목을 고쳐도 이미 낸 기록은 그대로 남는다.
@@ -30,12 +28,16 @@ function HygieneCheck({ onClose }) {
     const [answers, setAnswers] = useState(/** @type {Record<number, {status: string, note: string}>} */ ({}));
     const [memo, setMemo] = useState('');
     const [existing, setExisting] = useState(/** @type {any} */ (null));
-    // 오늘의 두 칸(오전·오후) 기록. 어느 칸이 비었는지, 오전을 누가 했는지 판단하는 데 쓴다.
-    const [slots, setSlots] = useState(/** @type {{am: any, pm: any}} */ ({ am: null, pm: null }));
-    // 지금 채우는 칸. 서버가 자기 시계로 정해 내려준다.
-    // 직원이 고르게 하지 않는 이유: 고를 수 있으면 칸과 실제 제출 시각이 어긋난다
+    // 오늘의 회차와 기록. 어느 회차가 비었는지, 다른 회차를 누가 했는지 판단하는 데 쓴다.
+    const [slots, setSlots] = useState(
+        /** @type {{slot_key: string, label: string, run_at: string|null, check: any}[]} */ ([]),
+    );
+    // 지금 채우는 회차. 서버가 자기 시계로 정해 내려준다.
+    // 직원이 고르게 하지 않는 이유: 고를 수 있으면 회차와 실제 제출 시각이 어긋난다
     // (실제로 '오전 · 16:29' 같은 기록이 남았다). 기기 시계가 틀어져 있어도 서버 기준으로 일관된다.
-    const [slot, setSlot] = useState('am');
+    const [slot, setSlot] = useState('');
+    // 매장 관리자가 적어 둔 점검 지침(누가 점검할지 등). 없으면 표시하지 않는다.
+    const [guide, setGuide] = useState(/** @type {string|null} */ (null));
     // 항목 id → 사진 id 목록. 제출할 때 결과에 함께 실어 보낸다.
     const [photos, setPhotos] = useState(/** @type {Record<number, number[]>} */ ({}));
     const [uploading, setUploading] = useState(/** @type {number|null} */ (null));
@@ -43,12 +45,18 @@ function HygieneCheck({ onClose }) {
     const [saving, setSaving] = useState(false);
     const { notify } = useNotification();
 
-    // 다른 칸을 누가 점검했는지. 같은 사람이 두 칸을 다 하지 않도록 안내하는 데 쓴다.
+    const current = slots.find((s) => s.slot_key === slot) ?? null;
+    // 오늘 다른 회차를 내가 이미 했는지. 같은 사람이 여러 회차를 다 하지 않도록 안내하는 데 쓴다.
     // 막지 않고 알리기만 한다 — 혼자 근무하는 시간대가 있을 수 있고, 시스템은 지금 몇 명이
     // 일하는지 모른다. 막으면 점검 자체를 못 하는 상황이 생긴다.
-    const otherSlot = slot === 'am' ? 'pm' : 'am';
-    const otherSlotLabel = SLOT_NAME[otherSlot];
-    const otherChecker = slots[otherSlot]?.checked_by_name ?? null;
+    const me = (() => {
+        try {
+            return JSON.parse(localStorage.getItem('user') || '{}').id ?? null;
+        } catch {
+            return null;
+        }
+    })();
+    const mineElsewhere = slots.filter((s) => s.slot_key !== slot && s.check && s.check.checked_by_id === me);
 
     const load = useCallback(async () => {
         try {
@@ -58,11 +66,13 @@ function HygieneCheck({ onClose }) {
             ]);
             setItems(itemRes.data);
 
-            const bySlot = todayRes.data.slots ?? { am: null, pm: null };
-            const cur = todayRes.data.current_slot ?? 'am';
-            setSlots(bySlot);
+            /** @type {any[]} */
+            const list = todayRes.data.slots ?? [];
+            const cur = todayRes.data.current_slot ?? '';
+            setSlots(list);
             setSlot(cur);
-            const today = bySlot[cur];
+            setGuide(todayRes.data.guide ?? null);
+            const today = list.find((s) => s.slot_key === cur)?.check ?? null;
             setExisting(today);
             if (today) {
                 // 이미 낸 기록이 있으면 그 값으로 채워 '수정' 모드로 연다.
@@ -159,15 +169,15 @@ function HygieneCheck({ onClose }) {
             })),
         };
         try {
-            let savedSlot = slot;
+            let savedLabel = current?.label ?? '';
             if (existing) await axios.put(`/api/hygiene/checks/${existing.id}`, body, authCfg());
             else {
-                // 어느 칸으로 기록됐는지는 서버가 알려준다. 화면을 정오 직전에 열어 정오를 넘겨
-                // 제출하면 화면이 들고 있던 칸과 실제로 기록된 칸이 다르다.
+                // 어느 회차로 기록됐는지는 서버가 알려준다. 화면을 경계 직전에 열어 경계를 넘겨
+                // 제출하면 화면이 들고 있던 회차와 실제로 기록된 회차가 다르다.
                 const res = await axios.post('/api/hygiene/checks', body, authCfg());
-                savedSlot = res.data?.slot ?? slot;
+                savedLabel = res.data?.slot_label ?? savedLabel;
             }
-            notify(existing ? '점검 기록을 수정했습니다.' : `${SLOT_NAME[savedSlot]} 위생 점검을 제출했습니다.`, {
+            notify(existing ? '점검 기록을 수정했습니다.' : `${savedLabel} 위생 점검을 제출했습니다.`, {
                 icon: '✅',
             });
             onClose();
@@ -202,6 +212,7 @@ function HygieneCheck({ onClose }) {
                     background: var(--accent-bg); padding: 5px 12px; border-radius: 999px; }
                 .hc-otherdone { font-size: .82rem; color: var(--success); }
                 .hc-otherwait { font-size: .82rem; color: var(--text-secondary, #999); }
+                .hc-guide { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--accent-bg); color: var(--text-primary, #333); font-size: .84rem; line-height: 1.55; white-space: pre-line; word-break: keep-all; }
                 .hc-warn { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
                     background: var(--warning-bg); color: #ef6c00; font-size: .84rem; line-height: 1.5; word-break: keep-all; }
                 [data-theme='dark'] .hc-warn { background: rgba(239, 108, 0, .18); color: #ffb74d; }
@@ -239,12 +250,20 @@ function HygieneCheck({ onClose }) {
                     <h2 className="hc-title">🧼 위생 점검</h2>
                     {!loading && (
                         <div className="hc-slotnow">
-                            <span className="hc-slotbadge">{SLOT_NAME[slot]} 점검</span>
-                            {slots[otherSlot] ? (
-                                <span className="hc-otherdone">{otherSlotLabel} 완료 ✓</span>
-                            ) : (
-                                <span className="hc-otherwait">{otherSlotLabel} 미완료</span>
-                            )}
+                            <span className="hc-slotbadge">{current?.label ?? ''} 점검</span>
+                            {slots
+                                .filter((s) => s.slot_key !== slot)
+                                .map((s) =>
+                                    s.check ? (
+                                        <span key={s.slot_key} className="hc-otherdone">
+                                            {s.label} 완료 ✓
+                                        </span>
+                                    ) : (
+                                        <span key={s.slot_key} className="hc-otherwait">
+                                            {s.label} 미완료
+                                        </span>
+                                    ),
+                                )}
                         </div>
                     )}
                     <p className="hc-sub">
@@ -254,10 +273,11 @@ function HygieneCheck({ onClose }) {
                               ? `${existing.checked_by_name}님이 제출했습니다. 고쳐서 다시 저장할 수 있습니다.`
                               : '매장을 둘러보고 항목마다 상태를 골라주세요.'}
                     </p>
-                    {!loading && !existing && otherChecker ? (
+                    {!loading && guide ? <p className="hc-guide">📢 {guide}</p> : null}
+                    {!loading && !existing && mineElsewhere.length > 0 ? (
                         <p className="hc-warn">
-                            ⚠️ {otherSlotLabel} 점검을 {otherChecker}님이 하셨습니다. 일을 고르게 나누기 위해 가급적
-                            다른 분이 진행해주세요.
+                            ⚠️ 오늘 {mineElsewhere.map((s) => s.label).join(' · ')} 점검을 이미 하셨습니다. 일을 고르게
+                            나누기 위해 가급적 다른 분이 진행해주세요.
                         </p>
                     ) : null}
                 </div>

@@ -89,7 +89,8 @@ function listAlertTypes() {
  *
  * 재고 조사 알림처럼 '다른 설정의 시각을 그대로 따라가는' 알림이 있다. 시각을 두 곳에
  * 입력하게 하면 언젠가 어긋나므로, 원래 설정이 바뀔 때마다 여기로 옮겨 적는다.
- *  - 없던 시각은 추가한다(켜진 채로, 오늘이 이미 지났으면 오늘은 보낸 것으로)
+ *  - 없던 시각은 추가한다(오늘이 이미 지났으면 오늘은 보낸 것으로). 켜짐 여부는 기존 시각을 따른다 —
+ *    관리자가 알림을 꺼 둔 뒤 회차를 추가했는데 새 시각만 켜져 다시 울리면 안 된다. 처음이면 켜진 채로.
  *  - 사라진 시각은 지운다
  *  - 남아 있는 시각은 건드리지 않는다 — 관리자가 꺼 둔 것을 다시 켜버리면 안 된다
  *
@@ -99,10 +100,11 @@ function listAlertTypes() {
 async function syncSchedules(key, times) {
     const want = new Set(times);
     const [rows] = await pool.query(
-        "SELECT id, TIME_FORMAT(run_at, '%H:%i') AS t FROM alert_schedules WHERE alert_key = ?",
+        "SELECT id, TIME_FORMAT(run_at, '%H:%i') AS t, is_enabled FROM alert_schedules WHERE alert_key = ?",
         [key],
     );
     const have = new Set(rows.map((/** @type {any} */ r) => r.t));
+    const enabled = rows.length === 0 || rows.some((/** @type {any} */ r) => r.is_enabled) ? 1 : 0;
 
     const gone = rows.filter((/** @type {any} */ r) => !want.has(r.t)).map((/** @type {any} */ r) => r.id);
     if (gone.length > 0) await pool.query('DELETE FROM alert_schedules WHERE id IN (?)', [gone]);
@@ -112,8 +114,8 @@ async function syncSchedules(key, times) {
         // 이미 지난 시각이면 오늘치는 보낸 것으로 둔다. 회차를 추가하자마자 알림이 울리면 곤란하다.
         await pool.query(
             `INSERT INTO alert_schedules (alert_key, run_at, is_enabled, last_fired_date)
-             VALUES (?, ?, 1, IF(? <= CURTIME(), CURDATE(), NULL))`,
-            [key, t, t],
+             VALUES (?, ?, ?, IF(? <= CURTIME(), CURDATE(), NULL))`,
+            [key, t, enabled, t],
         );
     }
 }

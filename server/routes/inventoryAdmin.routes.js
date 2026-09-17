@@ -5,7 +5,7 @@ const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
 const { kstDate } = require('../utils/kstDate');
 const { latestStatus } = require('../services/inventoryStatus');
-const { toMinutes, syncInventoryReminders } = require('../utils/inventorySlots');
+const { inventorySlots } = require('../utils/inventorySlots');
 
 // 재고 조사 기록 조회. 관리자 전용.
 router.use(authenticateToken, requireAdmin);
@@ -97,91 +97,9 @@ router.get('/counts', async (req, res) => {
 });
 
 // ============================================================
-// 조사 회차 (inventory_slots)
+// 조사 회차 (inventory_slots) — 위생 점검과 같은 공통 모듈을 쓴다(utils/slotSchedule.js).
 // ============================================================
-// 매장마다 근무 시간이 달라 시각을 코드에 박을 수 없다. 관리자가 정한다.
-// 경계(어느 시각까지 어느 회차인지)는 이웃한 두 시각의 가운데로 앱이 계산한다 —
-// 관리자가 경계까지 입력하게 하면 "11시 조사인데 왜 13시까지 11시 회차인가"를 매번 설명해야 한다.
-router.get('/slots', async (req, res) => {
-    try {
-        const [rows] = await pool.query(
-            `SELECT id, slot_key, label, TIME_FORMAT(run_at, '%H:%i') AS run_at
-             FROM inventory_slots ORDER BY slot_key`,
-        );
-        // 경계를 함께 내려 화면이 '몇 시까지 이 회차인지'를 보여줄 수 있게 한다.
-        const withRange = rows.map((/** @type {any} */ r, /** @type {number} */ i) => {
-            const prev = rows[i - 1];
-            const next = rows[i + 1];
-            const mid = (/** @type {any} */ a, /** @type {any} */ b) =>
-                Math.round((toMinutes(a.run_at) + toMinutes(b.run_at)) / 2);
-            const fmt = (/** @type {number} */ m) =>
-                `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-            return {
-                ...r,
-                from: prev ? fmt(mid(prev, r)) : '00:00',
-                until: next ? fmt(mid(r, next)) : '24:00',
-            };
-        });
-        res.json(withRange);
-    } catch (/** @type {any} */ err) {
-        console.error('[🔥 GET /api/admin/inventory/slots 에러]', err);
-        res.status(500).json({ success: false, message: '회차를 불러오지 못했습니다.', debug_info: debugInfo(err) });
-    }
-});
-
-/** 'HH:MM'만 통과시킨다. */
-const asTime = (/** @type {any} */ v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(v ?? '')) ? String(v) : null);
-
-router.post('/slots', async (req, res) => {
-    const runAt = asTime(req.body.run_at);
-    if (!runAt) return res.status(400).json({ success: false, message: '시각을 HH:MM으로 입력해주세요.' });
-    const label =
-        String(req.body.label ?? '')
-            .trim()
-            .slice(0, 20) || defaultLabel(runAt);
-    const key = runAt.replace(':', '');
-    try {
-        await pool.query('INSERT INTO inventory_slots (slot_key, label, run_at, sort_order) VALUES (?, ?, ?, ?)', [
-            key,
-            label,
-            runAt,
-            Number(key),
-        ]);
-        // 회차가 바뀌면 '재고 조사 시각 알림'도 따라 바뀐다.
-        await syncInventoryReminders();
-        res.json({ success: true, slot_key: key });
-    } catch (/** @type {any} */ err) {
-        if (err && err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ success: false, message: '이미 같은 시각의 회차가 있습니다.' });
-        }
-        console.error('[🔥 POST /api/admin/inventory/slots 에러]', err);
-        res.status(500).json({ success: false, message: '회차를 추가하지 못했습니다.', debug_info: debugInfo(err) });
-    }
-});
-
-/** 시각에서 기본 이름을 만든다. '15:00' → '오후 3시', '09:30' → '오전 9시 30분' */
-function defaultLabel(/** @type {string} */ runAt) {
-    const [h, m] = runAt.split(':').map(Number);
-    const half = h < 12 ? '오전' : '오후';
-    const hour12 = h % 12 === 0 ? 12 : h % 12;
-    return `${half} ${hour12}시${m ? ` ${m}분` : ''}`;
-}
-
-router.delete('/slots/:id', async (req, res) => {
-    try {
-        // 지난 기록은 slot_label 스냅샷을 갖고 있어 회차를 지워도 그대로 보인다.
-        const [[left]] = await pool.query('SELECT COUNT(*) AS n FROM inventory_slots');
-        if (left.n <= 1) {
-            return res.status(409).json({ success: false, message: '회차는 최소 하나는 있어야 합니다.' });
-        }
-        await pool.query('DELETE FROM inventory_slots WHERE id = ?', [req.params.id]);
-        await syncInventoryReminders();
-        res.json({ success: true });
-    } catch (/** @type {any} */ err) {
-        console.error('[🔥 DELETE /api/admin/inventory/slots/:id 에러]', err);
-        res.status(500).json({ success: false, message: '회차를 지우지 못했습니다.', debug_info: debugInfo(err) });
-    }
-});
+router.use('/slots', inventorySlots.router);
 
 // ============================================================
 // 조사 품목 (inventory_items)

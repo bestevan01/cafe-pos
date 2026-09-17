@@ -5,7 +5,7 @@ import StatCard from '../../components/stats/StatCard';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
 import { useDragSort } from '../../hooks/useDragSort';
-import InventorySlots from '../../components/InventorySlots';
+import SlotSchedule from '../../components/SlotSchedule';
 
 const MODES = [
     {
@@ -386,7 +386,12 @@ function InventoryItems({ onBack }) {
 
             {/* 알림 설정(주문 필요·조사 시각)은 여기 두지 않는다. 알림 설정 화면 한 곳에 모았다 —
                 두 곳에 있으면 어디서 바꿔야 하는지 헷갈린다. */}
-            <InventorySlots />
+            <SlotSchedule
+                endpoint="/api/admin/inventory/slots"
+                title="조사 회차"
+                work="조사"
+                emptyHint="추가하기 전까지는 하루 한 번('조사')으로 기록되고, 조사 시각 알림도 나가지 않습니다."
+            />
 
             <StatCard title="세는 단위" icon="📏" wide subtitle={`${units.length}개`}>
                 <p className="ii-hint">

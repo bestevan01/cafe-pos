@@ -6,6 +6,8 @@ import Button from '../../components/ui/Button';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
 import { useDragSort } from '../../hooks/useDragSort';
+import SlotSchedule from '../../components/SlotSchedule';
+import HygieneGuideEditor from '../../components/HygieneGuideEditor';
 
 // axios에 전역 인증 인터셉터가 없어 호출마다 헤더를 붙인다(다른 관리자 화면과 동일).
 // 컴포넌트 밖에 두는 이유: 안에 두면 매 렌더마다 새 함수가 되어 useCallback 의존성이 흔들린다.
@@ -16,7 +18,9 @@ const authCfg = () => ({ headers: { Authorization: `Bearer ${localStorage.getIte
 const CATEGORIES = ['개인위생', '조리·기구', '냉장·냉동', '매장·홀', '폐기물', '기타'];
 
 /**
- * 위생 점검 체크리스트 '항목' 편집 화면 (관리자 전용).
+ * 위생 점검 설정 화면 (관리자 전용) — 체크리스트 항목, 점검 회차, 점검 안내 문구.
+ *
+ * ── 체크리스트 항목 ──
  *
  * 직원이 매일 점검할 문구를 관리자가 직접 만든다.
  * 삭제는 소프트 삭제(은퇴)다 — 지난 기록에서 이 항목의 추이를 계속 볼 수 있어야 하기 때문.
@@ -150,7 +154,7 @@ function HygieneItems({ onBack }) {
     };
 
     return (
-        <StatsLayout title="📋 체크리스트 수정" onBack={onBack} actions={<ThemeToggle />}>
+        <StatsLayout title="⚙️ 점검 설정" onBack={onBack} actions={<ThemeToggle />}>
             <style>{`
                 .hyg-row { display: grid; grid-template-columns: 26px 108px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color, #eee); background: var(--card-bg, #fff); }
                 /* 잡은 행은 공중에 뜬 것처럼 보여야 어디로 가고 있는지 눈으로 쫓을 수 있다.
@@ -273,6 +277,15 @@ function HygieneItems({ onBack }) {
                     </p>
                 )}
             </StatCard>
+
+            <SlotSchedule
+                endpoint="/api/admin/hygiene/slots"
+                title="점검 회차"
+                work="점검"
+                emptyHint="추가하기 전까지는 오전 · 오후(12시 기준) 두 번으로 기록되고, 점검 시각 알림도 나가지 않습니다."
+            />
+
+            <HygieneGuideEditor />
 
             {retired.length > 0 && (
                 <StatCard title="뺀 항목" icon="🗄️" wide subtitle={`${retired.length}개`}>

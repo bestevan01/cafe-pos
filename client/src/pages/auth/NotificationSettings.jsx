@@ -47,6 +47,12 @@ function NotificationSettings({ onBack, isAdmin }) {
                         <span>여기서 켜고 끄면 이 매장 근무자 전원에게 적용됩니다</span>
                     </div>
                     <AlertSchedule
+                        alertKey="hygiene_check_reminder"
+                        title="위생 점검 시각 알림"
+                        hint="위생 점검 시각이 되면 근무자에게 점검할 시간이라고 알립니다. 누르면 위생 점검 화면이 바로 열립니다. 그 회차 점검을 이미 냈으면 알리지 않습니다."
+                        timesFrom="시각은 위생 점검 → 점검 설정 → 점검 회차를 그대로 따라갑니다. 시각을 바꾸려면 그곳에서 회차를 바꿔주세요."
+                    />
+                    <AlertSchedule
                         alertKey="inventory_count_reminder"
                         title="재고 조사 시각 알림"
                         hint="재고 조사 시각이 되면 근무자에게 조사할 시간이라고 알립니다. 누르면 재고 조사 화면이 바로 열립니다. 그 회차 조사를 이미 냈으면 알리지 않습니다."

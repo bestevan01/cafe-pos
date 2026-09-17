@@ -270,9 +270,17 @@ function App() {
             setIsProfileVerified(false);
         };
         const offs = [
+            // 직원용 창은 직원 화면에서만 그려진다. 관리자가 대시보드에서 누른 경우(보내보기 등)는
+            // 직원 화면으로 옮겨 연다 — 그대로 두면 눌러도 아무 일도 일어나지 않는다.
             registerAlertAction('open_inventory_count', () => {
                 toMain();
+                setAdminStaffMode(true);
                 setShowInventory(true);
+            }),
+            registerAlertAction('open_hygiene_check', () => {
+                toMain();
+                setAdminStaffMode(true);
+                setShowHygiene(true);
             }),
             registerAlertAction('open_inventory_status', () => {
                 toMain();

@@ -304,7 +304,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode, o
                     <button onClick={() => setView('hygiene')} className="admin-card">
                         <div className="card-icon">🧼</div>
                         <div className="card-title">위생 점검</div>
-                        <div className="card-desc">점검 기록 확인 및 체크리스트 관리</div>
+                        <div className="card-desc">점검 기록 확인 및 점검 설정</div>
                     </button>
                     <button onClick={() => setView('inventory')} className="admin-card">
                         <div className="card-icon">📦</div>

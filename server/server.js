@@ -496,8 +496,7 @@ async function ensureSchema() {
         // 전부 아침일 거라 여겼지만 16:29, 13:22처럼 오후에 낸 기록도 있어, 그대로 두면
         // 보고서에 '오전 · 16:29'처럼 앞뒤가 안 맞는 줄이 남는다.
         // 부팅마다 돌리면 안 된다 — 아침 점검을 늦게 낸 경우처럼 사람이 일부러 고른 칸을 덮어쓴다.
-        // 경계는 정오. routes/hygiene.routes.js의 PM_FROM_HOUR와 같아야 한다 —
-        // 다르면 과거 기록과 앞으로 쌓일 기록의 기준이 달라진다.
+        // 경계는 정오. 회차를 넣기 전의 기본 두 칸(utils/hygieneSlots.js의 LEGACY_PLAN)과 같은 기준이다.
         const [fixed] = await pool.query("UPDATE hygiene_checks SET slot = 'pm' WHERE HOUR(checked_at) >= 12");
         console.log(`✅ [DB] 위생 점검 칸 컬럼 추가 — 오후 제출 ${fixed.affectedRows}건을 pm으로 보정`);
     } catch (/** @type {any} */ err) {
@@ -522,6 +521,58 @@ async function ensureSchema() {
         if (err.code !== 'ER_CANT_DROP_FIELD_OR_KEY') {
             console.error('🔥 [DB] 옛 유니크 키 제거 실패 — 오후 점검이 막힙니다:', err.message);
         }
+    }
+
+    // 위생 점검 회차를 매장이 정한다. 자세한 배경은 migrations/020_hygiene_slots.sql 참고.
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hygiene_slots
+            (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                slot_key   VARCHAR(10) NOT NULL,
+                label      VARCHAR(20) NOT NULL,
+                run_at     TIME        NOT NULL,
+                sort_order INT         NOT NULL DEFAULT 0,
+                UNIQUE KEY uq_hygiene_slots_key (slot_key)
+            )
+        `);
+        // 그날부터 유효한 회차 목록. 보고서가 과거를 그날 기준으로 그리게 한다(소급 방지).
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hygiene_slot_plans
+            (
+                effective_date DATE PRIMARY KEY,
+                slots          TEXT      NOT NULL,
+                created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+        // 매장별 설정(키-값). 매장마다 다른 문구를 코드에 박지 않기 위한 곳(utils/storeSettings.js).
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS store_settings
+            (
+                setting_key     VARCHAR(64) PRIMARY KEY,
+                setting_value   TEXT        NOT NULL,
+                updated_by_name VARCHAR(50) NULL,
+                updated_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        `);
+    } catch (/** @type {any} */ err) {
+        console.error('⚠️ [DB] 위생 점검 회차 테이블 준비 실패:', err.message);
+    }
+    try {
+        await pool.query('ALTER TABLE hygiene_checks ADD COLUMN slot_label VARCHAR(20) NULL AFTER slot');
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] hygiene_checks.slot_label 추가 실패:', err.message);
+        }
+    }
+    try {
+        // 회차 이름을 복사해 두기 전의 기록에 이름을 채운다. 그때는 오전·오후 두 칸뿐이었다.
+        // 비어 있는 것만 채우므로 부팅마다 돌아도 이미 적힌 이름을 건드리지 않는다.
+        await pool.query(
+            "UPDATE hygiene_checks SET slot_label = IF(slot = 'pm', '오후', '오전') WHERE slot_label IS NULL AND slot IN ('am', 'pm')",
+        );
+    } catch (/** @type {any} */ err) {
+        console.error('⚠️ [DB] hygiene_checks.slot_label 채우기 실패:', err.message);
     }
 }
 
@@ -584,6 +635,7 @@ setupSocketHandlers(io);
 // 다른 기능도 여기에 한 줄씩 더하면 된다.
 const { registerAlert, startAlertScheduler } = require('./utils/alerts');
 const { loadSlots, currentSlot, syncInventoryReminders } = require('./utils/inventorySlots');
+const { hygieneSlots } = require('./utils/hygieneSlots');
 const { latestStatus, lowAlertText } = require('./services/inventoryStatus');
 
 registerAlert('inventory_low', {
@@ -640,11 +692,53 @@ registerAlert('inventory_count_reminder', {
     },
 });
 
+// 위생 점검 시각 알림 — 재고 조사 시각 알림과 같은 방식이다. 시각은 위생 점검 회차를 따라간다.
+// 회차를 넣기 전(오전·오후 기본 두 칸)에는 시각이 없어 보내지 않는다.
+registerAlert('hygiene_check_reminder', {
+    label: '위생 점검 시각 알림',
+    description: '점검할 시간이 되면 알려드립니다. 누르면 위생 점검 화면이 바로 열립니다.',
+    audience: 'staff',
+    // 재고 조사 알림과 같은 이유로 지금 접속해 일하는 사람에게만 보낸다.
+    channels: ['socket'],
+    graceMinutes: 30,
+    managed: true,
+    action: 'open_hygiene_check',
+    build: async ({ runAt }) => {
+        let slot;
+        if (runAt) {
+            slot = (await hygieneSlots.listSlots()).find((s) => s.run_at === runAt);
+            if (!slot) return null; // 그사이 회차가 바뀌었다
+        } else {
+            const now = await hygieneSlots.currentSlot();
+            slot = now.slots.find((s) => s.slot_key === now.key);
+            if (!slot) return null;
+        }
+        // 이미 누가 냈으면 알리지 않는다.
+        const [[done]] = await pool.query(
+            'SELECT id FROM hygiene_checks WHERE check_date = CURDATE() AND slot = ? LIMIT 1',
+            [slot.slot_key],
+        );
+        if (done) return null;
+        return {
+            title: `${slot.label} 위생 점검 시간입니다`,
+            body: '눌러서 바로 점검을 기록할 수 있습니다.',
+        };
+    },
+});
+
 startAlertScheduler(io);
 // 기동 때 한 번 맞춘다. 회차는 있는데 알림 시각이 비어 있는 상태(처음 배포 등)를 메운다.
-void syncInventoryReminders().catch((/** @type {any} */ err) =>
-    console.error('⚠️ [알림] 재고 조사 시각 동기화 실패:', err.message),
-);
+// 표가 먼저 만들어져야 하므로 스키마 준비를 기다린다(새 매장에 처음 배포하면 표가 아직 없다).
+void schemaReady.then(async () => {
+    for (const [name, sync] of /** @type {[string, () => Promise<void>][]} */ ([
+        ['재고 조사', syncInventoryReminders],
+        ['위생 점검', hygieneSlots.syncReminders],
+    ])) {
+        await sync().catch((/** @type {any} */ err) =>
+            console.error(`⚠️ [알림] ${name} 시각 동기화 실패:`, err.message),
+        );
+    }
+});
 
 // ---------------------------------------------------------
 // [8] 서버 실행 (Listen)
