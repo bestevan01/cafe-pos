@@ -93,6 +93,41 @@ async function sendToAudience(audience, payload) {
     return { sent, removed: dead.length };
 }
 
+/**
+ * 한 사람의 기기들(구독)에만 보낸다. 연결이 끊긴 근무자에게 시각 알림을 전할 때 쓴다(utils/presence.js).
+ * @param {string} userId
+ * @param {any} payload
+ * @returns {Promise<{sent: number, removed: number, skipped?: string}>}
+ */
+async function sendToUser(userId, payload) {
+    if (!isConfigured) return { sent: 0, removed: 0, skipped: 'VAPID 미설정' };
+    const [subs] = await pool.query('SELECT id, endpoint, p256dh, auth_key FROM push_subscriptions WHERE user_id = ?', [
+        userId,
+    ]);
+    if (subs.length === 0) return { sent: 0, removed: 0, skipped: '구독 없음' };
+    const body = JSON.stringify(payload);
+    /** @type {number[]} */
+    const dead = [];
+    let sent = 0;
+    await Promise.all(
+        subs.map(async (/** @type {any} */ s) => {
+            try {
+                await webpush.sendNotification(
+                    { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth_key } },
+                    body,
+                    { TTL: 60 * 60 },
+                );
+                sent++;
+            } catch (/** @type {any} */ err) {
+                if (err?.statusCode === 404 || err?.statusCode === 410) dead.push(s.id);
+                else console.error('[🔥 푸시 전송 실패]', err?.statusCode, err?.body || err?.message);
+            }
+        }),
+    );
+    if (dead.length > 0) await pool.query('DELETE FROM push_subscriptions WHERE id IN (?)', [dead]);
+    return { sent, removed: dead.length };
+}
+
 /** 특정 구독 하나에만 보낸다(테스트용). @param {string} endpoint @param {any} payload */
 async function sendToEndpoint(endpoint, payload) {
     if (!isConfigured) return { sent: 0, removed: 0, skipped: 'VAPID 미설정' };
@@ -116,4 +151,4 @@ async function sendToEndpoint(endpoint, payload) {
     }
 }
 
-module.exports = { isConfigured, publicKey: PUBLIC_KEY ?? null, sendToAudience, sendToEndpoint };
+module.exports = { isConfigured, publicKey: PUBLIC_KEY ?? null, sendToAudience, sendToUser, sendToEndpoint };

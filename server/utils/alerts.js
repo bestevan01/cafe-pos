@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const push = require('../config/push');
+const presence = require('./presence');
 
 /**
  * 정해진 시각에 브라우저 알림을 띄우는 공통 장치.
@@ -17,6 +18,10 @@ const push = require('../config/push');
  * 두 갈래로 보낸다.
  *  - 소켓: 앱 탭이 열려 있는 사람에게 곧바로
  *  - 웹 푸시: 탭을 닫아둔 사람에게도(서비스 워커가 브라우저 백그라운드에서 받는다)
+ *
+ *  - 연결이 끊긴 근무자(utils/presence.js): 푸시 구독이 있으면 그 사람 기기로 푸시,
+ *    없으면(또는 실패하면) 다시 연결될 때 유예 시간 안에서 전한다. 소켓 전용 알림도 마찬가지다 —
+ *    '쉬는 사람을 울리지 않는다'는 원칙은 로그아웃했거나 1시간 넘게 끊긴 사람을 빼는 것으로 지킨다.
  *
  * 둘 다 받는 사람은 알림이 두 번 뜰 것 같지만, 양쪽이 같은 tag를 쓰므로 브라우저가
  * 하나로 합친다(뒤엣것이 앞엣것을 덮어쓴다).
@@ -152,8 +157,9 @@ async function findDue() {
  * @param {{scheduleId?: number, runAt?: string, socketId?: string, endpoint?: string, dedupeKey?: string}} [opts]
  *        socketId/endpoint를 주면 그 사람에게만 보낸다(테스트용).
  *        dedupeKey를 주면 직전에 보낸 것과 같을 때 건너뛴다.
- * @returns {Promise<{sent: boolean, reason?: string, payload?: any, push?: {sent: number, removed: number, skipped?: string}}>}
+ * @returns {Promise<{sent: boolean, reason?: string, payload?: any, push?: {sent: number, removed: number, skipped?: string}, away?: {pushed: number, queued: number}}>}
  *          push는 웹 푸시로 몇 건 나갔는지(탭이 닫힌 사람 몫). 소켓 몫은 따로 세지 않는다.
+ *          away는 연결이 끊긴 근무자에게 푸시로 간 건수와, 다시 연결될 때 전하려고 남긴 인원.
  */
 async function fireAlert(io, key, opts = {}) {
     const def = registry.get(key);
@@ -199,7 +205,79 @@ async function fireAlert(io, key, opts = {}) {
             console.error('[🔥 푸시 발송 오류]', err.message);
         }
     }
-    return { sent: true, payload, push: pushed };
+
+    // (3) 근무 중인데 지금 연결이 끊긴 사람. 테스트 발송(특정 소켓·구독)에는 쓰지 않는다.
+    let away = { pushed: 0, queued: 0 };
+    if (!opts.socketId && !opts.endpoint) {
+        try {
+            away = await reachAway(def, key, payload, opts.runAt, channels.includes('push'));
+        } catch (/** @type {any} */ err) {
+            console.error('[🔥 끊긴 근무자 알림 오류]', err.message);
+        }
+    }
+    return { sent: true, payload, push: pushed, away };
+}
+
+/**
+ * 연결이 끊긴 근무자에게 전한다. 1순위 푸시(구독이 있으면), 2순위 다시 연결될 때.
+ * @param {AlertDef} def
+ * @param {string} key
+ * @param {any} payload
+ * @param {string|undefined} runAt
+ * @param {boolean} alreadyPushed  이 알림이 이미 대상 전원에게 푸시로 나갔는지
+ */
+async function reachAway(def, key, payload, runAt, alreadyPushed) {
+    const users = presence.awayUsers(def.audience);
+    let pushed = 0;
+    let queued = 0;
+    const expiresAt = Date.now() + (def.graceMinutes ?? GRACE_MINUTES) * 60 * 1000;
+    for (const u of users) {
+        let reached = false;
+        if (alreadyPushed) {
+            // 위에서 역할 전체에 푸시했다. 구독이 있었다면 이미 받았다.
+            const [[has]] = await pool.query('SELECT 1 AS ok FROM push_subscriptions WHERE user_id = ? LIMIT 1', [
+                u.id,
+            ]);
+            reached = Boolean(has);
+        } else {
+            const r = await push.sendToUser(u.id, payload);
+            reached = r.sent > 0;
+            if (reached) pushed += r.sent;
+        }
+        if (!reached) {
+            presence.queue(u.id, { key, runAt, expiresAt });
+            queued++;
+        }
+    }
+    return { pushed, queued };
+}
+
+/**
+ * 다시 연결된 사람에게 밀린 알림을 전한다(socketHandlers.js가 register_user 때 부른다).
+ * 전하기 직전에 내용을 다시 만든다 — 그사이 회차를 냈다면 build가 null을 돌려 건너뛴다.
+ * @param {import('socket.io').Socket} socket
+ */
+async function deliverPending(socket) {
+    const userId = socket.data.user?.id;
+    if (!userId) return;
+    for (const p of presence.takePending(userId)) {
+        const def = registry.get(p.key);
+        if (!def) continue;
+        try {
+            const built = await def.build({ runAt: p.runAt });
+            if (!built) continue;
+            socket.emit('app_alert', {
+                key: p.key,
+                title: built.title,
+                body: built.body,
+                action: built.action ?? def.action ?? null,
+                at: Date.now(),
+            });
+            console.log(`[🔔 밀린 알림 전달] ${p.key} (${p.runAt ?? '-'}) → ${socket.data.user.username}`);
+        } catch (/** @type {any} */ err) {
+            console.error('[🔥 밀린 알림 전달 오류]', err.message);
+        }
+    }
 }
 
 /**
@@ -221,9 +299,13 @@ function startAlertScheduler(io) {
                 await pool.query('UPDATE alert_schedules SET last_fired_date = CURDATE() WHERE id = ?', [row.id]);
                 if (result.sent) {
                     const p = result.push;
+                    const a = result.away;
                     console.log(
                         `[🔔 알림 발송] ${row.alert_key} (${row.run_at}) — ${result.payload.title}` +
-                            ` · 푸시 ${p?.sent ?? 0}건${p?.removed ? ` (만료 ${p.removed}건 정리)` : ''}`,
+                            ` · 푸시 ${p?.sent ?? 0}건${p?.removed ? ` (만료 ${p.removed}건 정리)` : ''}` +
+                            (a && (a.pushed || a.queued)
+                                ? ` · 끊긴 근무자 푸시 ${a.pushed}건 / 다시 연결 시 전달 ${a.queued}명`
+                                : ''),
                     );
                 }
             }
@@ -236,4 +318,12 @@ function startAlertScheduler(io) {
     setInterval(tick, TICK_MS).unref();
 }
 
-module.exports = { registerAlert, listAlertTypes, fireAlert, syncSchedules, startAlertScheduler, GRACE_MINUTES };
+module.exports = {
+    registerAlert,
+    listAlertTypes,
+    fireAlert,
+    deliverPending,
+    syncSchedules,
+    startAlertScheduler,
+    GRACE_MINUTES,
+};

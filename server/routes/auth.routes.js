@@ -8,7 +8,7 @@ const { generateTempPassword } = require('../utils/tempPassword');
 const debugInfo = require('../utils/debugInfo');
 const { loginRateLimiter, recordLoginFailure, recordLoginSuccess } = require('../middlewares/loginRateLimit');
 const { isStrongPassword, PASSWORD_POLICY_MESSAGE } = require('../utils/passwordPolicy');
-const { releaseKitchenOnLogout } = require('../sockets/socketHandlers');
+const { releaseKitchenOnLogout, forgetOnLogout } = require('../sockets/socketHandlers');
 
 const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 const VALID_ROLES = ['admin', 'staff', 'pending'];
@@ -110,13 +110,15 @@ router.get('/me', authenticateToken, (req, res) => {
 });
 
 /**
- * 로그아웃 알림. 토큰은 클라이언트가 지우므로 서버가 할 일은 실시간 자리(주방 인원)를 비우는 것뿐이다.
+ * 로그아웃 알림. 토큰은 클라이언트가 지우므로 서버가 할 일은 실시간 자리(주방 인원)를 비우고
+ * 퇴근한 사람에게 시각 알림이 가지 않게 하는 것뿐이다.
  * 소켓 'logout'은 연결이 끊겨 있으면 전달되지 않아 HTTP로도 받는다(sockets/socketHandlers.js 참고).
  * 둘 다 도착해도 결과는 같다.
  */
 router.post('/logout', authenticateToken, (req, res) => {
     const socketId = typeof req.body?.socket_id === 'string' ? req.body.socket_id : null;
     releaseKitchenOnLogout(req.user.username, socketId);
+    forgetOnLogout(req.user.id);
     res.json({ success: true });
 });
 

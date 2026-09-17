@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const presence = require('../utils/presence');
+
+/** alerts.js는 서버 기동 중에 등록이 끝나므로 쓸 때 불러온다. @param {import('socket.io').Socket} socket */
+const deliverPending = (socket) => require('../utils/alerts').deliverPending(socket);
 
 const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 
@@ -141,6 +145,8 @@ module.exports = (io) => {
         // 역할별 방에 넣어둔다. 관리자에게만 보낼 알림(재고 주문 필요 등)을 고르기 위해서다.
         // 방 이름은 핸드셰이크에서 DB로 확인한 역할이라 클라이언트가 속일 수 없다.
         if (socket.data.user?.role) socket.join(`role:${socket.data.user.role}`);
+        // 근무 중인 사람의 연결 상태(끊긴 근무자에게 시각 알림을 전하기 위해, utils/presence.js).
+        presence.connected(socket.data.user, socket.id);
 
         socket.on('register_user', () => {
             // 클라이언트가 보낸 값이 아닌, 핸드셰이크에서 검증된 신원만 신뢰합니다.
@@ -148,6 +154,9 @@ module.exports = (io) => {
             connectedUsers.set(socket.id, { username: user.username, role: user.role });
             console.log(`[👤 유저 등록] ${user.username} (ID: ${socket.id})`);
             broadcastUserCount();
+            // 끊긴 동안 못 받은 시각 알림을 전한다. connection이 아니라 여기서 하는 이유:
+            // 화면이 알림 수신기를 붙인 뒤에 register_user를 보내므로, 이때 보내야 흘리지 않는다.
+            void deliverPending(socket);
         });
 
         socket.on('claim_cashier', () => {
@@ -229,6 +238,7 @@ module.exports = (io) => {
             console.log(`[👋 로그아웃] ${user?.username || '알 수 없음'} (ID: ${socket.id})`);
             connectedUsers.delete(socket.id);
             releaseKitchen(socket.data.user?.username, socket.id, { immediate: true });
+            if (socket.data.user) presence.loggedOut(socket.data.user.id);
             broadcastUserCount();
         });
 
@@ -237,6 +247,7 @@ module.exports = (io) => {
 
             connectedUsers.delete(socket.id);
             broadcastUserCount();
+            if (socket.data.user) presence.disconnected(socket.data.user, socket.id);
 
             if (socket.id === currentCashierId) {
                 currentCashierId = null;
@@ -278,3 +289,9 @@ module.exports = (io) => {
  * @param {string|null} socketId  로그아웃한 기기의 소켓(끊겨 있으면 이미 세션에서 빠져 있다)
  */
 module.exports.releaseKitchenOnLogout = (username, socketId) => releaseKitchen(username, socketId, { immediate: true });
+
+/**
+ * HTTP 로그아웃에서 부른다. 퇴근한 사람에게 시각 알림이 가지 않게 끊긴 근무자 목록에서 뺀다.
+ * @param {string} userId
+ */
+module.exports.forgetOnLogout = (userId) => presence.loggedOut(userId);
