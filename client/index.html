@@ -3,7 +3,22 @@
     <head>
         <meta charset="UTF-8" />
         <link href="/favicon.svg" rel="icon" type="image/svg+xml" />
-        <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+        <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport" />
+
+        <!-- 홈 화면에 추가했을 때 독립 앱으로 열리게 한다.
+             iPhone·iPad는 이 상태(standalone)에서만 알림을 쓸 수 있다 —
+             manifest나 apple-mobile-web-app-capable이 없으면 홈 화면 아이콘이 그냥 사파리 탭으로
+             열리고, 알림 권한 요청 자체가 막힌다. -->
+        <link href="/manifest.webmanifest" rel="manifest" />
+        <meta content="yes" name="apple-mobile-web-app-capable" />
+        <meta content="default" name="apple-mobile-web-app-status-bar-style" />
+        <meta content="Cafe POS" name="apple-mobile-web-app-title" />
+        <meta content="#165027" name="theme-color" />
+        <!-- 홈 화면 아이콘. iOS는 SVG를 못 쓰므로 PNG다. 탭 아이콘(favicon.svg)과 같은 그림이지만
+             모서리를 깎지 않은 정사각형이다 — iOS가 직접 둥글게 깎으므로, 이미 둥근 그림을 넣으면
+             모서리가 이중으로 보인다. -->
+        <link href="/icons/icon-180.png" rel="apple-touch-icon" sizes="180x180" />
+
         <title>Baek's Cafe POS</title>
     </head>
     <body>

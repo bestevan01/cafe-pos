@@ -110,6 +110,10 @@ module.exports = (io) => {
     io.on('connection', (socket) => {
         console.log(`[🟢 Socket 연결됨] ID: ${socket.id} (현재 접속자: ${io.engine.clientsCount}명)`);
 
+        // 역할별 방에 넣어둔다. 관리자에게만 보낼 알림(재고 주문 필요 등)을 고르기 위해서다.
+        // 방 이름은 핸드셰이크에서 DB로 확인한 역할이라 클라이언트가 속일 수 없다.
+        if (socket.data.user?.role) socket.join(`role:${socket.data.user.role}`);
+
         socket.on('register_user', () => {
             // 클라이언트가 보낸 값이 아닌, 핸드셰이크에서 검증된 신원만 신뢰합니다.
             const user = socket.data.user;

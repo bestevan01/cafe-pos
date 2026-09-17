@@ -8,7 +8,8 @@ import { NotificationContext } from '../hooks/useNotification';
  * 전역 알림 시스템.
  * - notify(message, options?)  : 오른쪽 상단 토스트 (alert 대체, 논블로킹). 토스트 id 반환.
  *      options = { icon, title, duration(ms, 0이면 수동 닫기),
- *                  dedupeKey(같은 키로 dedupeWindow(기본 3초) 내 재호출 시 무시 → 화면당 1개) }
+ *                  dedupeKey(같은 키로 dedupeWindow(기본 3초) 내 재호출 시 무시 → 화면당 1개),
+ *                  onClick(있으면 토스트를 눌렀을 때 실행하고 닫음) }
  * - confirm(message, options?) : 중앙 확인 다이얼로그 (window.confirm 대체). Promise<boolean> 반환.
  *      options = { title, confirmText, cancelText, danger }
  *
@@ -22,7 +23,7 @@ let idCounter = 0;
  */
 export function NotificationProvider({ children }) {
     const [toasts, setToasts] = useState(
-        /** @type {{id: number, message: import('react').ReactNode, icon?: *, title?: string, loading?: boolean}[]} */ ([]),
+        /** @type {{id: number, message: import('react').ReactNode, icon?: *, title?: string, loading?: boolean, onClick?: () => void}[]} */ ([]),
     );
     /** @typedef {{message: import('react').ReactNode, title: string, confirmText: string, cancelText: string, danger: boolean, resolve: (v: boolean) => void}} ConfirmState */
     const [confirmState, setConfirmState] = useState(/** @type {ConfirmState|null} */ (null));
@@ -67,7 +68,14 @@ export function NotificationProvider({ children }) {
             const duration = options.duration ?? 3000;
             setToasts((prev) => [
                 ...prev,
-                { id, message, icon: options.icon, title: options.title, loading: options.loading },
+                {
+                    id,
+                    message,
+                    icon: options.icon,
+                    title: options.title,
+                    loading: options.loading,
+                    onClick: options.onClick,
+                },
             ]);
             if (duration > 0) setTimeout(() => removeToast(id), duration);
             return id;
@@ -280,6 +288,10 @@ export function NotificationProvider({ children }) {
                             box-sizing: border-box;
                         }
                         .ntf-toast-icon { flex-shrink: 0; font-size: 1.6rem; line-height: 1; }
+                        /* 누르면 어딘가로 가는 토스트. 눌러도 된다는 것이 보여야 한다. */
+                        .ntf-toast.clickable { cursor: pointer; }
+                        .ntf-toast.clickable:hover { filter: brightness(0.97); }
+                        .ntf-toast.clickable .ntf-toast-msg::after { content: ' ›'; font-weight: 700; }
                         .ntf-toast-spinner { flex-shrink: 0; width: 24px; height: 24px; border: 3px solid var(--border-color, #e0e0e0); border-top-color: var(--accent); border-radius: 50%; animation: ntf-spin 0.8s linear infinite; }
                         @keyframes ntf-spin { to { transform: rotate(360deg); } }
                         .ntf-toast-text { flex: 1; min-width: 0; text-align: left; }
@@ -314,8 +326,28 @@ export function NotificationProvider({ children }) {
                             {toasts.map((t) => (
                                 <motion.div
                                     key={t.id}
-                                    className="ntf-toast"
-                                    role="status"
+                                    className={`ntf-toast${t.onClick ? ' clickable' : ''}`}
+                                    role={t.onClick ? 'button' : 'status'}
+                                    tabIndex={t.onClick ? 0 : undefined}
+                                    onClick={
+                                        t.onClick
+                                            ? () => {
+                                                  removeToast(t.id);
+                                                  t.onClick?.();
+                                              }
+                                            : undefined
+                                    }
+                                    onKeyDown={
+                                        t.onClick
+                                            ? (e) => {
+                                                  if (e.key === 'Enter' || e.key === ' ') {
+                                                      e.preventDefault();
+                                                      removeToast(t.id);
+                                                      t.onClick?.();
+                                                  }
+                                              }
+                                            : undefined
+                                    }
                                     layout
                                     {...toastAnim}
                                     transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
@@ -332,7 +364,11 @@ export function NotificationProvider({ children }) {
                                     {!t.loading && (
                                         <button
                                             className="ntf-toast-close"
-                                            onClick={() => removeToast(t.id)}
+                                            onClick={(e) => {
+                                                // 닫기만 해야 한다. 토스트 자체의 onClick(화면 이동)까지 번지면 안 된다.
+                                                e.stopPropagation();
+                                                removeToast(t.id);
+                                            }}
                                             aria-label="닫기"
                                         >
                                             ×
