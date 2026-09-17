@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import { socket, onResync } from '../../utils/socket';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
 import Button from '../../components/ui/Button';
@@ -227,7 +227,10 @@ function HygieneDashboard({ onBack }) {
         if (view === 'items') return undefined;
         const refresh = () => void load();
         socket.on('hygiene_updated', refresh);
+        // 연결이 끊긴 동안 온 신호는 다시 오지 않는다. 돌아오면 다시 받는다(utils/socket.js).
+        const offResync = onResync(refresh);
         return () => {
+            offResync();
             socket.off('hygiene_updated', refresh);
         };
     }, [view, load]);

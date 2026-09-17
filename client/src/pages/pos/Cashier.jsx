@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'rea
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEmptyAfterExit } from '../../hooks/useEmptyAfterExit';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import { socket, onResync } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
 import { groupByCategory, allowsShot } from '../../utils/menuCategories';
 import QuantityKeypad from '../../components/QuantityKeypad';
@@ -216,7 +216,18 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         void fetchMenu();
         void fetchActiveEvents();
 
-        socket.on('new_order', (newOrderGroup) => setOrderGroups((prev) => [newOrderGroup, ...prev]));
+        // 다시 불러온 목록에 이미 들어 있을 수 있어 같은 주문은 겹쳐 넣지 않는다.
+        socket.on('new_order', (newOrderGroup) =>
+            setOrderGroups((prev) =>
+                prev.some((g) => g.display_id === newOrderGroup.display_id) ? prev : [newOrderGroup, ...prev],
+            ),
+        );
+        // 연결이 끊긴 동안 온 주문·메뉴·이벤트 변경은 신호로 다시 오지 않는다. 돌아오면 다시 받는다.
+        const offResync = onResync(() => {
+            void fetchOrders();
+            void fetchMenu();
+            void fetchActiveEvents();
+        });
         socket.on('order_updated', ({ display_id, is_paid, is_completed, is_delivered }) => {
             setOrderGroups((prev) => {
                 const target = prev.find((g) => g.display_id === display_id);
@@ -250,6 +261,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
 
         return () => {
             window.removeEventListener('resize', handleResize);
+            offResync();
             socket.off('new_order');
             socket.off('order_updated');
             socket.off('order_deleted');

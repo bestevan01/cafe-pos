@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import { socket, onResync } from '../../utils/socket';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useNotification } from '../../hooks/useNotification';
 import StatsLayout from '../../components/stats/StatsLayout';
@@ -78,7 +78,10 @@ function CostAnalysis({ onBack }) {
         if (view !== 'analysis') return undefined;
         const refresh = () => void fetchAll();
         socket.on('menu_updated', refresh);
+        // 연결이 끊긴 동안 온 신호는 다시 오지 않는다. 돌아오면 다시 받는다(utils/socket.js).
+        const offResync = onResync(refresh);
         return () => {
+            offResync();
             socket.off('menu_updated', refresh);
         };
     }, [view, fetchAll]);

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEmptyAfterExit } from '../../hooks/useEmptyAfterExit';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import { socket, onResync } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
 
 /**
@@ -74,10 +74,14 @@ function Kitchen() {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void fetchOrders();
 
-        // 실시간 주문 수신
+        // 실시간 주문 수신. 다시 불러온 목록에 이미 들어 있을 수 있어 같은 주문은 겹쳐 넣지 않는다.
         socket.on('new_order', (newOrderGroup) => {
-            setOrderGroups((prev) => [newOrderGroup, ...prev]);
+            setOrderGroups((prev) =>
+                prev.some((g) => g.display_id === newOrderGroup.display_id) ? prev : [newOrderGroup, ...prev],
+            );
         });
+        // 화면이 꺼져 연결이 끊긴 동안 온 주문은 신호로 다시 오지 않는다. 돌아오면 통째로 다시 받는다.
+        const offResync = onResync(() => void fetchOrders());
 
         // 주문 상태 업데이트 (결제완료 or 조리완료)
         socket.on('order_updated', ({ display_id, is_paid, is_completed }) => {
@@ -117,6 +121,7 @@ function Kitchen() {
         });
 
         return () => {
+            offResync();
             socket.off('new_order');
             socket.off('order_updated');
             socket.off('order_item_made');

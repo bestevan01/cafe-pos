@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import { socket, onResync } from '../../utils/socket';
 import { debounce } from '../../utils/debounce';
 import { useNotification } from '../../hooks/useNotification';
 
@@ -122,7 +122,10 @@ function CashSettlement({ onClose }) {
         if (step !== 'close') return undefined;
         const refresh = debounce(() => void fetchCalcData());
         socket.on('sales_updated', refresh.run);
+        // 연결이 끊긴 동안 온 신호는 다시 오지 않는다. 돌아오면 다시 받는다(utils/socket.js).
+        const offResync = onResync(refresh.run);
         return () => {
+            offResync();
             refresh.cancel();
             socket.off('sales_updated', refresh.run);
         };
