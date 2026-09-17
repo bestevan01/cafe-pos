@@ -98,6 +98,23 @@ function App() {
     // [2] 인증 및 세션 관리 (Auth & Session)
     // ---------------------------------------------------------
     const handleLogout = useCallback(() => {
+        // 서버에 로그아웃을 알려 주방 인원 등 실시간 자리를 바로 비우게 한다.
+        // 소켓 신호만으로는 부족하다 — 지금 소켓이 끊겨 있으면(절전에서 막 깨어나 재연결 중 등)
+        // 신호가 대기열에 있다가 아래 disconnect()와 함께 버려져, 서버가 1시간 동안 자리를 지킨다.
+        // HTTP로도 보낸다. 토큰을 지우기 전에 읽어 둔다.
+        // axios가 아니라 fetch인 이유: axios 인터셉터는 401을 '세션 만료'로 보고 로그아웃을 다시 부른다.
+        // keepalive는 로그아웃 직후 화면이 바뀌거나 탭이 닫혀도 요청이 끝까지 가게 한다.
+        const token = localStorage.getItem('token');
+        if (token) {
+            void fetch(`${axios.defaults.baseURL}/api/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ socket_id: socket.id ?? null }),
+                keepalive: true,
+            }).catch(() => {
+                /* 실패해도 로그아웃은 진행한다. 서버는 유예 시간이 지나면 스스로 정리한다. */
+            });
+        }
         socket.emit('logout');
         socket.disconnect();
         localStorage.removeItem('token');

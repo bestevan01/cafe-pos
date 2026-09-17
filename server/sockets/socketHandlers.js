@@ -55,8 +55,36 @@ function kitchenCount() {
     return kitchenSessions.size;
 }
 
+/** @type {import('socket.io').Server|null} 소켓 밖(HTTP 로그아웃)에서도 주방 인원을 알리기 위해 둔다. */
+let ioRef = null;
+
+/**
+ * 주방 세션에서 소켓 하나를 뗀다.
+ * immediate면 남은 소켓이 없을 때 세션까지 지우고, 아니면 유예를 시작한다.
+ * @param {string|undefined} username
+ * @param {string|null|undefined} socketId
+ * @param {{immediate: boolean}} opts
+ */
+function releaseKitchen(username, socketId, { immediate }) {
+    const session = username ? kitchenSessions.get(username) : null;
+    if (!username || !session) return;
+
+    if (socketId) session.sockets.delete(socketId);
+    if (session.sockets.size > 0) return; // 다른 기기가 아직 주방 화면을 열고 있다
+
+    if (immediate) {
+        kitchenSessions.delete(username);
+        console.log(`[🍳 주방 퇴장] ${username} (남은 주방 인원: ${kitchenSessions.size}명)`);
+    } else {
+        session.leftAt = Date.now();
+        console.log(`[🍳 주방 연결 끊김] ${username} — ${KITCHEN_GRACE_MS / 60000}분간 자리 유지`);
+    }
+    ioRef?.emit('kitchen_status', kitchenCount());
+}
+
 /** @param {import('socket.io').Server} io */
 module.exports = (io) => {
+    ioRef = io;
     // 핸드셰이크 단계에서 JWT를 검증해야만 소켓 연결을 허용합니다.
     io.use((socket, next) => {
         // 인증 실패 에러에는 type:'auth' 표시를 달아, 클라이언트가
@@ -193,14 +221,14 @@ module.exports = (io) => {
         // 역할 변경처럼 사람이 직접 나간 경우다. 유예 없이 즉시 비운다 —
         // 자리를 뜬다고 스스로 알린 것이므로 붙잡아 둘 이유가 없다.
         socket.on('leave_kitchen', () => {
-            releaseKitchen(socket, { immediate: true });
+            releaseKitchen(socket.data.user?.username, socket.id, { immediate: true });
         });
 
         socket.on('logout', () => {
             const user = connectedUsers.get(socket.id);
             console.log(`[👋 로그아웃] ${user?.username || '알 수 없음'} (ID: ${socket.id})`);
             connectedUsers.delete(socket.id);
-            releaseKitchen(socket, { immediate: true });
+            releaseKitchen(socket.data.user?.username, socket.id, { immediate: true });
             broadcastUserCount();
         });
 
@@ -217,36 +245,12 @@ module.exports = (io) => {
             }
 
             // 연결이 끊긴 것만으로는 자리를 비우지 않는다. 화면이 꺼졌거나 순단일 수 있다.
-            releaseKitchen(socket, { immediate: false });
+            releaseKitchen(socket.data.user?.username, socket.id, { immediate: false });
         });
 
         socket.on('error', (/** @type {any} */ err) => {
             console.error(`[❌ Socket 에러] ID: ${socket.id}, 에러 상세:`, err);
         });
-
-        /**
-         * 이 소켓을 주방 세션에서 뗀다.
-         * immediate면 세션까지 지우고, 아니면 유예를 시작한다(마지막 소켓이었을 때).
-         * @param {import('socket.io').Socket} sock
-         * @param {{immediate: boolean}} opts
-         */
-        function releaseKitchen(sock, { immediate }) {
-            const username = sock.data.user?.username;
-            const session = username ? kitchenSessions.get(username) : null;
-            if (!session) return;
-
-            session.sockets.delete(sock.id);
-            if (session.sockets.size > 0) return; // 다른 기기가 아직 주방 화면을 열고 있다
-
-            if (immediate) {
-                kitchenSessions.delete(username);
-                console.log(`[🍳 주방 퇴장] ${username} (남은 주방 인원: ${kitchenSessions.size}명)`);
-            } else {
-                session.leftAt = Date.now();
-                console.log(`[🍳 주방 연결 끊김] ${username} — ${KITCHEN_GRACE_MS / 60000}분간 자리 유지`);
-            }
-            io.emit('kitchen_status', kitchenCount());
-        }
 
         function broadcastUserCount() {
             const staffUsers = Array.from(connectedUsers.values()).filter((user) => user.role !== 'admin');
@@ -261,3 +265,16 @@ module.exports = (io) => {
         if (pruneKitchenSessions()) io.emit('kitchen_status', kitchenSessions.size);
     }, KITCHEN_SWEEP_MS).unref();
 };
+
+/**
+ * HTTP 로그아웃에서 부른다(routes/auth.routes.js의 POST /logout).
+ *
+ * 소켓의 'logout'만으로는 부족하다. 로그아웃하는 순간 소켓이 끊겨 있으면(태블릿이 절전에서 막
+ * 깨어나 재연결 중 등) 그 신호는 전송 대기열에 있다가 곧바로 이어지는 disconnect()와 함께 버려진다.
+ * 그러면 서버는 로그아웃을 모른 채 연결 끊김으로만 보고 1시간 자리를 지켜, 이미 퇴근한 사람이
+ * 주방 인원으로 남는다. HTTP는 소켓 상태와 무관하게 도착한다.
+ *
+ * @param {string} username
+ * @param {string|null} socketId  로그아웃한 기기의 소켓(끊겨 있으면 이미 세션에서 빠져 있다)
+ */
+module.exports.releaseKitchenOnLogout = (username, socketId) => releaseKitchen(username, socketId, { immediate: true });
