@@ -51,14 +51,22 @@ router.post('', authenticateToken, async (req, res) => {
         }
 
         // 메뉴 가격표를 DB에서 직접 로드 (클라이언트가 보낸 price는 신뢰하지 않음)
-        const [menuRows] = await conn.query('SELECT name, price FROM menu');
-        const menuMap = new Map(menuRows.map((/** @type {any} */ m) => [m.name, Number(m.price)]));
+        const [menuRows] = await conn.query('SELECT name, price, type FROM menu');
+        const menuMap = new Map(
+            menuRows.map((/** @type {any} */ m) => [m.name, { price: Number(m.price), type: String(m.type) }]),
+        );
 
         const SHOT_EXTRA = 500;
+        // 샷을 받는 분류. 화면(client/src/utils/menuCategories.js의 SHOT_TYPES)과 같은 표다.
+        // 화면이 버튼을 감춰도 요청은 얼마든지 만들 수 있으므로 서버에서도 막는다.
+        const SHOT_TYPES = new Set(['coffee']);
 
         // 메뉴명으로 서버 기준 단가를 계산. 샷은 "(샷 N개)" 접미사로 N잔당 +500*N.
-        // 레거시 "(샷추가)"(=1샷)도 호환. 모르는 메뉴면 null.
-        /** @param {string} menuName */
+        // 레거시 "(샷추가)"(=1샷)도 호환. 모르는 메뉴면 null, 샷을 받지 않는 분류에 샷이 붙었으면 'no_shot'.
+        /**
+         * @param {string} menuName
+         * @returns {number|null|'no_shot'}
+         */
         const resolveBaseUnitPrice = (menuName) => {
             let baseName = menuName;
             let shots = 0;
@@ -70,8 +78,10 @@ router.post('', authenticateToken, async (req, res) => {
                 baseName = menuName.slice(0, -' (샷추가)'.length);
                 shots = 1;
             }
-            if (!menuMap.has(baseName)) return null;
-            return menuMap.get(baseName) + SHOT_EXTRA * shots;
+            const menu = menuMap.get(baseName);
+            if (!menu) return null;
+            if (shots > 0 && !SHOT_TYPES.has(menu.type)) return 'no_shot';
+            return menu.price + SHOT_EXTRA * shots;
         };
 
         // 이벤트가 지정된 경우, 가격 재계산에 필요한 필드까지 모두 잠금(FOR UPDATE) 조회
@@ -117,6 +127,13 @@ router.post('', authenticateToken, async (req, res) => {
             }
 
             const baseUnit = resolveBaseUnitPrice(item.menu_name);
+            if (baseUnit === 'no_shot') {
+                await conn.rollback();
+                return res.json({
+                    success: false,
+                    message: `샷을 추가할 수 없는 메뉴입니다: ${item.menu_name}. 화면을 새로고침한 뒤 다시 담아주세요.`,
+                });
+            }
             if (baseUnit === null) {
                 await conn.rollback();
                 return res.json({ success: false, message: `알 수 없는 메뉴입니다: ${item.menu_name}` });

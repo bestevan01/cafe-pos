@@ -4,7 +4,7 @@ import { useEmptyAfterExit } from '../../hooks/useEmptyAfterExit';
 import axios from 'axios';
 import { socket } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
-import { groupByCategory } from '../../utils/menuCategories';
+import { groupByCategory, allowsShot } from '../../utils/menuCategories';
 import QuantityKeypad from '../../components/QuantityKeypad';
 
 function Cashier({ onlyOrder = false, isCashier = false }) {
@@ -87,13 +87,24 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         const byName = new Map(list.map((m) => [m.name, m]));
         /** @type {string[]} */ const removed = [];
         /** @type {string[]} */ const repriced = [];
+        // 분류가 바뀌어 샷을 받는 쪽 ↔ 안 받는 쪽으로 옮겨간 메뉴. 잔 수는 그대로 옮긴다 —
+        // 옮기지 않으면 한쪽 목록에만 남아 화면에서는 0잔인데 결제 금액에는 잡힌다.
+        /** @type {string[]} */ const moved = [];
+        let droppedShots = 0;
 
-        // 비커피: cart가 담을 당시의 가격을 들고 있어 가격이 바뀌면 따로 맞춰 줘야 한다.
-        const nextCart = [];
+        /** @type {import('../../types').CartItem[]} */ const nextCart = [];
+        /** @type {Record<string, number[]>} */ const nextShots = {};
+
+        // 샷 없는 메뉴: cart가 담을 당시의 가격을 들고 있어 가격이 바뀌면 따로 맞춰 줘야 한다.
         for (const item of cartRef.current) {
             const menu = byName.get(item.name);
             if (!menu) {
                 removed.push(item.name); // 삭제된 메뉴는 팔 수 없다
+                continue;
+            }
+            if (allowsShot(menu)) {
+                nextShots[item.name] = Array(item.quantity).fill(0);
+                moved.push(item.name);
                 continue;
             }
             if (menu.price !== item.price) {
@@ -104,22 +115,38 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
             }
         }
 
-        // 커피: 가격은 menuList에서 그때그때 읽으므로 삭제만 걸러 내면 된다.
-        /** @type {Record<string, number[]>} */ const nextShots = {};
+        // 샷 받는 메뉴: 가격은 menuList에서 그때그때 읽으므로 삭제·분류 변경만 보면 된다.
         for (const [name, slots] of Object.entries(shotConfigRef.current)) {
-            if (!byName.has(name)) {
+            const menu = byName.get(name);
+            if (!menu) {
                 removed.push(name);
+                continue;
+            }
+            if (!allowsShot(menu)) {
+                droppedShots += slots.reduce((a, b) => a + b, 0);
+                nextCart.push({ name, price: menu.price, quantity: slots.length });
+                moved.push(name);
                 continue;
             }
             nextShots[name] = slots;
         }
 
-        if (removed.length > 0) {
+        if (removed.length > 0 || moved.length > 0) {
             setCart(nextCart);
             setShotConfig(nextShots);
-            notify(`${removed.join(', ')} 메뉴가 삭제되어 주문에서 빠졌습니다.`, { icon: '⚠️' });
         } else if (repriced.length > 0) {
             setCart(nextCart);
+        }
+        if (removed.length > 0) {
+            notify(`${removed.join(', ')} 메뉴가 삭제되어 주문에서 빠졌습니다.`, { icon: '⚠️' });
+        }
+        if (moved.length > 0) {
+            notify(
+                `${moved.join(', ')} 분류가 바뀌어 주문에 반영했습니다.${
+                    droppedShots > 0 ? ` 추가했던 샷 ${droppedShots}개는 빠졌습니다.` : ''
+                }`,
+                { icon: '☕' },
+            );
         }
         if (repriced.length > 0) {
             notify(`${repriced.join(', ')} 가격이 바뀌어 주문에 반영했습니다.`, { icon: '💰' });
@@ -235,8 +262,8 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // [4] 장바구니 및 🌟 이벤트 할인 로직
     // ---------------------------------------------------------
     const SHOT_PRICE = 500;
-    /** @param {string} name */
-    const isCoffee = (name) => name.includes('아메리카노') || name.includes('라떼') || name.includes('아샷추');
+    // 샷 추가 여부는 메뉴 분류로 정한다(utils/menuCategories.js의 allowsShot).
+    // 아래 '커피'는 '샷을 받는 메뉴'라는 뜻이다.
 
     /**
      * 특정 잔의 추가 샷 수를 절대값으로 맞춘다(키패드 입력용).
@@ -269,7 +296,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     const setMenuTotal = (menu, target) => {
         const qty = Math.max(0, Math.floor(Number(target) || 0));
 
-        if (isCoffee(menu.name)) {
+        if (allowsShot(menu)) {
             const slots = shotConfig[menu.name] || [];
             // notify는 setState 안에서 부르면 안 되므로(갱신 중 부수효과) 미리 계산해 둔다.
             const droppedShots = slots.slice(qty).reduce((a, b) => a + b, 0);
@@ -303,7 +330,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // 커피는 잔마다 샷을 따로 두므로 shotConfig에서, 비커피는 cart 수량에서 읽는다.
     /** @param {import('../../types').Menu} menu */
     const getMenuCounts = (menu) => {
-        if (isCoffee(menu.name)) {
+        if (allowsShot(menu)) {
             const slots = shotConfig[menu.name] || [];
             return { total: slots.length, slots };
         }
@@ -317,7 +344,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
      * @param {number} delta
      */
     const handleTotalChange = (menu, delta) => {
-        if (isCoffee(menu.name)) {
+        if (allowsShot(menu)) {
             setShotConfig((prev) => {
                 const slots = [...(prev[menu.name] || [])];
                 if (delta > 0) slots.push(0);
@@ -627,7 +654,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                         </div>
                     )}
                 </div>
-                {!isSoldOut && isCoffee(menu.name) && total > 0 && (
+                {!isSoldOut && allowsShot(menu) && total > 0 && (
                     <div className="shot-box" onClick={(e) => e.stopPropagation()}>
                         <button className="shot-toggle" onClick={() => toggleShotPanel(menu.name)}>
                             <span>

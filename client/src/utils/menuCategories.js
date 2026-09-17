@@ -16,6 +16,24 @@ export const MENU_CATEGORIES = [
     { type: 'dessert', label: '디저트' },
 ];
 
+/**
+ * 샷 추가를 받는 분류. 관리자가 메뉴 관리에서 고른 분류가 곧 샷 추가 여부다.
+ *
+ * 예전에는 이름에 '아메리카노·라떼·아샷추'가 들어가는지로 정했다. 그러면 '딸기 라떼'(티)에도
+ * 샷 버튼이 뜨고, '콜드브루'(커피)에는 뜨지 않아 관리자가 예측할 수 없었다.
+ * ⚠️ 서버(routes/order.routes.js의 SHOT_TYPES)도 같은 표로 검증한다. 바꿀 때 함께 바꾼다.
+ */
+export const SHOT_TYPES = ['coffee'];
+
+/**
+ * 이 메뉴에 샷을 추가할 수 있는지.
+ * @param {{type?: string}} menu
+ * @returns {boolean}
+ */
+export function allowsShot(menu) {
+    return SHOT_TYPES.includes(menu.type ?? '');
+}
+
 /** 표에 없는 값이 들어왔을 때 쓰는 이름. 메뉴가 화면에서 사라지는 것보다 낫다. */
 const UNKNOWN_LABEL = '기타';
 
