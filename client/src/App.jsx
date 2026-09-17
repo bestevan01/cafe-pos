@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { socket } from './utils/socket';
+import { socket, onResync } from './utils/socket';
 
 // Pages & Components
 import RoleSelection from './pages/pos/RoleSelection';
@@ -266,8 +266,12 @@ function App() {
         });
 
         socket.emit('request_state'); // 현재 상태 요청
+        // 캐셔 사용 여부·주방 인원은 바뀔 때만 신호가 온다. 연결이 끊긴 동안 바뀐 것은 다시 오지 않으므로
+        // (역할 선택 화면을 띄워 둔 채 화면이 꺼졌다 켜진 경우 등) 돌아오면 현재 상태를 다시 묻는다.
+        const offResync = onResync(() => socket.emit('request_state'));
 
         return () => {
+            offResync();
             socket.off('connect', registerMyUser);
             socket.off('connect_error', handleAuthError);
             socket.off('user_count');
