@@ -4,7 +4,8 @@ const pool = require('../config/db');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
 const { kstDate } = require('../utils/kstDate');
-const { latestStatus } = require('../services/inventoryStatus');
+const { latestStatus, evaluate } = require('../services/inventoryStatus');
+const { setSetting, getScaleMax } = require('../utils/storeSettings');
 const { inventorySlots } = require('../utils/inventorySlots');
 
 // 재고 조사 기록 조회. 관리자 전용.
@@ -53,11 +54,14 @@ router.get('/counts', async (req, res) => {
         );
         if (counts.length === 0) return res.json({ from, to, counts: [] });
 
+        // 통 무게는 품목의 현재 값으로 메운다(현재 재고와 같은 규칙, services/inventoryStatus.js).
         const [items] = await pool.query(
-            `SELECT i.count_id, i.item_id, i.item_label, i.measure_mode, i.count_unit,
-                    i.count_per_pack, i.base_unit, i.tare_g, i.low_threshold, i.quantity, i.spare_count, i.sort_order
+            `SELECT i.count_id, i.item_id, i.item_label, i.measure_mode, i.count_unit, i.count_per_pack,
+                    i.base_unit, COALESCE(i.tare_g, g.tare_g) AS tare_g, i.low_threshold, i.quantity,
+                    i.spare_count, i.over_scale, i.sort_order
              FROM inventory_count_items i
                       JOIN inventory_counts c ON c.id = i.count_id
+                      LEFT JOIN inventory_items g ON g.id = i.item_id
              WHERE c.count_date BETWEEN ? AND ?
              ORDER BY i.sort_order, i.id`,
             [from, to],
@@ -65,14 +69,8 @@ router.get('/counts', async (req, res) => {
         /** @type {Map<number, any[]>} */
         const byCount = new Map();
         for (const it of items) {
-            const quantity = Number(it.quantity);
-            const threshold = it.low_threshold === null ? null : Number(it.low_threshold);
-            const row = {
-                ...it,
-                quantity,
-                low_threshold: threshold,
-                is_low: threshold !== null && quantity <= threshold,
-            };
+            // 판단은 현재 재고와 같은 함수로 한다. 따로 계산하면 기록의 '주문 N건'이 다른 기준으로 갈린다.
+            const row = evaluate(it, null);
             const list = byCount.get(it.count_id);
             if (list) list.push(row);
             else byCount.set(it.count_id, [row]);
@@ -93,6 +91,36 @@ router.get('/counts', async (req, res) => {
             message: '재고 조사 기록을 불러오지 못했습니다.',
             debug_info: debugInfo(err),
         });
+    }
+});
+
+// ============================================================
+// 매장 설정 — 저울 최대 무게
+// ============================================================
+// 저울이 잴 수 있는 최대 무게. 이보다 무거운 통(거의 가득 찬 통)은 '이 이상'으로 기록된다.
+// 품목 화면이 주문 기준이 잴 수 있는 한계보다 높지 않은지 확인하는 데도 쓴다.
+router.get('/settings', async (req, res) => {
+    try {
+        res.json({ scale_max_g: await getScaleMax() });
+    } catch (/** @type {any} */ err) {
+        console.error('[🔥 GET /api/admin/inventory/settings 에러]', err);
+        res.status(500).json({ success: false, message: '설정을 불러오지 못했습니다.', debug_info: debugInfo(err) });
+    }
+});
+
+router.put('/settings', async (req, res) => {
+    const v = Number(req.body.scale_max_g);
+    if (!Number.isInteger(v) || v < 100 || v > 100000) {
+        return res
+            .status(400)
+            .json({ success: false, message: '저울 최대 무게는 100~100000g 사이 정수로 입력해주세요.' });
+    }
+    try {
+        await setSetting('scaleMaxG', String(v), req.user.name);
+        res.json({ success: true, scale_max_g: v });
+    } catch (/** @type {any} */ err) {
+        console.error('[🔥 PUT /api/admin/inventory/settings 에러]', err);
+        res.status(500).json({ success: false, message: '설정을 저장하지 못했습니다.', debug_info: debugInfo(err) });
     }
 });
 

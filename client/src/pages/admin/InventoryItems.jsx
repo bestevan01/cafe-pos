@@ -37,8 +37,24 @@ const MODES = [
  * @param {(item: any) => void} props.retire
  * @param {(mode: string, from: number, to: number) => void} props.onReorder
  * @param {(mode: string) => void} props.onCommit
+ * @param {number} props.scaleMax  매장 저울 최대 무게(g). 저울 품목 카드에서만 쓴다
+ * @param {number} props.scaleRev  바뀌면 저울 최대 무게 입력칸을 다시 그린다(저장 실패 시 되돌리기)
+ * @param {(raw: string) => void} props.onScaleMax
  */
-function ModeCard({ mode, list, units, loading, patch, patchNumber, retire, onReorder, onCommit }) {
+function ModeCard({
+    mode,
+    list,
+    units,
+    loading,
+    patch,
+    patchNumber,
+    retire,
+    onReorder,
+    onCommit,
+    scaleMax,
+    scaleRev,
+    onScaleMax,
+}) {
     // 순서는 부모가 들고 있는다. 여기서 사본을 두면 부모 목록과 어긋날 수 있다.
     // 드래그 effect가 옛 클로저를 붙잡지 않도록 콜백만 ref로 최신화한다(위생 점검과 같은 방식).
     const cbRef = useRef({ onReorder, onCommit });
@@ -56,6 +72,25 @@ function ModeCard({ mode, list, units, loading, patch, patchNumber, retire, onRe
     return (
         <StatCard title={mode.label} icon="📦" wide loading={loading} subtitle={`${order.length}개`}>
             <p className="ii-hint">{mode.hint}</p>
+            {mode.key === 'weight' && (
+                <div className="ii-scale">
+                    <span className="ii-field">
+                        저울 최대 무게
+                        <input
+                            key={`${scaleMax}-${scaleRev}`}
+                            defaultValue={scaleMax}
+                            onBlur={(e) => onScaleMax(e.target.value)}
+                            aria-label="저울 최대 무게"
+                        />
+                        g
+                    </span>
+                    <span className="ii-hint">
+                        이보다 무거운 통(거의 가득 찬 통)은 직원이 「넘침」으로 기록하고, 앱은 &lsquo;○g 이상&rsquo;으로
+                        봅니다. 주문 기준은 저울로 잴 수 있는 양(저울 최대 무게 − 빈 통 무게)보다 낮게 잡아야 판단할 수
+                        있습니다.
+                    </span>
+                </div>
+            )}
             {/* useDragSort의 마크업 약속: 목록에 data-drag-list, 행에 data-drag-row + data-drag-id.
                 하나라도 빠지면 손잡이를 잡아도 아무 일도 일어나지 않는다. */}
             <div data-drag-list>
@@ -144,6 +179,17 @@ function ModeCard({ mode, list, units, loading, patch, patchNumber, retire, onRe
                         <button className="ii-x" onClick={() => retire(item)}>
                             빼기
                         </button>
+
+                        {/* 저울이 넘치면 '○g 이상'만 안다. 기준이 그보다 높으면 주문이 필요한지 판단할 수 없다. */}
+                        {mode.key === 'weight' &&
+                            item.low_threshold != null &&
+                            Number(item.low_threshold) >= scaleMax - Number(item.tare_g ?? 0) && (
+                                <span className="ii-warn">
+                                    ⚠️ 주문 기준이 저울로 잴 수 있는 양(
+                                    {Math.max(0, scaleMax - Number(item.tare_g ?? 0)).toLocaleString()}g)보다 높아, 통이
+                                    가득 찼을 때 주문이 필요한지 판단할 수 없습니다. 기준을 낮춰주세요.
+                                </span>
+                            )}
                     </div>
                 ))}
             </div>
@@ -171,17 +217,23 @@ function InventoryItems({ onBack }) {
     const [loading, setLoading] = useState(true);
     const [draft, setDraft] = useState({ name: '', mode: 'pack', unit: '', per: '', base_unit: '개' });
     const [newUnit, setNewUnit] = useState('');
+    // 매장 저울의 최대 무게(g). 주문 기준이 잴 수 있는 한계보다 높지 않은지 보는 데 쓴다.
+    const [scaleMax, setScaleMax] = useState(1000);
+    // 저장에 실패하면 입력칸을 원래 값으로 되돌리려고 다시 그린다(입력칸은 defaultValue라 값만 바꿔선 안 바뀐다).
+    const [scaleRev, setScaleRev] = useState(0);
 
     const authCfg = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
     const load = useCallback(async () => {
         try {
-            const [itemRes, unitRes] = await Promise.all([
+            const [itemRes, unitRes, settingRes] = await Promise.all([
                 axios.get('/api/admin/inventory/items', authCfg()),
                 axios.get('/api/admin/inventory/units', authCfg()),
+                axios.get('/api/admin/inventory/settings', authCfg()),
             ]);
             setItems(itemRes.data);
             setUnits(unitRes.data);
+            setScaleMax(Number(settingRes.data.scale_max_g) || 1000);
             setDraft((d) => (d.unit ? d : { ...d, unit: unitRes.data[0]?.name ?? '개' }));
         } catch {
             notify('품목을 불러오지 못했습니다.', { icon: '⚠️', dedupeKey: 'load-inv-items' });
@@ -194,6 +246,20 @@ function InventoryItems({ onBack }) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         void load();
     }, [load]);
+
+    /** 저울 최대 무게를 바꾼다. 같은 값이면 보내지 않는다. @param {string} raw */
+    const saveScaleMax = async (raw) => {
+        const v = Number(String(raw).trim());
+        if (v === scaleMax) return;
+        try {
+            await axios.put('/api/admin/inventory/settings', { scale_max_g: v }, authCfg());
+            setScaleMax(v);
+            notify(`저울 최대 무게를 ${v.toLocaleString()}g으로 저장했습니다.`, { icon: '✅' });
+        } catch (/** @type {any} */ err) {
+            setScaleRev((n) => n + 1);
+            notify(err?.response?.data?.message || '저울 최대 무게를 저장하지 못했습니다.', { icon: '⚠️' });
+        }
+    };
 
     /** 화면을 먼저 바꾸고 보낸다. 실패하면 되돌린다. @param {any} item @param {string} field @param {any} value */
     const patch = async (item, field, value) => {
@@ -325,6 +391,9 @@ function InventoryItems({ onBack }) {
                 .ii-unit button { border: none; background: none; color: var(--text-secondary, #aaa); cursor: pointer; font-size: .8rem; padding: 0 4px; }
                 .ii-unit button:hover { color: var(--danger); }
                 .ii-mode { font-size: .74rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--bg-color, #f2f2f2); color: var(--text-secondary, #888); }
+                .ii-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg-color, #f7f7f7); }
+                .ii-scale .ii-hint { flex: 1; min-width: 220px; margin: 0; }
+                .ii-warn { flex-basis: 100%; padding-left: 34px; font-size: .78rem; color: var(--warning, #ef6c00); line-height: 1.5; word-break: keep-all; }
                 .ii-restore { padding: 6px 10px; font-size: .8rem; border: 1px solid var(--border-color, #ddd); border-radius: 7px; background: none; color: var(--text-secondary, #888); cursor: pointer; font-family: inherit; }
             `}</style>
 
@@ -340,6 +409,9 @@ function InventoryItems({ onBack }) {
                     retire={retire}
                     onReorder={reorderWithin}
                     onCommit={commitOrder}
+                    scaleMax={scaleMax}
+                    scaleRev={scaleRev}
+                    onScaleMax={(raw) => void saveScaleMax(raw)}
                 />
             ))}
 

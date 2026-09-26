@@ -10,7 +10,18 @@ const pool = require('../config/db');
 /** 키 목록. 아무 키나 받지 않도록 여기서 정한다. */
 const KEYS = {
     hygieneGuide: { key: 'hygiene_guide', max: 1000 },
+    // 재고 조사에 쓰는 저울의 최대 측정 무게(g). 이보다 무거운 통은 '이 이상'으로 기록한다.
+    scaleMaxG: { key: 'scale_max_g', max: 10 },
 };
+
+/** 저울 최대 무게를 정하지 않았을 때. 두 매장의 저울이 1kg짜리다. */
+const DEFAULT_SCALE_MAX_G = 1000;
+
+/** 매장 저울의 최대 측정 무게(g). @returns {Promise<number>} */
+async function getScaleMax() {
+    const v = Number((await getSetting('scaleMaxG'))?.value);
+    return Number.isFinite(v) && v > 0 ? v : DEFAULT_SCALE_MAX_G;
+}
 
 /**
  * @param {keyof typeof KEYS} name
@@ -47,4 +58,4 @@ async function setSetting(name, value, byName) {
     );
 }
 
-module.exports = { getSetting, setSetting };
+module.exports = { getSetting, setSetting, getScaleMax, DEFAULT_SCALE_MAX_G };

@@ -6,6 +6,7 @@ const debugInfo = require('../utils/debugInfo');
 const { loadSlots, slotSql, currentSlot } = require('../utils/inventorySlots');
 const { fireAlert } = require('../utils/alerts');
 const { latestStatus } = require('../services/inventoryStatus');
+const { getScaleMax } = require('../utils/storeSettings');
 
 // 직원용 재고 조사 API. 로그인만 하면 누구나 쓴다(역할 무관).
 // 품목 설정과 기록 조회는 관리자 전용이라 inventoryAdmin.routes.js에 따로 있다.
@@ -52,7 +53,7 @@ router.get('/today', async (req, res) => {
         for (const key of slotKeys) {
             if (!bySlot[key]) continue;
             const [rows] = await pool.query(
-                `SELECT item_id, item_label, quantity, spare_count, count_unit, measure_mode
+                `SELECT item_id, item_label, quantity, spare_count, over_scale, count_unit, measure_mode
                  FROM inventory_count_items
                  WHERE count_id = ?
                  ORDER BY sort_order, id`,
@@ -69,16 +70,20 @@ router.get('/today', async (req, res) => {
              ORDER BY count_date DESC, slot DESC
              LIMIT 1`,
         );
-        /** @type {Record<string, {quantity: number, spare_count: number}>} */
+        /** @type {Record<string, {quantity: number, spare_count: number, over_scale: boolean}>} */
         const previous = {};
         if (prev) {
             const [rows] = await pool.query(
-                'SELECT item_id, quantity, spare_count FROM inventory_count_items WHERE count_id = ?',
+                'SELECT item_id, quantity, spare_count, over_scale FROM inventory_count_items WHERE count_id = ?',
                 [prev.id],
             );
             for (const r of rows) {
                 if (r.item_id != null) {
-                    previous[r.item_id] = { quantity: Number(r.quantity), spare_count: Number(r.spare_count) };
+                    previous[r.item_id] = {
+                        quantity: Number(r.quantity),
+                        spare_count: Number(r.spare_count),
+                        over_scale: r.over_scale === 1,
+                    };
                 }
             }
         }
@@ -89,6 +94,8 @@ router.get('/today', async (req, res) => {
             slot_list: now.slots,
             current_slot: now.key,
             current_slot_label: now.label,
+            // 저울 최대 무게. 이 이상은 잴 수 없어 화면이 '넘침'으로 받는다.
+            scale_max_g: await getScaleMax(),
             // 회차를 정해 둔 매장인데 오늘은 적용되는 회차가 없다(미운영일). 화면이 알려준다.
             off_day: now.offDay,
             previous,
@@ -108,11 +115,16 @@ router.get('/today', async (req, res) => {
  * 제출된 수치를 저장할 행으로 만든다.
  * 품목 정보는 요청 본문이 아니라 DB에서 읽는다 — 클라이언트가 보낸 환산값을 믿으면
  * 기록을 위조할 수 있고, 관리자가 방금 고친 값과도 어긋난다.
+ * 저울 품목은 저울 최대 무게를 넘으면 잴 수 없다(거의 가득 찬 통). 직원이 '넘침'을 누르거나
+ * 최대 무게 이상을 적으면 저울 최대 무게를 넣고 over_scale로 표시한다 — '이 이상'이라는 뜻이다.
+ * 적은 숫자를 그대로 두지 않는 이유: 저울이 넘치면 화면에 나온 숫자 자체가 믿을 수 없다.
+ *
  * @param {any[]} items 조사 대상 품목
  * @param {any} body
+ * @param {number} scaleMax 저울 최대 무게(g)
  * @returns {{error: string}|{rows: any[][]}}
  */
-function buildCountRows(items, body) {
+function buildCountRows(items, body, scaleMax) {
     const input = Array.isArray(body.items) ? body.items : [];
     /** @type {Map<number, any>} */
     const byId = new Map(input.map((/** @type {any} */ r) => [Number(r.item_id), r]));
@@ -121,7 +133,10 @@ function buildCountRows(items, body) {
     const rows = [];
     for (const item of items) {
         const raw = byId.get(item.id);
-        const quantity = Number(raw?.quantity);
+        let quantity = Number(raw?.quantity);
+        const isWeight = item.measure_mode === 'weight';
+        const over = isWeight && (raw?.over_scale === true || (Number.isFinite(quantity) && quantity >= scaleMax));
+        if (over) quantity = scaleMax;
         if (raw === undefined || !Number.isFinite(quantity) || quantity < 0) {
             return { error: `"${item.name}" 수량을 확인해주세요.` };
         }
@@ -145,6 +160,7 @@ function buildCountRows(items, body) {
             item.low_threshold ?? null,
             quantity,
             spare,
+            over ? 1 : 0,
             item.sort_order,
         ]);
     }
@@ -175,7 +191,8 @@ async function notifyIfLow(io) {
 }
 
 const COUNT_ITEM_COLUMNS = `(count_id, item_id, item_label, measure_mode, count_unit,
-                             count_per_pack, base_unit, tare_g, low_threshold, quantity, spare_count, sort_order)`;
+                             count_per_pack, base_unit, tare_g, low_threshold, quantity, spare_count, over_scale,
+                             sort_order)`;
 
 // 회차 제출. (날짜, 회차)에 UNIQUE가 걸려 있어 같은 회차를 두 번 내면 409로 막힌다.
 router.post('/counts', async (req, res) => {
@@ -185,7 +202,7 @@ router.post('/counts', async (req, res) => {
         return res.status(400).json({ success: false, message: '조사할 품목이 없습니다. 관리자에게 문의하세요.' });
     }
 
-    const built = buildCountRows(items, req.body);
+    const built = buildCountRows(items, req.body, await getScaleMax());
     if ('error' in built) return res.status(400).json({ success: false, message: built.error });
     const memo =
         String(req.body.memo ?? '')
@@ -239,7 +256,7 @@ router.put('/counts/:id', async (req, res) => {
     const items = await loadCountItems().catch(() => null);
     if (!items) return res.status(500).json({ success: false, message: '품목을 불러오지 못했습니다.' });
 
-    const built = buildCountRows(items, req.body);
+    const built = buildCountRows(items, req.body, await getScaleMax());
     if ('error' in built) return res.status(400).json({ success: false, message: built.error });
     const memo =
         String(req.body.memo ?? '')
