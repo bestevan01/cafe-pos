@@ -24,7 +24,7 @@ const GROUPS = [
         mode: 'weight',
         title: '저울',
         icon: '⚖️',
-        hint: '통째로 저울에 올린 무게. 빈 통 무게는 앱이 뺍니다. 창고의 안 뜯은 통은 따로 적어주세요',
+        hint: '통째로 저울에 올린 무게. 빈 통 무게는 앱이 뺍니다. 창고의 안 뜯은 통은 따로 적어주세요. 저울이 넘치면 「넘침」을 누르세요',
     },
 ];
 
@@ -54,8 +54,15 @@ function InventoryCount({ onClose }) {
     const [offDay, setOffDay] = useState(false);
     const [previous, setPrevious] = useState(/** @type {Record<string, any>} */ ({}));
     const [existing, setExisting] = useState(/** @type {any} */ (null));
-    /** 품목 id → {quantity, spare} 문자열. 입력 중에는 문자열로 두어야 '0.' 같은 중간 상태가 안 깨진다. */
-    const [values, setValues] = useState(/** @type {Record<string, {quantity: string, spare: string}>} */ ({}));
+    /**
+     * 품목 id → {quantity, spare} 문자열. 입력 중에는 문자열로 두어야 '0.' 같은 중간 상태가 안 깨진다.
+     * over는 저울 품목이 저울 최대 무게를 넘었다는 표시(거의 가득 찬 통). 그때는 무게를 적지 않는다.
+     */
+    const [values, setValues] = useState(
+        /** @type {Record<string, {quantity: string, spare: string, over?: boolean}>} */ ({}),
+    );
+    // 매장 저울의 최대 무게(g). 이 이상은 잴 수 없어 '넘침'으로 받는다.
+    const [scaleMax, setScaleMax] = useState(1000);
     const [memo, setMemo] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -72,18 +79,21 @@ function InventoryCount({ onClose }) {
             setOffDay(Boolean(res.data.off_day));
             setSlot(cur);
             setPrevious(prev ?? {});
+            setScaleMax(Number(res.data.scale_max_g) || 1000);
 
             const mine = bySlot?.[cur] ?? null;
             setExisting(mine);
             if (mine) {
                 // 이미 낸 회차면 그때 적은 값으로 채워 '수정' 모드로 연다.
-                /** @type {Record<string, {quantity: string, spare: string}>} */
+                /** @type {Record<string, {quantity: string, spare: string, over?: boolean}>} */
                 const filled = {};
                 for (const r of mine.items ?? []) {
                     if (r.item_id == null) continue;
+                    const over = r.over_scale === 1;
                     filled[r.item_id] = {
-                        quantity: String(Number(r.quantity)),
+                        quantity: over ? '' : String(Number(r.quantity)),
                         spare: String(Number(r.spare_count ?? 0)),
+                        over,
                     };
                 }
                 setValues(filled);
@@ -112,6 +122,31 @@ function InventoryCount({ onClose }) {
         });
     };
 
+    /**
+     * 저울 품목의 무게. 저울 최대 무게 이상을 적으면 '넘침'으로 바꾼다 — 저울이 넘치면
+     * 화면에 뜬 숫자 자체를 믿을 수 없어서, 적은 숫자를 그대로 두지 않는다.
+     * @param {number} id @param {string} v
+     */
+    const setWeight = (id, v) => {
+        const cleaned = clean(v);
+        const over = cleaned !== '' && Number(cleaned) >= scaleMax;
+        setValues((prev) => {
+            const cur = prev[id] ?? { quantity: '', spare: '' };
+            return { ...prev, [id]: { ...cur, quantity: over ? '' : cleaned, over: over || cur.over } };
+        });
+    };
+
+    /** '넘침'을 켜고 끈다. 켜면 적어 둔 무게는 지운다. @param {number} id */
+    const toggleOver = (id) => {
+        setValues((prev) => {
+            const cur = prev[id] ?? { quantity: '', spare: '' };
+            return { ...prev, [id]: { ...cur, quantity: '', over: !cur.over } };
+        });
+    };
+
+    /** 입력을 마쳤는지. 저울이 넘친 품목은 무게 없이도 마친 것이다. @param {any} i */
+    const isFilled = (i) => Boolean(values[i.id]?.over) || String(values[i.id]?.quantity ?? '').trim() !== '';
+
     const grouped = useMemo(
         () =>
             GROUPS.map((g) => ({ ...g, list: items.filter((i) => i.measure_mode === g.mode) })).filter(
@@ -120,10 +155,10 @@ function InventoryCount({ onClose }) {
         [items],
     );
 
-    const filledCount = items.filter((i) => String(values[i.id]?.quantity ?? '').trim() !== '').length;
+    const filledCount = items.filter(isFilled).length;
 
     const submit = async () => {
-        const missing = items.find((i) => String(values[i.id]?.quantity ?? '').trim() === '');
+        const missing = items.find((i) => !isFilled(i));
         if (missing) {
             notify(`"${missing.name}" 수량을 적어주세요.`, { icon: '⚠️' });
             return;
@@ -138,11 +173,16 @@ function InventoryCount({ onClose }) {
 
         setSaving(true);
         const body = {
-            items: items.map((i) => ({
-                item_id: i.id,
-                quantity: Number(values[i.id].quantity),
-                spare_count: i.measure_mode === 'weight' ? Number(values[i.id]?.spare || 0) : 0,
-            })),
+            items: items.map((i) => {
+                const over = i.measure_mode === 'weight' && Boolean(values[i.id]?.over);
+                return {
+                    item_id: i.id,
+                    // 넘친 통은 서버가 저울 최대 무게로 기록한다('이 이상').
+                    quantity: over ? scaleMax : Number(values[i.id].quantity),
+                    over_scale: over,
+                    spare_count: i.measure_mode === 'weight' ? Number(values[i.id]?.spare || 0) : 0,
+                };
+            }),
             memo,
         };
         try {
@@ -185,7 +225,7 @@ function InventoryCount({ onClose }) {
 
                 .ic-group { margin-top: 16px; }
                 .ic-group-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-                .ic-group-name { font-size: .95rem; font-weight: 800; color: var(--text-primary, #333); }
+                .ic-group-name { flex-shrink: 0; white-space: nowrap; font-size: .95rem; font-weight: 800; color: var(--text-primary, #333); }
                 .ic-group-hint { font-size: .74rem; color: var(--text-secondary, #999); word-break: keep-all; }
 
                 .ic-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-color, #f1f1f1); }
@@ -195,6 +235,10 @@ function InventoryCount({ onClose }) {
                 .ic-field input { width: 74px; padding: 9px 8px; font-size: 1rem; text-align: right; border: 1px solid var(--border-color, #ccc); border-radius: 8px; background: var(--bg-color, #fff); color: var(--text-primary, #222); font-family: inherit; box-sizing: border-box; }
                 .ic-field input:focus { outline: 2px solid var(--accent, #1a73e8); outline-offset: -1px; }
                 .ic-unit { font-size: .8rem; color: var(--text-secondary, #888); min-width: 26px; }
+                .ic-field input:disabled { background: var(--border-color, #f0f0f0); color: var(--text-secondary, #888); }
+                /* 저울이 넘친 통. 손가락으로 누르는 버튼이라 높이를 입력칸과 맞춘다. */
+                .ic-over { box-sizing: border-box; height: 38px; padding: 0 10px; border: 1px solid var(--border-color, #ccc); border-radius: 8px; background: none; color: var(--text-secondary, #888); font-family: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+                .ic-over.on { background: var(--warning-bg, #fff3e0); border-color: var(--warning, #ef6c00); color: var(--warning, #ef6c00); }
                 .ic-sub { font-size: .7rem; color: var(--text-secondary, #aaa); text-align: center; margin-bottom: 2px; }
                 .ic-conv { font-size: .72rem; color: var(--text-secondary, #aaa); white-space: nowrap; min-width: 62px; text-align: right; }
 
@@ -268,8 +312,9 @@ function InventoryCount({ onClose }) {
                                                 {item.name}
                                                 {prev && (
                                                     <span className="ic-prev">
-                                                        직전 {Number(prev.quantity)}
-                                                        {item.count_unit}
+                                                        {prev.over_scale
+                                                            ? `직전 ${Number(prev.quantity)}${item.count_unit} 넘음`
+                                                            : `직전 ${Number(prev.quantity)}${item.count_unit}`}
                                                         {item.measure_mode === 'weight' && prev.spare_count > 0
                                                             ? ` · 미개봉 ${Number(prev.spare_count)}통`
                                                             : ''}
@@ -299,10 +344,27 @@ function InventoryCount({ onClose }) {
                                                     <input
                                                         inputMode="decimal"
                                                         value={v.quantity}
-                                                        onChange={(e) => setValue(item.id, 'quantity', e.target.value)}
+                                                        disabled={Boolean(v.over)}
+                                                        placeholder={v.over ? `${scaleMax} 넘음` : ''}
+                                                        onChange={(e) =>
+                                                            item.measure_mode === 'weight'
+                                                                ? setWeight(item.id, e.target.value)
+                                                                : setValue(item.id, 'quantity', e.target.value)
+                                                        }
                                                         aria-label={`${item.name} 수량`}
                                                     />
                                                     <span className="ic-unit">{item.count_unit}</span>
+                                                    {/* 저울 최대 무게를 넘는 통(거의 가득 찬 통)은 잴 수 없다. */}
+                                                    {item.measure_mode === 'weight' && (
+                                                        <button
+                                                            type="button"
+                                                            className={`ic-over ${v.over ? 'on' : ''}`}
+                                                            aria-pressed={Boolean(v.over)}
+                                                            onClick={() => toggleOver(item.id)}
+                                                        >
+                                                            넘침
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -315,7 +377,13 @@ function InventoryCount({ onClose }) {
                                                 per !== 1
                                                     ? `≈ ${Math.round(qty * per).toLocaleString()}${item.base_unit}`
                                                     : ''}
+                                                {item.measure_mode === 'weight' && v.over
+                                                    ? item.tare_g != null
+                                                        ? `순 ${Math.max(0, Math.round(scaleMax - Number(item.tare_g))).toLocaleString()}g 이상`
+                                                        : `${scaleMax.toLocaleString()}g 이상`
+                                                    : ''}
                                                 {item.measure_mode === 'weight' &&
+                                                !v.over &&
                                                 item.tare_g != null &&
                                                 v.quantity !== ''
                                                     ? `순 ${Math.max(0, Math.round(qty - Number(item.tare_g))).toLocaleString()}g`

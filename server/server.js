@@ -575,6 +575,17 @@ async function ensureSchema() {
         console.error('⚠️ [DB] hygiene_checks.slot_label 채우기 실패:', err.message);
     }
 
+    // 저울 최대 무게를 넘는 통은 '이 이상'으로 기록한다. 자세한 배경은 migrations/022_inventory_over_scale.sql 참고.
+    try {
+        await pool.query(
+            'ALTER TABLE inventory_count_items ADD COLUMN over_scale TINYINT(1) NOT NULL DEFAULT 0 AFTER spare_count',
+        );
+    } catch (/** @type {any} */ err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+            console.error('⚠️ [DB] inventory_count_items.over_scale 추가 실패:', err.message);
+        }
+    }
+
     // 회차마다 적용 요일을 둔다(요일마다 운영 시간이 달라서). 자세한 배경은 migrations/021_slot_days.sql 참고.
     // 기존 회차는 매일로 둔다 — 지금까지 매일 적용되던 것과 같다.
     for (const table of ['inventory_slots', 'hygiene_slots']) {

@@ -35,9 +35,11 @@ const num = (/** @type {number} */ n) => Number(n).toLocaleString(undefined, { m
  */
 function remainText(r) {
     if (r.measure_mode === 'weight') {
-        if (r.tare_missing) return `${num(r.quantity)}g (빈 통 무게 미측정)`;
+        // 저울이 넘친 통은 '이 이상'이다(저울 최대 무게를 넘어 잴 수 없었다).
+        const more = r.at_least ? ' 이상' : '';
+        if (r.tare_missing) return `${num(r.quantity)}g${more} (빈 통 무게 미측정)`;
         const spare = Number(r.spare_count) > 0 ? ` + 미개봉 ${num(r.spare_count)}통` : '';
-        return `${num(r.net)}g${spare}`;
+        return `${num(r.net)}g${more}${spare}`;
     }
     if (r.measure_mode === 'each') return `${num(r.quantity)}${r.count_unit}`;
 
@@ -134,6 +136,7 @@ function InventoryDashboard({ onBack }) {
                 .inv-delta { min-width: 58px; text-align: right; font-size: .8rem; color: var(--text-secondary, #aaa); white-space: nowrap; }
                 .inv-delta.down { color: var(--danger); }
                 .inv-tag { font-size: .72rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--danger-bg); color: var(--danger); white-space: nowrap; }
+                .inv-tag.unknown { background: var(--warning-bg, #fff3e0); color: var(--warning, #ef6c00); }
 
                 .inv-hist { border-bottom: 1px solid var(--border-color, #eee); }
                 .inv-hist-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 4px; background: none; border: none; font-family: inherit; font-size: .92rem; color: var(--text-primary, #333); cursor: pointer; text-align: left; }
@@ -192,7 +195,9 @@ function InventoryDashboard({ onBack }) {
                                     <span className="inv-amount">
                                         {remainText(r)}
                                         {r.measure_mode === 'weight' && r.total_ratio != null && (
-                                            <span className="inv-ratio">({num(r.total_ratio)}통)</span>
+                                            <span className="inv-ratio">
+                                                ({num(r.total_ratio)}통{r.at_least ? ' 이상' : ''})
+                                            </span>
                                         )}
                                         {r.measure_mode === 'pack' && r.amount != null && (
                                             <span className="inv-ratio">
@@ -208,6 +213,15 @@ function InventoryDashboard({ onBack }) {
                                             : `${r.delta > 0 ? '+' : ''}${num(r.delta)}`}
                                     </span>
                                     {r.is_low && <span className="inv-tag">주문</span>}
+                                    {/* 저울이 넘쳐 최솟값만 아는데, 주문 기준이 그보다 높아 판단할 수 없다. */}
+                                    {r.low_unknown && (
+                                        <span
+                                            className="inv-tag unknown"
+                                            title="저울이 넘쳐 정확한 양을 모르는데, 주문 기준이 저울로 잴 수 있는 양보다 높습니다. 품목 관리에서 기준을 낮춰주세요."
+                                        >
+                                            판단 불가
+                                        </span>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -242,13 +256,8 @@ function InventoryDashboard({ onBack }) {
                                 {c.items.map((/** @type {any} */ r, /** @type {number} */ i) => (
                                     <div className={`inv-row ${r.is_low ? 'low' : ''}`} key={i}>
                                         <span className="inv-label">{r.item_label}</span>
-                                        <span className="inv-amount">
-                                            {num(r.quantity)}
-                                            {r.count_unit}
-                                            {r.measure_mode === 'weight' && Number(r.spare_count) > 0
-                                                ? ` + 미개봉 ${num(r.spare_count)}통`
-                                                : ''}
-                                        </span>
+                                        {/* 현재 재고와 같은 표현을 쓴다(저울은 빈 통 무게를 뺀 순 무게). */}
+                                        <span className="inv-amount">{remainText(r)}</span>
                                     </div>
                                 ))}
                                 {c.memo && <div className="inv-memo">특이사항: {c.memo}</div>}
