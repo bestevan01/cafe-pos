@@ -17,6 +17,7 @@ module.exports = {
     inventorySlots,
     loadSlots: inventorySlots.loadSlots,
     currentSlot: inventorySlots.currentSlot,
+    todaySlots: inventorySlots.todaySlots,
     syncInventoryReminders: inventorySlots.syncReminders,
     slotSql,
     toMinutes,

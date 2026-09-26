@@ -30,7 +30,8 @@ async function recordPlan() {
         `INSERT INTO hygiene_slot_plans (effective_date, slots)
          VALUES (CURDATE(), ?)
          ON DUPLICATE KEY UPDATE slots = VALUES(slots)`,
-        [JSON.stringify(slots.map((s) => ({ slot_key: s.slot_key, label: s.label })))],
+        // 요일도 함께 남긴다. 보고서가 그날 요일에 해야 했던 회차만 그리고, 회차가 없는 요일은 미운영일로 본다.
+        [JSON.stringify(slots.map((s) => ({ slot_key: s.slot_key, label: s.label, days: s.days })))],
     );
 }
 
@@ -46,7 +47,7 @@ const hygieneSlots = createSlotSchedule({
  * 보고서 구간에 필요한 회차 이력. 구간 시작 전의 마지막 한 건도 함께 준다(구간 첫날에 유효한 목록).
  * @param {string} from 'YYYY-MM-DD'
  * @param {string} to   'YYYY-MM-DD'
- * @returns {Promise<{effective_date: string, slots: {slot_key: string, label: string}[]}[]>}
+ * @returns {Promise<{effective_date: string, slots: {slot_key: string, label: string, days?: string}[]}[]>}
  */
 async function loadPlans(from, to) {
     const [rows] = await pool.query(

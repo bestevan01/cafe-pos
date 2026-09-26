@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useNotification } from '../../hooks/useNotification';
+import { slotNames } from '../../utils/slotNames';
 
 /**
  * 측정 방식별 묶음. 화면에서 이 순서대로 나온다.
@@ -49,6 +50,8 @@ function InventoryCount({ onClose }) {
     const [slots, setSlots] = useState(/** @type {Record<string, any>} */ ({}));
     // 회차는 매장이 정한다(관리자 화면). 개수도 시각도 매장마다 달라 서버가 준 목록을 그대로 쓴다.
     const [slotList, setSlotList] = useState(/** @type {any[]} */ ([]));
+    // 오늘은 적용되는 회차가 없는 요일(미운영일). 막지는 않고 알린다 — 누가 나와 조사할 수도 있다.
+    const [offDay, setOffDay] = useState(false);
     const [previous, setPrevious] = useState(/** @type {Record<string, any>} */ ({}));
     const [existing, setExisting] = useState(/** @type {any} */ (null));
     /** 품목 id → {quantity, spare} 문자열. 입력 중에는 문자열로 두어야 '0.' 같은 중간 상태가 안 깨진다. */
@@ -66,6 +69,7 @@ function InventoryCount({ onClose }) {
             setItems(list);
             setSlots(bySlot);
             setSlotList(available ?? []);
+            setOffDay(Boolean(res.data.off_day));
             setSlot(cur);
             setPrevious(prev ?? {});
 
@@ -215,16 +219,22 @@ function InventoryCount({ onClose }) {
                 <div className="ic-head">
                     <h2 className="ic-title">📦 재고 조사</h2>
                     <div className="ic-slots">
-                        {slotList.map((s) => (
+                        {/* 이름이 겹치면(미운영일에 '마감'이 둘 등) 시각을 붙여 구분한다. */}
+                        {slotList.map((s, _i, all) => (
                             <span
                                 key={s.slot_key}
                                 className={`ic-slot ${s.slot_key === slot ? 'now' : ''} ${slots[s.slot_key] ? 'done' : ''}`}
                             >
-                                {s.label}
+                                {slotNames(all)(s.slot_key)}
                                 {slots[s.slot_key] ? ' 완료' : ''}
                             </span>
                         ))}
                     </div>
+                    {offDay && !loading && (
+                        <p className="ic-note">
+                            오늘은 정해진 조사 회차가 없는 날입니다. 그래도 조사하면 시각에 맞는 회차로 기록됩니다.
+                        </p>
+                    )}
                     {existing && (
                         <p className="ic-note">
                             {existing.counted_by_name}님이 제출했습니다. 고쳐서 다시 저장할 수 있습니다.

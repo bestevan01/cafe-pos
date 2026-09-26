@@ -574,6 +574,16 @@ async function ensureSchema() {
     } catch (/** @type {any} */ err) {
         console.error('⚠️ [DB] hygiene_checks.slot_label 채우기 실패:', err.message);
     }
+
+    // 회차마다 적용 요일을 둔다(요일마다 운영 시간이 달라서). 자세한 배경은 migrations/021_slot_days.sql 참고.
+    // 기존 회차는 매일로 둔다 — 지금까지 매일 적용되던 것과 같다.
+    for (const table of ['inventory_slots', 'hygiene_slots']) {
+        try {
+            await pool.query(`ALTER TABLE ${table} ADD COLUMN days VARCHAR(7) NOT NULL DEFAULT '1234567' AFTER run_at`);
+        } catch (/** @type {any} */ err) {
+            if (err.code !== 'ER_DUP_FIELDNAME') console.error(`⚠️ [DB] ${table}.days 추가 실패:`, err.message);
+        }
+    }
 }
 
 // ---------------------------------------------------------
@@ -634,7 +644,7 @@ setupSocketHandlers(io);
 // 알림 장치는 공통이고(utils/alerts.js), 기능이 '무엇을 알릴지'를 등록한다.
 // 다른 기능도 여기에 한 줄씩 더하면 된다.
 const { registerAlert, startAlertScheduler } = require('./utils/alerts');
-const { loadSlots, currentSlot, syncInventoryReminders } = require('./utils/inventorySlots');
+const { inventorySlots, currentSlot, syncInventoryReminders } = require('./utils/inventorySlots');
 const { hygieneSlots } = require('./utils/hygieneSlots');
 const { latestStatus, lowAlertText } = require('./services/inventoryStatus');
 
@@ -645,6 +655,11 @@ registerAlert('inventory_low', {
     // 누르면 관리자 재고 현황 화면으로 간다.
     action: 'open_inventory_status',
     build: async () => {
+        // 재고 조사 회차를 정해 둔 매장에서 오늘 회차가 없으면 미운영일이다. 쉬는 날 관리자를 울리지 않는다.
+        // (제출 순간의 알림은 이 확인을 거치지 않는다 — 누가 나와 조사했다면 알려야 한다)
+        if ((await inventorySlots.listSlots()).length > 0 && (await inventorySlots.todaySlots()).length === 0) {
+            return null;
+        }
         const status = await latestStatus();
         // 기록이 없거나 부족한 품목이 없으면 굳이 알리지 않는다.
         // '이상 없음' 알림이 매일 뜨면 사람은 곧 무시하게 된다.
@@ -670,12 +685,14 @@ registerAlert('inventory_count_reminder', {
     action: 'open_inventory_count',
     build: async ({ runAt }) => {
         // 스케줄러는 예정 시각을 넘겨준다. '지금 보내보기'처럼 시각 없이 불리면 지금 회차로 본다.
+        // 오늘 적용되는 회차에서만 찾는다 — 그 요일이 아니거나(미운영일 포함) 그사이 회차가 바뀌었으면 보내지 않는다.
         let slot;
         if (runAt) {
-            slot = (await loadSlots()).find((s) => s.run_at === runAt);
-            if (!slot) return null; // 그사이 회차가 바뀌었다
+            slot = (await inventorySlots.todaySlots()).find((s) => s.run_at === runAt);
+            if (!slot) return null;
         } else {
             const now = await currentSlot();
+            if (now.offDay) return null;
             slot = now.slots.find((s) => s.slot_key === now.key);
             if (!slot) return null;
         }
@@ -704,12 +721,14 @@ registerAlert('hygiene_check_reminder', {
     managed: true,
     action: 'open_hygiene_check',
     build: async ({ runAt }) => {
+        // 오늘 적용되는 회차에서만 찾는다(요일이 다르거나 미운영일이면 보내지 않는다).
         let slot;
         if (runAt) {
-            slot = (await hygieneSlots.listSlots()).find((s) => s.run_at === runAt);
-            if (!slot) return null; // 그사이 회차가 바뀌었다
+            slot = (await hygieneSlots.todaySlots()).find((s) => s.run_at === runAt);
+            if (!slot) return null;
         } else {
             const now = await hygieneSlots.currentSlot();
+            if (now.offDay) return null;
             slot = now.slots.find((s) => s.slot_key === now.key);
             if (!slot) return null;
         }

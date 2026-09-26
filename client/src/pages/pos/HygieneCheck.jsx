@@ -4,6 +4,7 @@ import Button from '../../components/ui/Button';
 import { useNotification } from '../../hooks/useNotification';
 import HygienePhoto from '../../components/HygienePhoto';
 import { uploadHygienePhoto, deleteHygienePhoto } from '../../utils/hygienePhotos';
+import { slotNames } from '../../utils/slotNames';
 
 const authCfg = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
@@ -38,6 +39,8 @@ function HygieneCheck({ onClose }) {
     const [slot, setSlot] = useState('');
     // 매장 관리자가 적어 둔 점검 지침(누가 점검할지 등). 없으면 표시하지 않는다.
     const [guide, setGuide] = useState(/** @type {string|null} */ (null));
+    // 오늘은 적용되는 회차가 없는 요일(미운영일). 막지는 않고 알린다.
+    const [offDay, setOffDay] = useState(false);
     // 항목 id → 사진 id 목록. 제출할 때 결과에 함께 실어 보낸다.
     const [photos, setPhotos] = useState(/** @type {Record<number, number[]>} */ ({}));
     const [uploading, setUploading] = useState(/** @type {number|null} */ (null));
@@ -46,6 +49,8 @@ function HygieneCheck({ onClose }) {
     const { notify } = useNotification();
 
     const current = slots.find((s) => s.slot_key === slot) ?? null;
+    // 이름이 겹치면(미운영일에 '마감'이 둘 등) 시각을 붙여 구분한다.
+    const nameOf = slotNames(slots);
     // 오늘 다른 회차를 내가 이미 했는지. 같은 사람이 여러 회차를 다 하지 않도록 안내하는 데 쓴다.
     // 막지 않고 알리기만 한다 — 혼자 근무하는 시간대가 있을 수 있고, 시스템은 지금 몇 명이
     // 일하는지 모른다. 막으면 점검 자체를 못 하는 상황이 생긴다.
@@ -72,6 +77,7 @@ function HygieneCheck({ onClose }) {
             setSlots(list);
             setSlot(cur);
             setGuide(todayRes.data.guide ?? null);
+            setOffDay(Boolean(todayRes.data.off_day));
             const today = list.find((s) => s.slot_key === cur)?.check ?? null;
             setExisting(today);
             if (today) {
@@ -250,17 +256,17 @@ function HygieneCheck({ onClose }) {
                     <h2 className="hc-title">🧼 위생 점검</h2>
                     {!loading && (
                         <div className="hc-slotnow">
-                            <span className="hc-slotbadge">{current?.label ?? ''} 점검</span>
+                            <span className="hc-slotbadge">{current ? nameOf(current.slot_key) : ''} 점검</span>
                             {slots
                                 .filter((s) => s.slot_key !== slot)
                                 .map((s) =>
                                     s.check ? (
                                         <span key={s.slot_key} className="hc-otherdone">
-                                            {s.label} 완료 ✓
+                                            {nameOf(s.slot_key)} 완료 ✓
                                         </span>
                                     ) : (
                                         <span key={s.slot_key} className="hc-otherwait">
-                                            {s.label} 미완료
+                                            {nameOf(s.slot_key)} 미완료
                                         </span>
                                     ),
                                 )}
@@ -273,11 +279,16 @@ function HygieneCheck({ onClose }) {
                               ? `${existing.checked_by_name}님이 제출했습니다. 고쳐서 다시 저장할 수 있습니다.`
                               : '매장을 둘러보고 항목마다 상태를 골라주세요.'}
                     </p>
+                    {!loading && offDay ? (
+                        <p className="hc-sub" style={{ marginTop: 6 }}>
+                            오늘은 정해진 점검 회차가 없는 날입니다. 그래도 점검하면 시각에 맞는 회차로 기록됩니다.
+                        </p>
+                    ) : null}
                     {!loading && guide ? <p className="hc-guide">📢 {guide}</p> : null}
                     {!loading && !existing && mineElsewhere.length > 0 ? (
                         <p className="hc-warn">
-                            ⚠️ 오늘 {mineElsewhere.map((s) => s.label).join(' · ')} 점검을 이미 하셨습니다. 일을 고르게
-                            나누기 위해 가급적 다른 분이 진행해주세요.
+                            ⚠️ 오늘 {mineElsewhere.map((s) => nameOf(s.slot_key)).join(' · ')} 점검을 이미 하셨습니다.
+                            일을 고르게 나누기 위해 가급적 다른 분이 진행해주세요.
                         </p>
                     ) : null}
                 </div>

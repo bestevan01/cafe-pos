@@ -53,7 +53,7 @@ router.get('/today', async (req, res) => {
         // 하루에 여러 회차라 '오늘의 기록'이 하나가 아니다. 회차마다 기록을 붙여 내려보내
         // 클라이언트가 어느 회차가 비었는지, 다른 회차를 누가 했는지 알 수 있게 한다.
         const now = await hygieneSlots.currentSlot();
-        const configured = (await hygieneSlots.listSlots()).length > 0;
+        const configured = now.configured;
         const [rows] = await pool.query(
             `SELECT id, slot, slot_label, DATE_FORMAT(check_date, '%Y-%m-%d') AS check_date, checked_at,
                     checked_by_id, checked_by_name, memo
@@ -95,7 +95,7 @@ router.get('/today', async (req, res) => {
         const guide = await getSetting('hygieneGuide');
         // 지금 채울 회차도 함께 알려준다. 클라이언트가 자기 시계로 따로 판단하면
         // 서버가 실제로 기록할 회차와 어긋날 수 있다.
-        res.json({ slots, current_slot: now.key, guide: guide?.value ?? null });
+        res.json({ slots, current_slot: now.key, off_day: now.offDay, guide: guide?.value ?? null });
     } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/hygiene/today 에러]', err);
         res.status(500).json({

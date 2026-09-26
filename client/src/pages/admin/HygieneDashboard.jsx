@@ -37,21 +37,38 @@ const STATUS_NAME = /** @type {Record<string, string>} */ ({ ok: '양호', fail:
  */
 const slotName = (c) => c.slot_label || (c.slot === 'pm' ? '오후' : c.slot === 'am' ? '오전' : c.slot);
 
+/** 'YYYY-MM-DD'의 ISO 요일(1=월 … 7=일). 서버가 회차 요일을 같은 숫자로 저장한다. */
+const isoDayOf = (/** @type {string} */ ds) => {
+    const [y, m, d] = ds.split('-').map(Number);
+    const day = new Date(y, m - 1, d).getDay();
+    return String(day === 0 ? 7 : day);
+};
+
 /**
  * 그날 '해야 했던' 회차 목록. 회차 설정은 바뀐 날부터만 적용된다(서버 utils/hygieneSlots.js).
  * 지금 설정으로 과거를 그리면, 회차를 바꾼 순간 지난 기록이 전부 '기록 없음'투성이가 된다.
  *
- * @param {{effective_date: string, slots: {slot_key: string, label: string}[]}[]} plans  날짜 오름차순
+ * 회차에 요일이 있으면 그 요일 것만 남긴다. 남은 게 없으면 그날은 미운영일이다(operating=false).
+ * 요일 정보가 없는 옛 이력(요일 기능 이전)과 기본 오전·오후는 예전처럼 평일만 운영일로 본다.
+ *
+ * @param {{effective_date: string, slots: {slot_key: string, label: string, days?: string}[]}[]} plans  날짜 오름차순
  * @param {{slot_key: string, label: string}[]} fallback  설정하기 전의 기본(오전·오후)
  * @param {string} date 'YYYY-MM-DD'
+ * @returns {{slots: {slot_key: string, label: string}[], operating: boolean}}
  */
 const planFor = (plans, fallback, date) => {
+    /** @type {{slot_key: string, label: string, days?: string}[]} */
     let plan = fallback;
     for (const p of plans) {
         if (p.effective_date <= date) plan = p.slots;
         else break;
     }
-    return plan;
+    const iso = isoDayOf(date);
+    if (plan.some((sl) => sl.days)) {
+        const slots = plan.filter((sl) => !sl.days || sl.days.includes(iso));
+        return { slots, operating: slots.length > 0 };
+    }
+    return { slots: plan, operating: iso !== '6' && iso !== '7' };
 };
 
 /**
@@ -269,9 +286,10 @@ function HygieneDashboard({ onBack }) {
         else byDate.set(c.check_date, [c]);
     }
 
-    // 구간의 평일을 모두 늘어놓고 기록 유무를 붙인다.
+    // 구간의 운영일을 모두 늘어놓고 기록 유무를 붙인다.
     // 빠진 날을 감추면 준수 여부를 볼 수 없어 보고서로서 의미가 없다.
-    // 다만 휴무일도 '기록 없음'으로 나오므로 보고서에 그 취지를 한 줄 적어둔다.
+    // 운영일은 그날의 회차 요일로 정한다(planFor). 미운영일은 기록이 있을 때만 싣는다.
+    // 회차 요일로 드러나지 않는 휴무(공휴일 등)는 '기록 없음'으로 나오므로 보고서에 그 취지를 적어둔다.
     /** @type {{date: string, checks: any[]}[]} */
     const rows = [];
     {
@@ -279,10 +297,9 @@ function HygieneDashboard({ onBack }) {
         const [ty, tm, td] = range.to.split('-').map(Number);
         const end = new Date(ty, tm - 1, td);
         for (let d = new Date(fy, fm - 1, fd); d <= end; d.setDate(d.getDate() + 1)) {
-            const day = d.getDay();
             const key = ymd(d);
-            if (day === 0 || day === 6) {
-                if (byDate.has(key)) rows.push({ date: key, checks: byDate.get(key) ?? [] }); // 주말 점검은 있으면 싣는다
+            if (!planFor(plans, defaultPlan, key).operating) {
+                if (byDate.has(key)) rows.push({ date: key, checks: byDate.get(key) ?? [] }); // 쉬는 날 점검은 있으면 싣는다
                 continue;
             }
             rows.push({ date: key, checks: byDate.get(key) ?? [] });
@@ -311,7 +328,7 @@ function HygieneDashboard({ onBack }) {
     const totalFails = checks.reduce((n, c) => n + Number(c.fail_count), 0);
     // 그날 해야 했던 회차를 모두 채운 날을 센다. 회차 수는 날마다 다를 수 있다(설정을 바꾼 경우).
     const allDone = [...byDate.entries()].filter(([date, list]) =>
-        planFor(plans, defaultPlan, date).every((sl) => list.some((c) => c.slot === sl.slot_key)),
+        planFor(plans, defaultPlan, date).slots.every((sl) => list.some((c) => c.slot === sl.slot_key)),
     ).length;
     const checkedDays = byDate.size;
     const printedAt = new Date();
@@ -584,7 +601,7 @@ function HygieneDashboard({ onBack }) {
                                       </tr>,
                                   ]
                                 : // 그날 해야 했던 회차는 한 번만 했어도 모두 그린다(dayLines 참고).
-                                  dayLines(planFor(plans, defaultPlan, date), dayChecks).map((line, i, lines) => {
+                                  dayLines(planFor(plans, defaultPlan, date).slots, dayChecks).map((line, i, lines) => {
                                       const check = line.check;
                                       return (
                                           <tr key={`${date}-${line.key}`}>
@@ -682,9 +699,10 @@ function HygieneDashboard({ onBack }) {
 
                 <p className="rp-note">
                     · 점검 항목의 문구는 점검 당시 기록된 그대로이며, 이후 체크리스트가 변경되어도 바뀌지 않습니다.
-                    <br />· 평일 중 점검 기록이 없는 날은 &lsquo;기록 없음&rsquo;으로 표시됩니다(휴무일 포함).
-                    <br />· 날짜마다 그날 정해져 있던 점검 회차로 표시됩니다. 회차 설정을 바꾼 날부터 새 회차가
-                    적용됩니다.
+                    <br />· 운영일 중 점검 기록이 없는 날은 &lsquo;기록 없음&rsquo;으로 표시됩니다(공휴일 등 임시 휴무
+                    포함).
+                    <br />· 날짜마다 그날 정해져 있던 점검 회차로 표시되며, 회차가 없는 요일(미운영일)은 기록이 있을
+                    때만 실립니다. 회차 설정을 바꾼 날부터 새 회차가 적용됩니다.
                     {editRows.length > 0 && (
                         <>
                             <br />· 수정 이력은 제출 후 같은 날 안에 고친 내역이며, 취소선은 고치기 전의 내용입니다.

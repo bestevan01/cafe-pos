@@ -89,6 +89,8 @@ router.get('/today', async (req, res) => {
             slot_list: now.slots,
             current_slot: now.key,
             current_slot_label: now.label,
+            // 회차를 정해 둔 매장인데 오늘은 적용되는 회차가 없다(미운영일). 화면이 알려준다.
+            off_day: now.offDay,
             previous,
             previous_at: prev ?? null,
         });
