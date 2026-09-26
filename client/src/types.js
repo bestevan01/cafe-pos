@@ -72,6 +72,7 @@
  * @property {string} payment_method  'cash' | 'card' | 'event'
  * @property {number} is_paid  0|1
  * @property {number} is_completed  0|1
+ * @property {number} [is_made]  0|1 주방의 항목별 조리 체크
  * @property {number} [is_delivered]  0|1
  * @property {string} [staff_name]
  * @property {string|null} [applied_event_id]
@@ -81,9 +82,11 @@
 /**
  * 주문 그룹 내 개별 품목 (클라이언트에서 묶은 형태).
  * @typedef {object} OrderItem
+ * @property {string} [id]  orders 행의 UUID. 주방의 항목별 체크에 쓴다
  * @property {string} menu_name
  * @property {number} quantity
  * @property {number} price
+ * @property {number} [is_made]  0|1 주방에서 이 잔을 만들었는지
  */
 
 /**

@@ -6,52 +6,26 @@ const debugInfo = require('../utils/debugInfo');
 const crypto = require('crypto');
 const r2 = require('../config/r2');
 const { kstDate } = require('../utils/kstDate');
+const { hygieneSlots } = require('../utils/hygieneSlots');
+const { slotSql } = require('../utils/slotSchedule');
+const { getSetting } = require('../utils/storeSettings');
 
 // 직원용 위생 점검 API. 로그인만 하면 누구나 쓴다(역할 무관).
 // 항목 편집·기록 조회는 관리자 전용이라 hygieneAdmin.routes.js에 따로 있다.
 router.use(authenticateToken);
 
-/** 점검 칸. 오전·오후 두 번 하도록 운영 지침이 정해져 있다. */
-const SLOTS = ['am', 'pm'];
-
 /**
- * 오전과 오후를 가르는 시각. 말 그대로 정오를 경계로 한다.
+ * 점검 회차는 매장 관리자가 정한다(utils/hygieneSlots.js). 넣기 전에는 예전처럼 오전·오후를 정오로 나눈다.
  *
- * 두 매장 모두 오픈이 9시라 오전 점검은 오전 중에 끝나고, 오후 점검은 16시(본부동)·17시(은혜관)라
- * 정오 전에 할 일이 없다. 그래서 정오로 갈라도 두 점검이 섞이지 않는다.
- *
- * 감수하는 것 하나: 오전 점검이 정오를 넘겨 제출되면 오후 칸으로 기록된다. 그러면 진짜 오후
- * 점검 때 같은 칸이라 새 기록이 아니라 수정이 되어, 그날 오전이 빈 것으로 남는다.
- * 오픈이 9시인데 3시간 넘게 밀리는 경우라 드물다고 보고 정오를 택했다.
- * 그런 일이 잦아지면 이 값을 늦추는 것을 검토할 것.
- *
- * ⚠️ server.js의 backfill 쿼리와 마이그레이션 012도 같은 값을 쓴다. 바꾸면 함께 바꿔야
- * 과거 기록과 앞으로 쌓일 기록의 기준이 어긋나지 않는다.
- */
-const PM_FROM_HOUR = 12;
-
-/** 지금이 어느 칸인지 DB에게 묻는 SQL 조각. HOUR(NOW())는 +09:00 세션이라 한국 시각이다. */
-const SLOT_SQL = "IF(HOUR(NOW()) >= ?, 'pm', 'am')";
-
-/**
- * 지금이 어느 칸인지 정한다.
- *
- * 클라이언트가 고르게 하지 않는 이유:
- *  - 칸과 실제 제출 시각(checked_at)이 어긋날 수 없다. 둘 다 같은 시계에서 나온다.
+ * 어느 회차인지는 클라이언트가 고르지 않고 서버가 DB 시계로 정한다:
+ *  - 회차와 실제 제출 시각(checked_at)이 어긋날 수 없다. 둘 다 같은 시계에서 나온다.
  *    (칸을 사람이 고르던 때 '오전 · 16:29' 같은 앞뒤 안 맞는 기록이 실제로 남았다)
  *  - 기기 시계가 틀어져 있어도 기록은 서버 기준으로 일관된다.
  *  - 직원이 누를 것이 하나 줄어든다. 바쁜 시간대에 고민거리를 만들지 않는다.
  *
- * 그 '같은 시계'는 Node가 아니라 DB다. 처음에는 new Date().getHours()로 정했는데 그건
- * 프로세스의 시간대이고, 배포 서버(Render)는 UTC로 돈다. 한국 시각 16시가 7시로 읽혀
- * 오후 점검이 오전 칸으로 들어갔다. check_date(CURDATE)와 checked_at은 DB가 한국 기준으로
- * 찍는데 칸만 UTC로 정해져, 위에 적은 전제 자체가 깨져 있었다.
- * 주문번호의 날짜 접두사를 DB에서 뽑는 것도 같은 이유다(order.routes.js).
+ * 그 '같은 시계'는 Node가 아니라 DB다. 배포 서버(Render)는 UTC로 돌아서 new Date().getHours()로
+ * 정했을 때 한국 시각 16시가 7시로 읽혀 오후 점검이 오전 칸으로 들어간 일이 있었다.
  */
-async function currentSlot() {
-    const [[row]] = await pool.query(`SELECT ${SLOT_SQL} AS slot`, [PM_FROM_HOUR]);
-    return row.slot;
-}
 
 // 오늘 점검할 체크리스트. 은퇴한 항목(is_active=0)은 내려주지 않는다.
 router.get('/items', async (req, res) => {
@@ -76,37 +50,52 @@ router.get('/items', async (req, res) => {
 // 오늘 점검 기록. 없으면 check: null — 클라이언트는 이걸로 '작성' / '수정' 모드를 정한다.
 router.get('/today', async (req, res) => {
     try {
-        // 하루 2회가 되면서 '오늘의 기록'이 하나가 아니다. 두 칸을 모두 내려보내
-        // 클라이언트가 어느 칸이 비었는지, 오전을 누가 했는지 알 수 있게 한다.
+        // 하루에 여러 회차라 '오늘의 기록'이 하나가 아니다. 회차마다 기록을 붙여 내려보내
+        // 클라이언트가 어느 회차가 비었는지, 다른 회차를 누가 했는지 알 수 있게 한다.
+        const now = await hygieneSlots.currentSlot();
+        const configured = now.configured;
         const [rows] = await pool.query(
-            `SELECT id, slot, DATE_FORMAT(check_date, '%Y-%m-%d') AS check_date, checked_at,
+            `SELECT id, slot, slot_label, DATE_FORMAT(check_date, '%Y-%m-%d') AS check_date, checked_at,
                     checked_by_id, checked_by_name, memo
              FROM hygiene_checks
-             WHERE check_date = CURDATE()`,
+             WHERE check_date = CURDATE()
+             ORDER BY checked_at`,
         );
-        /** @type {Record<string, any>} */
-        const bySlot = { am: null, pm: null };
-        for (const r of rows) bySlot[r.slot] = r;
 
-        for (const slot of SLOTS) {
-            const check = bySlot[slot];
-            if (!check) continue;
+        /** @type {{slot_key: string, label: string, run_at: string|null, check: any}[]} */
+        const slots = now.slots.map((sl) => ({
+            slot_key: sl.slot_key,
+            label: sl.label,
+            // 기본 두 칸의 시각은 경계 계산용이라 보여주지 않는다.
+            run_at: configured ? sl.run_at : null,
+            check: null,
+        }));
+        for (const r of rows) {
+            const hit = slots.find((sl) => sl.slot_key === r.slot);
+            if (hit) hit.check = r;
+            // 오늘 중간에 회차를 바꿨다면 바꾸기 전 회차로 낸 기록이 남는다. 감추지 않고 따로 보여준다.
+            else slots.push({ slot_key: r.slot, label: r.slot_label ?? r.slot, run_at: null, check: r });
+        }
+
+        for (const sl of slots) {
+            if (!sl.check) continue;
             const [results] = await pool.query(
                 `SELECT item_id, item_label, item_category, sort_order, status, note
                  FROM hygiene_check_results
                  WHERE check_id = ?
                  ORDER BY sort_order, id`,
-                [check.id],
+                [sl.check.id],
             );
             const [photos] = await pool.query(
                 "SELECT id, item_id FROM hygiene_check_photos WHERE check_id = ? AND status = 'ready' ORDER BY id",
-                [check.id],
+                [sl.check.id],
             );
-            bySlot[slot] = { ...check, results, photos };
+            sl.check = { ...sl.check, results, photos };
         }
-        // 지금 채울 칸도 함께 알려준다. 클라이언트가 자기 시계로 따로 판단하면
-        // 서버가 실제로 기록할 칸과 어긋날 수 있다.
-        res.json({ slots: bySlot, current_slot: await currentSlot() });
+        const guide = await getSetting('hygieneGuide');
+        // 지금 채울 회차도 함께 알려준다. 클라이언트가 자기 시계로 따로 판단하면
+        // 서버가 실제로 기록할 회차와 어긋날 수 있다.
+        res.json({ slots, current_slot: now.key, off_day: now.offDay, guide: guide?.value ?? null });
     } catch (/** @type {any} */ err) {
         console.error('[🔥 GET /api/hygiene/today 에러]', err);
         res.status(500).json({
@@ -186,7 +175,7 @@ async function loadActiveItems() {
     return items;
 }
 
-// 오늘치 제출. 하루 1건이라 check_date에 UNIQUE가 걸려 있다.
+// 오늘치 제출. (check_date, slot)에 UNIQUE가 걸려 회차마다 한 건이다.
 router.post('/checks', async (req, res) => {
     const items = await loadActiveItems().catch(() => null);
     if (!items) return res.status(500).json({ success: false, message: '항목을 불러오지 못했습니다.' });
@@ -204,13 +193,14 @@ router.post('/checks', async (req, res) => {
     const conn = await pool.getConnection();
     try {
         // 점검과 결과가 따로 저장되면 항목 없는 빈 기록이 남는다. 한 트랜잭션으로 묶는다.
+        const slots = await hygieneSlots.loadSlots();
         await conn.beginTransaction();
         const [ins] = await conn.query(
             `INSERT INTO hygiene_checks (check_date, slot, checked_by_id, checked_by_name, memo)
-             VALUES (CURDATE(), ${SLOT_SQL}, ?, ?, ?)`,
-            // 클라이언트가 보낸 칸은 쓰지 않는다. 칸을 CURDATE()와 같은 문장에서 정해야
-            // 정오 경계에 걸쳐도 날짜·칸·checked_at이 서로 어긋나지 않는다.
-            [PM_FROM_HOUR, req.user.id, req.user.name, memo],
+             VALUES (CURDATE(), ${slotSql(slots)}, ?, ?, ?)`,
+            // 클라이언트가 보낸 회차는 쓰지 않는다. 회차를 CURDATE()와 같은 문장에서 정해야
+            // 경계에 걸쳐도 날짜·회차·checked_at이 서로 어긋나지 않는다.
+            [req.user.id, req.user.name, memo],
         );
         await conn.query(
             'INSERT INTO hygiene_check_results (check_id, item_id, item_label, item_category, sort_order, status, note) VALUES ?',
@@ -220,15 +210,18 @@ router.post('/checks', async (req, res) => {
         // 실제로 기록된 칸을 다시 읽어 돌려준다. 화면이 열릴 때 받은 칸과 다를 수 있다 —
         // 정오 직전에 열어 정오를 넘겨 제출하면 서버는 오후로 적는데 화면은 오전이라고 안내한다.
         const [[saved]] = await conn.query('SELECT slot FROM hygiene_checks WHERE id = ?', [ins.insertId]);
+        // 회차 이름을 복사해 둔다. 나중에 회차를 지우거나 바꿔도 이 기록은 그날 부르던 이름 그대로여야 한다.
+        const slotLabel = slots.find((sl) => sl.slot_key === saved.slot)?.label ?? saved.slot;
+        await conn.query('UPDATE hygiene_checks SET slot_label = ? WHERE id = ?', [slotLabel, ins.insertId]);
         await conn.commit();
         // 관리자의 점검 기록 화면이 새로고침 없이 받아보도록 알린다.
         req.app.get('io').emit('hygiene_updated');
-        res.json({ success: true, id: ins.insertId, slot: saved.slot });
+        res.json({ success: true, id: ins.insertId, slot: saved.slot, slot_label: slotLabel });
     } catch (/** @type {any} */ err) {
         await conn.rollback();
         // 두 사람이 동시에 제출하면 UNIQUE가 막는다. 이미 있다고 알려주고 클라이언트가 다시 불러오게 한다.
         if (err && err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ success: false, message: '오늘 점검이 이미 제출되었습니다.' });
+            return res.status(409).json({ success: false, message: '이 회차 점검이 이미 제출되었습니다.' });
         }
         console.error('[🔥 POST /api/hygiene/checks 에러]', err);
         res.status(500).json({ success: false, message: '점검 제출에 실패했습니다.', debug_info: debugInfo(err) });

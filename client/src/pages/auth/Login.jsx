@@ -7,7 +7,7 @@ const REFRESH_MS = 10 * 60 * 1000;
 import { useSystemTheme } from '../../hooks/useSystemTheme';
 import { useNotification } from '../../hooks/useNotification';
 import { getStoreInfo } from '../../utils/storeInfo';
-import { readLastMethod, writeLastMethod, consumeSkipAuto } from '../../utils/loginMemory';
+import { readLastMethod, writeLastMethod, consumeSkipAuto, willAutoPasskey } from '../../utils/loginMemory';
 import Button from '../../components/ui/Button';
 
 /**
@@ -32,6 +32,28 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
     // 자동 호출로 띄운 생체인증 창이 아직 떠 있는지. 사용자가 직접 누른 것과 구분해야
     // 화면을 벗어날 때 '자동으로 뜬 것만' 접을 수 있다.
     const autoCeremonyRef = useRef(false);
+    // 사용자가 이미 입력을 시작했는지. 서버가 늦게 깨어 자동 패스키가 뒤늦게 준비됐을 때,
+    // 아이디를 치고 있는 사람에게 생체인증 창을 들이밀지 않는다.
+    const userEngagedRef = useRef(false);
+    const usernameRef = useRef(/** @type {HTMLInputElement|null} */ (null));
+
+    /**
+     * 아이디칸에 커서를 넣는다 — 패스키 창이 자동으로 뜨지 않을 때만.
+     * 자동으로 뜰 때 넣으면 휴대폰에서 키보드가 생체인증 창과 함께 올라온다.
+     * 사용자가 이미 다른 칸(비밀번호 등)을 누른 상태면 빼앗지 않는다.
+     */
+    const focusUsername = useCallback(() => {
+        const el = usernameRef.current;
+        if (!el) return;
+        const active = document.activeElement;
+        if (active && active !== document.body && active !== el) return;
+        el.focus({ preventScroll: true });
+    }, []);
+
+    // 화면이 뜨는 즉시 판단한다. 자동 패스키는 옵션 프리페치를 기다리므로 그 결과를 기다리지 않는다.
+    useEffect(() => {
+        if (!willAutoPasskey()) focusUsername();
+    }, [focusUsername]);
 
     // 모달이 열려 있는 동안 ESC로 닫는다.
     useEffect(() => {
@@ -49,6 +71,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
 
     /** @param {import('react').ChangeEvent<HTMLInputElement>} e */
     const handleChange = (e) => {
+        userEngagedRef.current = true;
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
@@ -190,6 +213,8 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             setSubmitting(false);
             autoCeremonyRef.current = false;
             void prefetchAuthOptions(); // 다음 시도용 새 옵션 준비
+            // 자동으로 띄운 창이 닫혔다 → 비밀번호로 들어올 사람이니 아이디칸으로 안내한다.
+            if (auto) focusUsername();
             if (error.name === 'NotAllowedError') {
                 // 사용자가 생체인증 창을 취소한 경우. 자동 호출이었다면 더더욱 조용히 넘어간다.
                 console.log(auto ? '자동 패스키 인증 취소됨' : '패스키 인증 취소됨');
@@ -209,6 +234,7 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
             // 서버가 사유를 code로 알려준다. 만료는 다시 누르면 되는 상황이라
             // '등록된 기기가 아니다'로 뭉뚱그리면 직원이 패스키가 지워진 줄 오해한다.
             const data = error?.response?.data;
+            if (auto) focusUsername();
             if (data?.code === 'unknown_passkey') {
                 // 서버에서 패스키가 지워졌다. 기억을 지우지 않으면 방문할 때마다 자동 호출로 실패한다.
                 writeLastMethod(null);
@@ -247,10 +273,13 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
         if (document.visibilityState !== 'visible') return;
 
         autoTriedRef.current = true;
-        if (readLastMethod() !== 'passkey') return; // 직전 로그인이 비밀번호였다
-        if (consumeSkipAuto()) return; // 방금 직접 로그아웃했다 → 이번 한 번은 건너뛴다
+        // 아래 세 경우는 자동 창이 뜨지 않는다. 화면 진입 때 이미 커서를 넣었지만(willAutoPasskey),
+        // 판단이 어긋나도 커서 없이 남지 않도록 한 번 더 넣는다(이미 있으면 아무 일도 없다).
+        if (readLastMethod() !== 'passkey') return focusUsername(); // 직전 로그인이 비밀번호였다
+        if (consumeSkipAuto()) return focusUsername(); // 방금 직접 로그아웃했다 → 이번 한 번은 건너뛴다
+        if (userEngagedRef.current) return; // 기다리는 사이 이미 입력을 시작했다
         void passkeyLoginRef.current({ auto: true });
-    }, [passkeyAuthOptions]);
+    }, [passkeyAuthOptions, focusUsername]);
 
     return (
         <div className="login-container">
@@ -361,8 +390,15 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                 <img src="/logo.svg" alt="Baek's Cafe" className="login-logo" />
                 <h2 className="login-title">직원 로그인</h2>
 
-                <form ref={formRef} onSubmit={handleSubmit} className="login-form">
+                <form
+                    ref={formRef}
+                    onSubmit={handleSubmit}
+                    className="login-form"
+                    // 칸을 직접 누른 것도 '입력 시작'으로 본다(자동 저장된 값을 고르는 경우 onChange보다 먼저 온다).
+                    onPointerDown={() => (userEngagedRef.current = true)}
+                >
                     <input
+                        ref={usernameRef}
                         id="username"
                         name="username"
                         placeholder="아이디"

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { socket } from './utils/socket';
+import { socket, onResync } from './utils/socket';
 
 // Pages & Components
 import RoleSelection from './pages/pos/RoleSelection';
@@ -8,6 +8,14 @@ import Cashier from './pages/pos/Cashier';
 import Kitchen from './pages/pos/Kitchen';
 import CashSettlement from './pages/pos/CashSettlement.jsx';
 import HygieneCheck from './pages/pos/HygieneCheck.jsx';
+import InventoryCount from './pages/pos/InventoryCount.jsx';
+import {
+    show as showBrowserAlert,
+    runAlertAction,
+    registerAlertAction,
+    listenForAlertActions,
+} from './utils/browserNotify';
+import NotificationSettings from './pages/auth/NotificationSettings.jsx';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ProfileAuth from './pages/auth/ProfileAuth.jsx';
@@ -60,6 +68,11 @@ function App() {
     // 모달 상태
     const [showSettlement, setShowSettlement] = useState(false);
     const [showHygiene, setShowHygiene] = useState(false);
+    const [showInventory, setShowInventory] = useState(false);
+    const [showAlerts, setShowAlerts] = useState(false);
+    // 관리자 대시보드에서 바로 열 화면(알림을 눌러 들어온 경우). 대시보드가 받아서 쓰고 비운다.
+    // 이벤트로 알리면 대시보드가 아직 안 떠 있을 때(알림 설정 화면에서 누른 경우 등) 사라진다.
+    const [adminJump, setAdminJump] = useState(/** @type {string|null} */ (null));
     const [showProfile, setShowProfile] = useState(false);
     const [isProfileVerified, setIsProfileVerified] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -85,6 +98,23 @@ function App() {
     // [2] 인증 및 세션 관리 (Auth & Session)
     // ---------------------------------------------------------
     const handleLogout = useCallback(() => {
+        // 서버에 로그아웃을 알려 주방 인원 등 실시간 자리를 바로 비우게 한다.
+        // 소켓 신호만으로는 부족하다 — 지금 소켓이 끊겨 있으면(절전에서 막 깨어나 재연결 중 등)
+        // 신호가 대기열에 있다가 아래 disconnect()와 함께 버려져, 서버가 1시간 동안 자리를 지킨다.
+        // HTTP로도 보낸다. 토큰을 지우기 전에 읽어 둔다.
+        // axios가 아니라 fetch인 이유: axios 인터셉터는 401을 '세션 만료'로 보고 로그아웃을 다시 부른다.
+        // keepalive는 로그아웃 직후 화면이 바뀌거나 탭이 닫혀도 요청이 끝까지 가게 한다.
+        const token = localStorage.getItem('token');
+        if (token) {
+            void fetch(`${axios.defaults.baseURL}/api/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ socket_id: socket.id ?? null }),
+                keepalive: true,
+            }).catch(() => {
+                /* 실패해도 로그아웃은 진행한다. 서버는 유예 시간이 지나면 스스로 정리한다. */
+            });
+        }
         socket.emit('logout');
         socket.disconnect();
         localStorage.removeItem('token');
@@ -220,16 +250,71 @@ function App() {
             setCashierUserName(status.name);
         });
         socket.on('kitchen_status', (count) => setKitchenUserCount(count));
+
+        // 정해진 시각 알림(공통). 서버가 대상을 방으로 가려서 보내므로 여기서는 그냥 띄운다.
+        // 브라우저 알림이 막혀 있으면 앱 안 토스트로라도 보여준다 — 내용을 잃지 않는 게 먼저다.
+        socket.on('app_alert', (alert) => {
+            if (!showBrowserAlert(alert)) {
+                notify(alert.body ? `${alert.title} — ${alert.body}` : alert.title, {
+                    icon: '🔔',
+                    duration: 0,
+                    dedupeKey: `alert-${alert.key}`,
+                    // 브라우저 알림 대신 뜬 토스트도 누르면 같은 화면으로 간다.
+                    onClick: alert.action ? () => runAlertAction(alert.action) : undefined,
+                });
+            }
+        });
+
         socket.emit('request_state'); // 현재 상태 요청
+        // 캐셔 사용 여부·주방 인원은 바뀔 때만 신호가 온다. 연결이 끊긴 동안 바뀐 것은 다시 오지 않으므로
+        // (역할 선택 화면을 띄워 둔 채 화면이 꺼졌다 켜진 경우 등) 돌아오면 현재 상태를 다시 묻는다.
+        const offResync = onResync(() => socket.emit('request_state'));
 
         return () => {
+            offResync();
             socket.off('connect', registerMyUser);
             socket.off('connect_error', handleAuthError);
             socket.off('user_count');
             socket.off('cashier_status');
             socket.off('kitchen_status');
+            socket.off('app_alert');
         };
     }, [auth.isLoggedIn, auth.user, handleLogout, notify]);
+
+    // 알림을 눌렀을 때 열 화면. 이름과 실제 동작을 여기서 잇는다(utils/browserNotify 참고).
+    // 전체 화면(알림 설정·내 정보)이 떠 있으면 그 뒤에 모달이 가려지므로 먼저 닫는다.
+    useEffect(() => {
+        if (!auth.isLoggedIn) return undefined;
+        const toMain = () => {
+            setShowAlerts(false);
+            setShowProfile(false);
+            setIsProfileVerified(false);
+        };
+        const offs = [
+            // 직원용 창은 직원 화면에서만 그려진다. 관리자가 대시보드에서 누른 경우(보내보기 등)는
+            // 직원 화면으로 옮겨 연다 — 그대로 두면 눌러도 아무 일도 일어나지 않는다.
+            registerAlertAction('open_inventory_count', () => {
+                toMain();
+                setAdminStaffMode(true);
+                setShowInventory(true);
+            }),
+            registerAlertAction('open_hygiene_check', () => {
+                toMain();
+                setAdminStaffMode(true);
+                setShowHygiene(true);
+            }),
+            registerAlertAction('open_inventory_status', () => {
+                toMain();
+                setAdminStaffMode(false);
+                setAdminJump('inventory');
+            }),
+        ];
+        return () => offs.forEach((off) => off());
+    }, [auth.isLoggedIn]);
+
+    // 서비스 워커를 통해 들어온 동작을 받는다(탭이 닫혀 있을 때 온 푸시를 누른 경우).
+    // 로그인 여부와 상관없이 한 번 연결한다 — 받은 동작은 위에서 등록될 때까지 맡아둔다.
+    useEffect(() => listenForAlertActions(), []);
 
     // 캐셔 사용 중 순단(재연결) 시 자리 자동 재선점.
     // 재연결되면 소켓 ID가 바뀌어 서버가 이전 소켓 기준으로 자리를 비워버리므로,
@@ -254,6 +339,20 @@ function App() {
             socket.off('cashier_claimed', handleReclaimResult);
         };
     }, [myRole, notify]);
+
+    // 주방도 같은 이유로 재연결 때 다시 알린다.
+    // join_kitchen은 역할을 고르는 순간에만 보냈는데, 순단 후 재연결되면 소켓 ID가 바뀌어
+    // 서버는 이 사람을 주방에서 뗀 상태가 된다. 화면은 주방인데 서버상으로는 아무도 없어,
+    // 캐셔가 결제완료를 누르면 조리완료까지 넘어가 주문이 주방 목록에서 사라졌다.
+    useEffect(() => {
+        if (myRole !== 'kitchen') return;
+
+        const rejoinKitchen = () => socket.emit('join_kitchen');
+        socket.on('connect', rejoinKitchen);
+        return () => {
+            socket.off('connect', rejoinKitchen);
+        };
+    }, [myRole]);
 
     // ---------------------------------------------------------
     // [4] 렌더링 로직 (Render Logic)
@@ -292,6 +391,11 @@ function App() {
         );
     }
 
+    // 알림 설정은 역할과 무관하다. 각자 자기 기기에서 켜는 것이라 관리자·직원 모두 들어온다.
+    if (showAlerts) {
+        return <NotificationSettings onBack={() => setShowAlerts(false)} isAdmin={auth.user.role === 'admin'} />;
+    }
+
     // 관리자 대시보드 (직원 모드로 전환하지 않은 동안만)
     if (auth.user.role === 'admin' && !adminStaffMode) {
         // 본인 확인 통과 후엔 EditProfile 전체 페이지로 전환
@@ -314,6 +418,9 @@ function App() {
                     onLogout={handleManualLogout}
                     onEditProfile={() => setShowProfile(true)}
                     onEnterStaffMode={() => setAdminStaffMode(true)}
+                    onOpenAlerts={() => setShowAlerts(true)}
+                    jumpTo={adminJump}
+                    onJumped={() => setAdminJump(null)}
                 />
                 {showProfile && (
                     <ProfileAuth
@@ -377,6 +484,7 @@ function App() {
                 .btn-global-action:active { transform: scale(0.95); }
                 .btn-settle { background-color: var(--success); }
                 .btn-hygiene { background-color: var(--accent); }
+                .btn-inventory { background-color: var(--neutral); }
                 .btn-back-role { background-color: var(--neutral); margin-right: auto; }
 
                 /* 이름 드롭다운 — PC/모바일 공통(화면 크기와 무관하게 동일한 형태) */
@@ -388,6 +496,9 @@ function App() {
 
                 .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
                 .dropdown-item:last-child { border-bottom: none; }
+                /* 테마 변경은 하위 메뉴를 담는 div 안에 들어 있어서 그 div의 마지막 자식이 된다.
+                   실제로는 메뉴의 첫 줄이므로 위 규칙에 걸려 사라진 아래 선을 되살린다. */
+                .dropdown-theme-wrap > .dropdown-item { border-bottom: 1px solid var(--border-color, #eee); }
                 .dropdown-item.logout { color: var(--danger); }
                 .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
                 .dropdown-item.active { color: var(--accent); font-weight: 800; }
@@ -430,6 +541,13 @@ function App() {
                     {!myRole && (
                         <button onClick={() => setShowHygiene(true)} className="btn-global-action btn-hygiene">
                             🧼 위생 점검
+                        </button>
+                    )}
+
+                    {/* 재고 조사도 역할과 무관하다. 위생 점검과 같은 자리에 둔다. */}
+                    {!myRole && (
+                        <button onClick={() => setShowInventory(true)} className="btn-global-action btn-inventory">
+                            📦 재고 조사
                         </button>
                     )}
 
@@ -504,6 +622,15 @@ function App() {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        setShowAlerts(true);
+                                        setIsDropdownOpen(false);
+                                    }}
+                                    className="dropdown-item"
+                                >
+                                    🔔 알림 설정
+                                </button>
+                                <button
+                                    onClick={() => {
                                         handleManualLogout();
                                         setIsDropdownOpen(false);
                                     }}
@@ -522,6 +649,7 @@ function App() {
 
             {/* 위생 점검 모달 */}
             {showHygiene && <HygieneCheck onClose={() => setShowHygiene(false)} />}
+            {showInventory && <InventoryCount onClose={() => setShowInventory(false)} />}
 
             {/* 메인 화면 렌더링 */}
             {renderContent()}

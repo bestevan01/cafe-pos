@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import { socket, onResync } from '../../utils/socket';
 import { debounce } from '../../utils/debounce';
 import * as XLSX from 'xlsx';
 import AdvancedStats from './AdvancedStats.jsx';
@@ -110,7 +110,10 @@ function SalesDashboard({ onBack }) {
         // 매출은 결제된 주문만 센다. 주문 생성·주방 완료·전달 완료는 숫자를 바꾸지 않으므로
         // 그 신호까지 듣지 않는다(주문 하나에 네 번 오던 것이 결제 한 번으로 줄어든다).
         socket.on('sales_updated', refresh.run);
+        // 연결이 끊긴 동안 온 신호는 다시 오지 않는다. 돌아오면 다시 받는다(utils/socket.js).
+        const offResync = onResync(refresh.run);
         return () => {
+            offResync();
             refresh.cancel();
             socket.off('sales_updated', refresh.run);
         };

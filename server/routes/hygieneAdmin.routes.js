@@ -5,6 +5,8 @@ const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
 const { kstDate } = require('../utils/kstDate');
 const { HYGIENE_CATEGORIES } = require('../utils/hygieneCategories');
+const { hygieneSlots, loadPlans, LEGACY_PLAN } = require('../utils/hygieneSlots');
+const { getSetting, setSetting } = require('../utils/storeSettings');
 
 // 위생 점검 관리자 API — 체크리스트 항목 편집. 이 라우터는 전부 관리자 전용.
 router.use(authenticateToken, requireAdmin);
@@ -140,6 +142,7 @@ router.get('/checks', async (req, res) => {
             `SELECT c.id,
                     DATE_FORMAT(c.check_date, '%Y-%m-%d') AS check_date,
                     c.slot,
+                    c.slot_label,
                     c.checked_at,
                     c.checked_by_name,
                     c.memo,
@@ -151,8 +154,8 @@ router.get('/checks', async (req, res) => {
                       LEFT JOIN hygiene_check_results r ON r.check_id = c.id
              WHERE c.check_date BETWEEN ? AND ?
              GROUP BY c.id
-             -- 같은 날은 오전(am)이 먼저 오도록. 화면이 날짜로 묶어 보여준다.
-             ORDER BY c.check_date DESC, c.slot ASC`,
+             -- 같은 날은 먼저 낸 회차가 먼저 오도록. 화면이 날짜로 묶어 보여준다.
+             ORDER BY c.check_date DESC, c.checked_at ASC`,
             [from, to],
         );
         // 미흡 내역은 보고서에 반드시 들어간다. 기록마다 상세를 따로 부르면 한 달치에 수십 번 왕복하므로
@@ -203,9 +206,14 @@ router.get('/checks', async (req, res) => {
             else editsByCheck.set(e.check_id, [row]);
         }
 
+        // 날짜마다 '해야 했던 회차'를 그날 기준으로 그리기 위한 이력(소급 방지, utils/hygieneSlots.js).
+        const plans = await loadPlans(from, to);
+
         res.json({
             from,
             to,
+            plans,
+            default_plan: LEGACY_PLAN,
             checks: rows.map((/** @type {any} */ r) => ({
                 ...r,
                 fails: byCheck.get(r.id) ?? [],
@@ -225,7 +233,7 @@ router.get('/checks', async (req, res) => {
 router.get('/checks/:id', async (req, res) => {
     try {
         const [[check]] = await pool.query(
-            `SELECT id, slot, DATE_FORMAT(check_date, '%Y-%m-%d') AS check_date, checked_at,
+            `SELECT id, slot, slot_label, DATE_FORMAT(check_date, '%Y-%m-%d') AS check_date, checked_at,
                     checked_by_id, checked_by_name, memo
              FROM hygiene_checks
              WHERE id = ?`,
@@ -278,6 +286,41 @@ router.get('/checks/:id', async (req, res) => {
         res.status(500).json({
             success: false,
             message: '점검 기록을 불러오지 못했습니다.',
+            debug_info: debugInfo(err),
+        });
+    }
+});
+
+// ============================================================
+// 점검 회차 — 재고 조사와 같은 공통 모듈(utils/slotSchedule.js)
+// ============================================================
+router.use('/slots', hygieneSlots.router);
+
+// ============================================================
+// 점검 안내 문구 — 매장별 지침(예: 누가 점검하는지)을 직원 점검 화면 위에 보여준다.
+// ============================================================
+router.get('/guide', async (req, res) => {
+    try {
+        res.json((await getSetting('hygieneGuide')) ?? { value: '' });
+    } catch (/** @type {any} */ err) {
+        console.error('[🔥 GET /api/admin/hygiene/guide 에러]', err);
+        res.status(500).json({
+            success: false,
+            message: '안내 문구를 불러오지 못했습니다.',
+            debug_info: debugInfo(err),
+        });
+    }
+});
+
+router.put('/guide', async (req, res) => {
+    try {
+        await setSetting('hygieneGuide', req.body.value, req.user.name);
+        res.json({ success: true });
+    } catch (/** @type {any} */ err) {
+        console.error('[🔥 PUT /api/admin/hygiene/guide 에러]', err);
+        res.status(500).json({
+            success: false,
+            message: '안내 문구를 저장하지 못했습니다.',
             debug_info: debugInfo(err),
         });
     }

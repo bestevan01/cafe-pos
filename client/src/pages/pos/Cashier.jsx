@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useEmptyAfterExit } from '../../hooks/useEmptyAfterExit';
 import axios from 'axios';
-import { socket } from '../../utils/socket';
+import { socket, onResync } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
-import { groupByCategory } from '../../utils/menuCategories';
+import { groupByCategory, allowsShot } from '../../utils/menuCategories';
 import QuantityKeypad from '../../components/QuantityKeypad';
 
 function Cashier({ onlyOrder = false, isCashier = false }) {
@@ -13,6 +14,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // ---------------------------------------------------------
     const [cart, setCart] = useState(/** @type {import('../../types').CartItem[]} */ ([]));
     const [orderGroups, setOrderGroups] = useState(/** @type {import('../../types').OrderGroup[]} */ ([]));
+    const { showEmpty, onExitComplete: onEmptyExitComplete } = useEmptyAfterExit(orderGroups.length);
     const [menuList, setMenuList] = useState(/** @type {import('../../types').Menu[]} */ ([]));
     // 분류별로 묶어서 그린다. 묶음 안의 차례는 서버가 정렬해 준 sort_order를 그대로 지킨다.
     const menuGroups = useMemo(() => groupByCategory(menuList), [menuList]);
@@ -85,13 +87,24 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         const byName = new Map(list.map((m) => [m.name, m]));
         /** @type {string[]} */ const removed = [];
         /** @type {string[]} */ const repriced = [];
+        // 분류가 바뀌어 샷을 받는 쪽 ↔ 안 받는 쪽으로 옮겨간 메뉴. 잔 수는 그대로 옮긴다 —
+        // 옮기지 않으면 한쪽 목록에만 남아 화면에서는 0잔인데 결제 금액에는 잡힌다.
+        /** @type {string[]} */ const moved = [];
+        let droppedShots = 0;
 
-        // 비커피: cart가 담을 당시의 가격을 들고 있어 가격이 바뀌면 따로 맞춰 줘야 한다.
-        const nextCart = [];
+        /** @type {import('../../types').CartItem[]} */ const nextCart = [];
+        /** @type {Record<string, number[]>} */ const nextShots = {};
+
+        // 샷 없는 메뉴: cart가 담을 당시의 가격을 들고 있어 가격이 바뀌면 따로 맞춰 줘야 한다.
         for (const item of cartRef.current) {
             const menu = byName.get(item.name);
             if (!menu) {
                 removed.push(item.name); // 삭제된 메뉴는 팔 수 없다
+                continue;
+            }
+            if (allowsShot(menu)) {
+                nextShots[item.name] = Array(item.quantity).fill(0);
+                moved.push(item.name);
                 continue;
             }
             if (menu.price !== item.price) {
@@ -102,22 +115,38 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
             }
         }
 
-        // 커피: 가격은 menuList에서 그때그때 읽으므로 삭제만 걸러 내면 된다.
-        /** @type {Record<string, number[]>} */ const nextShots = {};
+        // 샷 받는 메뉴: 가격은 menuList에서 그때그때 읽으므로 삭제·분류 변경만 보면 된다.
         for (const [name, slots] of Object.entries(shotConfigRef.current)) {
-            if (!byName.has(name)) {
+            const menu = byName.get(name);
+            if (!menu) {
                 removed.push(name);
+                continue;
+            }
+            if (!allowsShot(menu)) {
+                droppedShots += slots.reduce((a, b) => a + b, 0);
+                nextCart.push({ name, price: menu.price, quantity: slots.length });
+                moved.push(name);
                 continue;
             }
             nextShots[name] = slots;
         }
 
-        if (removed.length > 0) {
+        if (removed.length > 0 || moved.length > 0) {
             setCart(nextCart);
             setShotConfig(nextShots);
-            notify(`${removed.join(', ')} 메뉴가 삭제되어 주문에서 빠졌습니다.`, { icon: '⚠️' });
         } else if (repriced.length > 0) {
             setCart(nextCart);
+        }
+        if (removed.length > 0) {
+            notify(`${removed.join(', ')} 메뉴가 삭제되어 주문에서 빠졌습니다.`, { icon: '⚠️' });
+        }
+        if (moved.length > 0) {
+            notify(
+                `${moved.join(', ')} 분류가 바뀌어 주문에 반영했습니다.${
+                    droppedShots > 0 ? ` 추가했던 샷 ${droppedShots}개는 빠졌습니다.` : ''
+                }`,
+                { icon: '☕' },
+            );
         }
         if (repriced.length > 0) {
             notify(`${repriced.join(', ')} 가격이 바뀌어 주문에 반영했습니다.`, { icon: '💰' });
@@ -187,7 +216,18 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
         void fetchMenu();
         void fetchActiveEvents();
 
-        socket.on('new_order', (newOrderGroup) => setOrderGroups((prev) => [newOrderGroup, ...prev]));
+        // 다시 불러온 목록에 이미 들어 있을 수 있어 같은 주문은 겹쳐 넣지 않는다.
+        socket.on('new_order', (newOrderGroup) =>
+            setOrderGroups((prev) =>
+                prev.some((g) => g.display_id === newOrderGroup.display_id) ? prev : [newOrderGroup, ...prev],
+            ),
+        );
+        // 연결이 끊긴 동안 온 주문·메뉴·이벤트 변경은 신호로 다시 오지 않는다. 돌아오면 다시 받는다.
+        const offResync = onResync(() => {
+            void fetchOrders();
+            void fetchMenu();
+            void fetchActiveEvents();
+        });
         socket.on('order_updated', ({ display_id, is_paid, is_completed, is_delivered }) => {
             setOrderGroups((prev) => {
                 const target = prev.find((g) => g.display_id === display_id);
@@ -221,6 +261,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
 
         return () => {
             window.removeEventListener('resize', handleResize);
+            offResync();
             socket.off('new_order');
             socket.off('order_updated');
             socket.off('order_deleted');
@@ -233,8 +274,8 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // [4] 장바구니 및 🌟 이벤트 할인 로직
     // ---------------------------------------------------------
     const SHOT_PRICE = 500;
-    /** @param {string} name */
-    const isCoffee = (name) => name.includes('아메리카노') || name.includes('라떼') || name.includes('아샷추');
+    // 샷 추가 여부는 메뉴 분류로 정한다(utils/menuCategories.js의 allowsShot).
+    // 아래 '커피'는 '샷을 받는 메뉴'라는 뜻이다.
 
     /**
      * 특정 잔의 추가 샷 수를 절대값으로 맞춘다(키패드 입력용).
@@ -267,7 +308,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     const setMenuTotal = (menu, target) => {
         const qty = Math.max(0, Math.floor(Number(target) || 0));
 
-        if (isCoffee(menu.name)) {
+        if (allowsShot(menu)) {
             const slots = shotConfig[menu.name] || [];
             // notify는 setState 안에서 부르면 안 되므로(갱신 중 부수효과) 미리 계산해 둔다.
             const droppedShots = slots.slice(qty).reduce((a, b) => a + b, 0);
@@ -301,7 +342,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
     // 커피는 잔마다 샷을 따로 두므로 shotConfig에서, 비커피는 cart 수량에서 읽는다.
     /** @param {import('../../types').Menu} menu */
     const getMenuCounts = (menu) => {
-        if (isCoffee(menu.name)) {
+        if (allowsShot(menu)) {
             const slots = shotConfig[menu.name] || [];
             return { total: slots.length, slots };
         }
@@ -315,7 +356,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
      * @param {number} delta
      */
     const handleTotalChange = (menu, delta) => {
-        if (isCoffee(menu.name)) {
+        if (allowsShot(menu)) {
             setShotConfig((prev) => {
                 const slots = [...(prev[menu.name] || [])];
                 if (delta > 0) slots.push(0);
@@ -625,7 +666,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                         </div>
                     )}
                 </div>
-                {!isSoldOut && isCoffee(menu.name) && total > 0 && (
+                {!isSoldOut && allowsShot(menu) && total > 0 && (
                     <div className="shot-box" onClick={(e) => e.stopPropagation()}>
                         <button className="shot-toggle" onClick={() => toggleShotPanel(menu.name)}>
                             <span>
@@ -677,103 +718,104 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
 
     const OrderGridContent = (
         <div className="order-grid">
-            <AnimatePresence>
-                <>
-                    {orderGroups.map((group) => {
-                        const groupTotal = group.items.reduce((acc, item) => acc + item.price, 0);
-                        return (
-                            <motion.div
-                                key={group.daily_number}
-                                className="receipt-card"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-                                layout
-                            >
-                                <div className="receipt-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
-                                        {group.is_completed === 1 ? (
-                                            <span className="badge badge-done">조리 완료 🍳</span>
-                                        ) : (
-                                            <span className="badge badge-cooking">조리 중 ⏳</span>
-                                        )}
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <AnimatePresence onExitComplete={onEmptyExitComplete}>
+                {orderGroups.map((group) => {
+                    const groupTotal = group.items.reduce((acc, item) => acc + item.price, 0);
+                    return (
+                        <motion.div
+                            key={group.daily_number}
+                            className="receipt-card"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
+                            layout
+                        >
+                            <div className="receipt-header">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <h1 className="receipt-num">#{String(group.daily_number).padStart(3, '0')}</h1>
+                                    {group.is_completed === 1 ? (
+                                        <span className="badge badge-done">조리 완료 🍳</span>
+                                    ) : (
+                                        <span className="badge badge-cooking">조리 중 ⏳</span>
+                                    )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <button
+                                        onClick={() => handleDelete(group.display_id)}
+                                        className="btn-action btn-cancel"
+                                    >
+                                        주문 취소
+                                    </button>
+                                    {group.is_paid === 0 ? (
                                         <button
-                                            onClick={() => handleDelete(group.display_id)}
-                                            className="btn-action btn-cancel"
+                                            onClick={() => {
+                                                // 🌟 핵심: 총액이 0원이면 팝업 없이 즉시 'event' 결제 완료! 0원이 아니면 팝업 띄우기
+                                                if (groupTotal === 0) {
+                                                    void handleConfirmPayment('event', group.display_id);
+                                                } else {
+                                                    setPaymentCheckId(group.display_id);
+                                                }
+                                            }}
+                                            className="btn-action btn-pay"
                                         >
-                                            주문 취소
+                                            결제 확인
                                         </button>
-                                        {group.is_paid === 0 ? (
-                                            <button
-                                                onClick={() => {
-                                                    // 🌟 핵심: 총액이 0원이면 팝업 없이 즉시 'event' 결제 완료! 0원이 아니면 팝업 띄우기
-                                                    if (groupTotal === 0) {
-                                                        void handleConfirmPayment('event', group.display_id);
-                                                    } else {
-                                                        setPaymentCheckId(group.display_id);
-                                                    }
-                                                }}
-                                                className="btn-action btn-pay"
-                                            >
-                                                결제 확인
-                                            </button>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                                                <span className="badge badge-paid">입금 완료 💰</span>
-                                                {group.is_completed === 1 && (
-                                                    <button
-                                                        onClick={() => handleDeliver(group.display_id)}
-                                                        className="btn-action btn-deliver"
-                                                    >
-                                                        전달 완료 🤲
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div style={{ flex: 1, overflowY: 'auto', marginBottom: '10px' }}>
-                                    {group.items.map((item, idx) => (
-                                        <div key={idx} className="receipt-item">
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span
-                                                    style={{
-                                                        color: item.menu_name.includes('(샷')
-                                                            ? 'var(--accent)'
-                                                            : 'inherit',
-                                                    }}
+                                    ) : (
+                                        <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                                            <span className="badge badge-paid">입금 완료 💰</span>
+                                            {group.is_completed === 1 && (
+                                                <button
+                                                    onClick={() => handleDeliver(group.display_id)}
+                                                    className="btn-action btn-deliver"
                                                 >
-                                                    {item.menu_name}
-                                                </span>
-                                                <span
-                                                    style={{
-                                                        fontSize: '0.85rem',
-                                                        color: 'var(--text-secondary, #888)',
-                                                    }}
-                                                >
-                                                    {(item.price / item.quantity).toLocaleString()}원
-                                                </span>
-                                            </div>
-                                            <div style={{ fontWeight: 'bold' }}>{item.quantity}</div>
+                                                    전달 완료 🤲
+                                                </button>
+                                            )}
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                                <div className="receipt-total">
-                                    <span>합계</span>
-                                    <span style={{ color: 'var(--danger)' }}>{groupTotal.toLocaleString()}원</span>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </>
+                            </div>
+                            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '10px' }}>
+                                {group.items.map((item, idx) => (
+                                    <div key={idx} className="receipt-item">
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span
+                                                style={{
+                                                    color: item.menu_name.includes('(샷') ? 'var(--accent)' : 'inherit',
+                                                }}
+                                            >
+                                                {item.menu_name}
+                                            </span>
+                                            <span
+                                                style={{
+                                                    fontSize: '0.85rem',
+                                                    color: 'var(--text-secondary, #888)',
+                                                }}
+                                            >
+                                                {(item.price / item.quantity).toLocaleString()}원
+                                            </span>
+                                        </div>
+                                        <div style={{ fontWeight: 'bold' }}>{item.quantity}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="receipt-total">
+                                <span>합계</span>
+                                <span style={{ color: 'var(--danger)' }}>{groupTotal.toLocaleString()}원</span>
+                            </div>
+                        </motion.div>
+                    );
+                })}
             </AnimatePresence>
-            {orderGroups.length === 0 && (
-                <p style={{ textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px' }}>
+            {showEmpty && (
+                <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.25 }}
+                    style={{ textAlign: 'center', color: 'var(--text-secondary, #888)', marginTop: '50px' }}
+                >
                     진행 중인 주문이 없습니다.
-                </p>
+                </motion.p>
             )}
         </div>
     );

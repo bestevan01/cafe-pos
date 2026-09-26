@@ -51,14 +51,22 @@ router.post('', authenticateToken, async (req, res) => {
         }
 
         // 메뉴 가격표를 DB에서 직접 로드 (클라이언트가 보낸 price는 신뢰하지 않음)
-        const [menuRows] = await conn.query('SELECT name, price FROM menu');
-        const menuMap = new Map(menuRows.map((/** @type {any} */ m) => [m.name, Number(m.price)]));
+        const [menuRows] = await conn.query('SELECT name, price, type FROM menu');
+        const menuMap = new Map(
+            menuRows.map((/** @type {any} */ m) => [m.name, { price: Number(m.price), type: String(m.type) }]),
+        );
 
         const SHOT_EXTRA = 500;
+        // 샷을 받는 분류. 화면(client/src/utils/menuCategories.js의 SHOT_TYPES)과 같은 표다.
+        // 화면이 버튼을 감춰도 요청은 얼마든지 만들 수 있으므로 서버에서도 막는다.
+        const SHOT_TYPES = new Set(['coffee']);
 
         // 메뉴명으로 서버 기준 단가를 계산. 샷은 "(샷 N개)" 접미사로 N잔당 +500*N.
-        // 레거시 "(샷추가)"(=1샷)도 호환. 모르는 메뉴면 null.
-        /** @param {string} menuName */
+        // 레거시 "(샷추가)"(=1샷)도 호환. 모르는 메뉴면 null, 샷을 받지 않는 분류에 샷이 붙었으면 'no_shot'.
+        /**
+         * @param {string} menuName
+         * @returns {number|null|'no_shot'}
+         */
         const resolveBaseUnitPrice = (menuName) => {
             let baseName = menuName;
             let shots = 0;
@@ -70,8 +78,10 @@ router.post('', authenticateToken, async (req, res) => {
                 baseName = menuName.slice(0, -' (샷추가)'.length);
                 shots = 1;
             }
-            if (!menuMap.has(baseName)) return null;
-            return menuMap.get(baseName) + SHOT_EXTRA * shots;
+            const menu = menuMap.get(baseName);
+            if (!menu) return null;
+            if (shots > 0 && !SHOT_TYPES.has(menu.type)) return 'no_shot';
+            return menu.price + SHOT_EXTRA * shots;
         };
 
         // 이벤트가 지정된 경우, 가격 재계산에 필요한 필드까지 모두 잠금(FOR UPDATE) 조회
@@ -117,6 +127,13 @@ router.post('', authenticateToken, async (req, res) => {
             }
 
             const baseUnit = resolveBaseUnitPrice(item.menu_name);
+            if (baseUnit === 'no_shot') {
+                await conn.rollback();
+                return res.json({
+                    success: false,
+                    message: `샷을 추가할 수 없는 메뉴입니다: ${item.menu_name}. 화면을 새로고침한 뒤 다시 담아주세요.`,
+                });
+            }
             if (baseUnit === null) {
                 await conn.rollback();
                 return res.json({ success: false, message: `알 수 없는 메뉴입니다: ${item.menu_name}` });
@@ -205,6 +222,13 @@ router.post('', authenticateToken, async (req, res) => {
             );
         }
 
+        // 방금 넣은 행을 다시 읽어 id를 얻는다. orders.id는 DB가 만드는 UUID라 insertId로는 알 수 없고,
+        // 주방이 항목별로 체크하려면 행마다 식별자가 있어야 한다. 커밋 전 같은 커넥션에서 읽는다.
+        const [insertedRows] = await conn.query(
+            'SELECT id, menu_name, quantity, total_price FROM orders WHERE display_id = ? ORDER BY created_at, id',
+            [formattedID],
+        );
+
         await conn.commit();
 
         if (isEventUpdated) {
@@ -214,7 +238,13 @@ router.post('', authenticateToken, async (req, res) => {
         io.emit('new_order', {
             display_id: formattedID,
             daily_number: String(nextDailyNum).padStart(3, '0'),
-            items: computedItems.map((i) => ({ menu_name: i.menu_name, quantity: i.quantity, price: i.total_price })),
+            items: insertedRows.map((/** @type {any} */ r) => ({
+                id: r.id,
+                menu_name: r.menu_name,
+                quantity: r.quantity,
+                price: r.total_price,
+                is_made: 0,
+            })),
             created_at: new Date(),
             payment_method: paymentMethod || 'cash',
             staff_name: staff_name || '키오스크',
@@ -324,6 +354,36 @@ router.patch('/:display_id/pay', authenticateToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: '결제 처리에 실패했습니다.',
+            debug_info: debugInfo(err),
+        });
+    }
+});
+
+// 주방의 항목별 중간 체크. 한 사람이 체크하면 다른 기기에서도 체크된 것으로 보이도록 알린다.
+// 주문 단위(display_id)가 아니라 품목 행(orders.id) 하나를 바꾼다.
+router.patch('/items/:id/made', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const io = req.app.get('io');
+    const made = req.body.made ? 1 : 0;
+
+    try {
+        const [[row]] = await pool.query('SELECT display_id, is_completed FROM orders WHERE id = ? LIMIT 1', [id]);
+        if (!row) {
+            return res.status(404).json({ success: false, message: '주문 항목을 찾을 수 없습니다.' });
+        }
+        // 이미 끝난 주문은 주방 목록에 없다. 뒤늦게 도착한 체크로 지난 기록을 건드리지 않는다.
+        if (row.is_completed === 1) {
+            return res.status(409).json({ success: false, message: '이미 조리가 완료된 주문입니다.' });
+        }
+
+        await pool.query('UPDATE orders SET is_made = ? WHERE id = ?', [made, id]);
+        io.emit('order_item_made', { id, display_id: row.display_id, is_made: made });
+        res.json({ success: true });
+    } catch (/** @type {any} */ err) {
+        console.error(`[🔥 PATCH /api/orders/items/${id}/made 에러]`, err);
+        res.status(500).json({
+            success: false,
+            message: '조리 체크에 실패했습니다.',
             debug_info: debugInfo(err),
         });
     }

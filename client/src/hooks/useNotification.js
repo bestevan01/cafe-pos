@@ -8,6 +8,7 @@ import { createContext, useContext } from 'react';
  * @property {boolean} [loading] 로딩 스피너 표시
  * @property {string} [dedupeKey] 같은 키의 중복 토스트 억제
  * @property {number} [dedupeWindow] 중복 억제 시간(ms, 기본 3000)
+ * @property {() => void} [onClick] 있으면 토스트를 눌렀을 때 실행하고 닫는다(알림에서 해당 화면으로 가기 등)
  */
 
 /**

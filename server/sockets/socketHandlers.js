@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const presence = require('../utils/presence');
+
+/** alerts.js는 서버 기동 중에 등록이 끝나므로 쓸 때 불러온다. @param {import('socket.io').Socket} socket */
+const deliverPending = (socket) => require('../utils/alerts').deliverPending(socket);
 
 const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 
@@ -13,10 +17,78 @@ const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 /** @type {string|null} */
 let currentCashierId = null;
 const connectedUsers = new Map();
-const kitchenUsers = new Set();
+
+/**
+ * 주방 담당자 '세션'. 소켓이 아니라 계정 단위로 센다.
+ *
+ * 예전에는 주방 화면을 연 소켓 id를 모아 세었는데, 그러면 태블릿 화면이 꺼지거나 매장
+ * 네트워크가 한 번 끊기는 순간 주방이 '아무도 없음'이 된다. 그 상태에서 캐셔가 결제완료를
+ * 누르면 조리완료까지 한 번에 처리되어(=혼자 근무할 때의 동작) 주문이 주방 목록에 아예
+ * 뜨지 않는다. 실제로 그렇게 주문을 놓쳤다.
+ *
+ * 그래서 연결이 아니라 '근무 중인가'로 본다. 소켓이 모두 끊겨도 유예 시간 동안은 자리를
+ * 지키는 것으로 보고, 역할을 바꾸거나 로그아웃하면 즉시 비운다.
+ * 유예는 1시간 — 앱의 무활동 자동 로그아웃과 같은 기준이라 '로그인된 세션'과 사실상 일치한다.
+ *
+ * 무한정 유지하지 않는 이유: 주방 담당이 그냥 탭을 닫고 가버리면 캐셔가 계속 주문을
+ * 주방 몫으로 남겨두고 아무도 만들지 않는, 반대 방향의 사고가 난다.
+ *
+ * @type {Map<string, {sockets: Set<string>, leftAt: number|null}>} username → 세션
+ */
+const kitchenSessions = new Map();
+const KITCHEN_GRACE_MS = 60 * 60 * 1000;
+const KITCHEN_SWEEP_MS = 60 * 1000;
+
+/** 유예가 끝난 세션을 정리한다. 실제로 지운 게 있으면 true. */
+function pruneKitchenSessions() {
+    const now = Date.now();
+    let removed = false;
+    for (const [username, session] of kitchenSessions) {
+        if (session.sockets.size === 0 && session.leftAt !== null && now - session.leftAt >= KITCHEN_GRACE_MS) {
+            kitchenSessions.delete(username);
+            removed = true;
+            console.log(`[🍳 주방 세션 만료] ${username} (${KITCHEN_GRACE_MS / 60000}분 무연결)`);
+        }
+    }
+    return removed;
+}
+
+/** 지금 주방을 맡고 있는 사람 수. 연결이 끊겨 유예 중인 사람도 포함한다. */
+function kitchenCount() {
+    pruneKitchenSessions();
+    return kitchenSessions.size;
+}
+
+/** @type {import('socket.io').Server|null} 소켓 밖(HTTP 로그아웃)에서도 주방 인원을 알리기 위해 둔다. */
+let ioRef = null;
+
+/**
+ * 주방 세션에서 소켓 하나를 뗀다.
+ * immediate면 남은 소켓이 없을 때 세션까지 지우고, 아니면 유예를 시작한다.
+ * @param {string|undefined} username
+ * @param {string|null|undefined} socketId
+ * @param {{immediate: boolean}} opts
+ */
+function releaseKitchen(username, socketId, { immediate }) {
+    const session = username ? kitchenSessions.get(username) : null;
+    if (!username || !session) return;
+
+    if (socketId) session.sockets.delete(socketId);
+    if (session.sockets.size > 0) return; // 다른 기기가 아직 주방 화면을 열고 있다
+
+    if (immediate) {
+        kitchenSessions.delete(username);
+        console.log(`[🍳 주방 퇴장] ${username} (남은 주방 인원: ${kitchenSessions.size}명)`);
+    } else {
+        session.leftAt = Date.now();
+        console.log(`[🍳 주방 연결 끊김] ${username} — ${KITCHEN_GRACE_MS / 60000}분간 자리 유지`);
+    }
+    ioRef?.emit('kitchen_status', kitchenCount());
+}
 
 /** @param {import('socket.io').Server} io */
 module.exports = (io) => {
+    ioRef = io;
     // 핸드셰이크 단계에서 JWT를 검증해야만 소켓 연결을 허용합니다.
     io.use((socket, next) => {
         // 인증 실패 에러에는 type:'auth' 표시를 달아, 클라이언트가
@@ -70,12 +142,21 @@ module.exports = (io) => {
     io.on('connection', (socket) => {
         console.log(`[🟢 Socket 연결됨] ID: ${socket.id} (현재 접속자: ${io.engine.clientsCount}명)`);
 
+        // 역할별 방에 넣어둔다. 관리자에게만 보낼 알림(재고 주문 필요 등)을 고르기 위해서다.
+        // 방 이름은 핸드셰이크에서 DB로 확인한 역할이라 클라이언트가 속일 수 없다.
+        if (socket.data.user?.role) socket.join(`role:${socket.data.user.role}`);
+        // 근무 중인 사람의 연결 상태(끊긴 근무자에게 시각 알림을 전하기 위해, utils/presence.js).
+        presence.connected(socket.data.user, socket.id);
+
         socket.on('register_user', () => {
             // 클라이언트가 보낸 값이 아닌, 핸드셰이크에서 검증된 신원만 신뢰합니다.
             const user = socket.data.user;
             connectedUsers.set(socket.id, { username: user.username, role: user.role });
             console.log(`[👤 유저 등록] ${user.username} (ID: ${socket.id})`);
             broadcastUserCount();
+            // 끊긴 동안 못 받은 시각 알림을 전한다. connection이 아니라 여기서 하는 이유:
+            // 화면이 알림 수신기를 붙인 뒤에 register_user를 보내므로, 이때 보내야 흘리지 않는다.
+            void deliverPending(socket);
         });
 
         socket.on('claim_cashier', () => {
@@ -128,7 +209,7 @@ module.exports = (io) => {
 
         socket.on('request_state', () => {
             socket.emit('cashier_status', cashierStatusPayload());
-            socket.emit('kitchen_status', kitchenUsers.size);
+            socket.emit('kitchen_status', kitchenCount());
         });
 
         socket.on('join_kitchen', () => {
@@ -137,20 +218,27 @@ module.exports = (io) => {
                 console.log(`[🍳 주방 입장(관리자, 카운트 제외)] ID: ${socket.id}`);
                 return;
             }
-            kitchenUsers.add(socket.id);
-            io.emit('kitchen_status', kitchenUsers.size);
-            console.log(`[🍳 주방 입장] ID: ${socket.id} (현재 주방 인원: ${kitchenUsers.size}명)`);
+            const username = socket.data.user.username;
+            const session = kitchenSessions.get(username) ?? { sockets: new Set(), leftAt: null };
+            session.sockets.add(socket.id);
+            session.leftAt = null; // 다시 붙었으니 유예 종료
+            kitchenSessions.set(username, session);
+            io.emit('kitchen_status', kitchenCount());
+            console.log(`[🍳 주방 입장] ${username} (ID: ${socket.id}, 현재 주방 인원: ${kitchenSessions.size}명)`);
         });
 
+        // 역할 변경처럼 사람이 직접 나간 경우다. 유예 없이 즉시 비운다 —
+        // 자리를 뜬다고 스스로 알린 것이므로 붙잡아 둘 이유가 없다.
         socket.on('leave_kitchen', () => {
-            kitchenUsers.delete(socket.id);
-            io.emit('kitchen_status', kitchenUsers.size);
+            releaseKitchen(socket.data.user?.username, socket.id, { immediate: true });
         });
 
         socket.on('logout', () => {
             const user = connectedUsers.get(socket.id);
             console.log(`[👋 로그아웃] ${user?.username || '알 수 없음'} (ID: ${socket.id})`);
             connectedUsers.delete(socket.id);
+            releaseKitchen(socket.data.user?.username, socket.id, { immediate: true });
+            if (socket.data.user) presence.loggedOut(socket.data.user.id);
             broadcastUserCount();
         });
 
@@ -159,6 +247,7 @@ module.exports = (io) => {
 
             connectedUsers.delete(socket.id);
             broadcastUserCount();
+            if (socket.data.user) presence.disconnected(socket.data.user, socket.id);
 
             if (socket.id === currentCashierId) {
                 currentCashierId = null;
@@ -166,11 +255,8 @@ module.exports = (io) => {
                 io.emit('cashier_status', cashierStatusPayload());
             }
 
-            if (kitchenUsers.has(socket.id)) {
-                kitchenUsers.delete(socket.id);
-                io.emit('kitchen_status', kitchenUsers.size);
-                console.log(`[🍳 주방 퇴장 (연결 끊김)] 남은 주방 인원: ${kitchenUsers.size}명`);
-            }
+            // 연결이 끊긴 것만으로는 자리를 비우지 않는다. 화면이 꺼졌거나 순단일 수 있다.
+            releaseKitchen(socket.data.user?.username, socket.id, { immediate: false });
         });
 
         socket.on('error', (/** @type {any} */ err) => {
@@ -183,4 +269,29 @@ module.exports = (io) => {
             io.emit('user_count', uniqueStaffCount);
         }
     });
+
+    // 유예가 끝나는 순간에는 아무 이벤트도 일어나지 않는다. 주기적으로 훑어 정리하고,
+    // 실제로 줄어들었을 때만 알린다 — 그래야 캐셔 화면이 뒤늦게라도 '주방 없음'으로 바뀐다.
+    setInterval(() => {
+        if (pruneKitchenSessions()) io.emit('kitchen_status', kitchenSessions.size);
+    }, KITCHEN_SWEEP_MS).unref();
 };
+
+/**
+ * HTTP 로그아웃에서 부른다(routes/auth.routes.js의 POST /logout).
+ *
+ * 소켓의 'logout'만으로는 부족하다. 로그아웃하는 순간 소켓이 끊겨 있으면(태블릿이 절전에서 막
+ * 깨어나 재연결 중 등) 그 신호는 전송 대기열에 있다가 곧바로 이어지는 disconnect()와 함께 버려진다.
+ * 그러면 서버는 로그아웃을 모른 채 연결 끊김으로만 보고 1시간 자리를 지켜, 이미 퇴근한 사람이
+ * 주방 인원으로 남는다. HTTP는 소켓 상태와 무관하게 도착한다.
+ *
+ * @param {string} username
+ * @param {string|null} socketId  로그아웃한 기기의 소켓(끊겨 있으면 이미 세션에서 빠져 있다)
+ */
+module.exports.releaseKitchenOnLogout = (username, socketId) => releaseKitchen(username, socketId, { immediate: true });
+
+/**
+ * HTTP 로그아웃에서 부른다. 퇴근한 사람에게 시각 알림이 가지 않게 끊긴 근무자 목록에서 뺀다.
+ * @param {string} userId
+ */
+module.exports.forgetOnLogout = (userId) => presence.loggedOut(userId);
