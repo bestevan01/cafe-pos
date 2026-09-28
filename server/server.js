@@ -586,6 +586,19 @@ async function ensureSchema() {
         }
     }
 
+    // 저울 품목의 용기 이름(통·봉지 등). 자세한 배경은 migrations/023_inventory_container_unit.sql 참고.
+    for (const [table, def] of [
+        ['inventory_items', "VARCHAR(10) NOT NULL DEFAULT '통'"],
+        ['inventory_count_items', 'VARCHAR(10) NULL'],
+    ]) {
+        try {
+            await pool.query(`ALTER TABLE ${table} ADD COLUMN container_unit ${def} AFTER base_unit`);
+        } catch (/** @type {any} */ err) {
+            if (err.code !== 'ER_DUP_FIELDNAME')
+                console.error(`⚠️ [DB] ${table}.container_unit 추가 실패:`, err.message);
+        }
+    }
+
     // 회차마다 적용 요일을 둔다(요일마다 운영 시간이 달라서). 자세한 배경은 migrations/021_slot_days.sql 참고.
     // 기존 회차는 매일로 둔다 — 지금까지 매일 적용되던 것과 같다.
     for (const table of ['inventory_slots', 'hygiene_slots']) {

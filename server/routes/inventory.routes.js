@@ -15,7 +15,7 @@ router.use(authenticateToken);
 const MEASURE_MODES = ['pack', 'each', 'weight'];
 
 /** 품목에서 매번 읽는 칼럼. 기록에 복사해 둘 값들이라 한곳에 모아 둔다. */
-const ITEM_COLUMNS = `id, name, measure_mode, count_unit, count_per_pack, base_unit,
+const ITEM_COLUMNS = `id, name, measure_mode, count_unit, count_per_pack, base_unit, container_unit,
                       tare_g, low_threshold, sort_order`;
 
 /**
@@ -161,6 +161,8 @@ function buildCountRows(items, body, scaleMax) {
             quantity,
             spare,
             over ? 1 : 0,
+            // 용기 이름도 복사해 둔다. 나중에 '통'을 '봉지'로 바꿔도 지난 기록은 그때 이름 그대로다.
+            item.container_unit ?? null,
             item.sort_order,
         ]);
     }
@@ -192,7 +194,7 @@ async function notifyIfLow(io) {
 
 const COUNT_ITEM_COLUMNS = `(count_id, item_id, item_label, measure_mode, count_unit,
                              count_per_pack, base_unit, tare_g, low_threshold, quantity, spare_count, over_scale,
-                             sort_order)`;
+                             container_unit, sort_order)`;
 
 // 회차 제출. (날짜, 회차)에 UNIQUE가 걸려 있어 같은 회차를 두 번 내면 409로 막힌다.
 router.post('/counts', async (req, res) => {

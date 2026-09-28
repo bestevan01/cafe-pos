@@ -57,7 +57,8 @@ router.get('/counts', async (req, res) => {
         // 통 무게는 품목의 현재 값으로 메운다(현재 재고와 같은 규칙, services/inventoryStatus.js).
         const [items] = await pool.query(
             `SELECT i.count_id, i.item_id, i.item_label, i.measure_mode, i.count_unit, i.count_per_pack,
-                    i.base_unit, COALESCE(i.tare_g, g.tare_g) AS tare_g, i.low_threshold, i.quantity,
+                    i.base_unit, COALESCE(i.container_unit, g.container_unit, '통') AS container_unit,
+                    COALESCE(i.tare_g, g.tare_g) AS tare_g, i.low_threshold, i.quantity,
                     i.spare_count, i.over_scale, i.sort_order
              FROM inventory_count_items i
                       JOIN inventory_counts c ON c.id = i.count_id
@@ -140,7 +141,7 @@ const MEASURE_MODES = ['pack', 'each', 'weight'];
 router.get('/items', async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT id, name, measure_mode, count_unit, count_per_pack, base_unit,
+            `SELECT id, name, measure_mode, count_unit, count_per_pack, base_unit, container_unit,
                     tare_g, low_threshold, is_active, sort_order
              FROM inventory_items
              ORDER BY sort_order, name`,
@@ -174,7 +175,8 @@ function buildItemUpdate(body) {
         fields.push('measure_mode = ?');
         values.push(body.measure_mode);
     }
-    for (const key of ['count_unit', 'base_unit']) {
+    // container_unit: 저울 품목의 용기 이름(통·봉지 등). 화면이 '미개봉 4봉지'처럼 부른다.
+    for (const key of ['count_unit', 'base_unit', 'container_unit']) {
         if (body[key] === undefined) continue;
         const v = String(body[key]).trim().slice(0, 10);
         if (!v) return { error: '단위를 입력해주세요.' };

@@ -17,7 +17,7 @@ const MODES = [
     {
         key: 'weight',
         label: '저울',
-        hint: '통째로 저울에 올린 무게에서 빈 통 무게를 뺍니다. 빈 통 무게는 통을 다 쓰고 세척·건조한 뒤 재서 넣으면, 그동안 쌓인 기록의 실제 양도 함께 드러납니다.',
+        hint: '미개봉 개수를 세고, 쓰고 있는 용기는 통째로 저울에 올린 무게에서 빈 용기 무게를 뺍니다. 용기 이름(통·봉 등)을 고르면 직원 화면에도 그 이름으로 나옵니다. 빈 용기 무게는 다 쓴 용기를 세척·건조한 뒤 재서 넣으면, 그동안 쌓인 기록의 실제 양도 함께 드러납니다.',
     },
 ];
 
@@ -85,9 +85,9 @@ function ModeCard({
                         g
                     </span>
                     <span className="ii-hint">
-                        이보다 무거운 통(거의 가득 찬 통)은 직원이 「넘침」으로 기록하고, 앱은 &lsquo;○g 이상&rsquo;으로
-                        봅니다. 주문 기준은 저울로 잴 수 있는 양(저울 최대 무게 − 빈 통 무게)보다 낮게 잡아야 판단할 수
-                        있습니다.
+                        이보다 무거운 용기(거의 가득 찬 것)는 직원이 「넘침」으로 기록하고, 앱은 &lsquo;○g
+                        이상&rsquo;으로 봅니다. 주문 기준은 저울로 잴 수 있는 양(저울 최대 무게 − 빈 용기 무게)보다 낮게
+                        잡아야 판단할 수 있습니다.
                     </span>
                 </div>
             )}
@@ -142,13 +142,33 @@ function ModeCard({
 
                         {mode.key === 'weight' && (
                             <>
+                                {/* 용기 이름. 원두처럼 봉지인 품목이 '미개봉 4통'으로 보이면 헷갈린다. */}
                                 <span className="ii-field">
-                                    빈 통 무게
+                                    용기
+                                    <select
+                                        value={item.container_unit ?? '통'}
+                                        onChange={(e) => patch(item, 'container_unit', e.target.value)}
+                                        aria-label={`${item.name} 용기 이름`}
+                                    >
+                                        {!units.some((u) => u.name === (item.container_unit ?? '통')) && (
+                                            <option value={item.container_unit ?? '통'}>
+                                                {item.container_unit ?? '통'}
+                                            </option>
+                                        )}
+                                        {units.map((u) => (
+                                            <option key={u.id} value={u.name}>
+                                                {u.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </span>
+                                <span className="ii-field">
+                                    빈 {item.container_unit ?? '통'} 무게
                                     <input
                                         defaultValue={item.tare_g == null ? '' : Number(item.tare_g)}
                                         placeholder="아직"
                                         onBlur={(e) => patchNumber(item, 'tare_g', e.target.value)}
-                                        aria-label={`${item.name} 빈 통 무게`}
+                                        aria-label={`${item.name} 빈 용기 무게`}
                                     />
                                     g
                                 </span>
@@ -186,8 +206,9 @@ function ModeCard({
                             Number(item.low_threshold) >= scaleMax - Number(item.tare_g ?? 0) && (
                                 <span className="ii-warn">
                                     ⚠️ 주문 기준이 저울로 잴 수 있는 양(
-                                    {Math.max(0, scaleMax - Number(item.tare_g ?? 0)).toLocaleString()}g)보다 높아, 통이
-                                    가득 찼을 때 주문이 필요한지 판단할 수 없습니다. 기준을 낮춰주세요.
+                                    {Math.max(0, scaleMax - Number(item.tare_g ?? 0)).toLocaleString()}g)보다 높아, 가득
+                                    찬 {item.container_unit ?? '통'}은(는) 주문이 필요한지 판단할 수 없습니다. 기준을
+                                    낮춰주세요.
                                 </span>
                             )}
                     </div>
@@ -215,7 +236,8 @@ function InventoryItems({ onBack }) {
     const [items, setItems] = useState(/** @type {any[]} */ ([]));
     const [units, setUnits] = useState(/** @type {any[]} */ ([]));
     const [loading, setLoading] = useState(true);
-    const [draft, setDraft] = useState({ name: '', mode: 'pack', unit: '', per: '', base_unit: '개' });
+    // container: 저울 품목의 용기 이름. 봉·줄 품목의 unit과 따로 둔다(모드를 바꿔도 서로 섞이지 않게).
+    const [draft, setDraft] = useState({ name: '', mode: 'pack', unit: '', per: '', base_unit: '개', container: '통' });
     const [newUnit, setNewUnit] = useState('');
     // 매장 저울의 최대 무게(g). 주문 기준이 잴 수 있는 한계보다 높지 않은지 보는 데 쓴다.
     const [scaleMax, setScaleMax] = useState(1000);
@@ -320,6 +342,7 @@ function InventoryItems({ onBack }) {
                     name,
                     measure_mode: draft.mode,
                     count_unit: draft.mode === 'weight' ? 'g' : draft.unit || '개',
+                    ...(draft.mode === 'weight' ? { container_unit: draft.container || '통' } : {}),
                     count_per_pack: per,
                     // 환산해서 보여줄 단위. 저울은 g, 나머지는 낱개가 기본이다.
                     base_unit: draft.mode === 'weight' ? 'g' : draft.base_unit || '개',
@@ -430,6 +453,22 @@ function InventoryItems({ onBack }) {
                             </option>
                         ))}
                     </select>
+                    {draft.mode === 'weight' && (
+                        <select
+                            value={draft.container}
+                            onChange={(e) => setDraft({ ...draft, container: e.target.value })}
+                            aria-label="용기 이름"
+                        >
+                            {!units.some((u) => u.name === draft.container) && (
+                                <option value={draft.container}>{draft.container}</option>
+                            )}
+                            {units.map((u) => (
+                                <option key={u.id} value={u.name}>
+                                    {u.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
                     {draft.mode !== 'weight' && (
                         <select value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })}>
                             {units.map((u) => (
@@ -441,7 +480,11 @@ function InventoryItems({ onBack }) {
                     )}
                     <input
                         className="small"
-                        placeholder={draft.mode === 'weight' ? '한 통 g' : `1${draft.unit || '단위'}=몇 개`}
+                        placeholder={
+                            draft.mode === 'weight'
+                                ? `한 ${draft.container || '통'} g`
+                                : `1${draft.unit || '단위'}=몇 개`
+                        }
                         value={draft.per}
                         onChange={(e) => setDraft({ ...draft, per: e.target.value.replace(/[^0-9.]/g, '') })}
                     />
