@@ -103,7 +103,8 @@ async function latestStatus() {
     // 순중량까지 함께 드러난다. (low_threshold는 반대다. 정책이라 복사본을 그대로 쓴다)
     const [items] = await pool.query(
         `SELECT i.item_id, i.item_label, i.measure_mode, i.count_unit, i.count_per_pack,
-                i.base_unit, COALESCE(i.tare_g, g.tare_g) AS tare_g, i.low_threshold,
+                i.base_unit, COALESCE(i.container_unit, g.container_unit, '통') AS container_unit,
+                COALESCE(i.tare_g, g.tare_g) AS tare_g, i.low_threshold,
                 i.quantity, i.spare_count, i.over_scale, i.sort_order
          FROM inventory_count_items i
                   LEFT JOIN inventory_items g ON g.id = i.item_id

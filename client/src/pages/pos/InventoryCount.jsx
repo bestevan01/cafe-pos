@@ -24,7 +24,7 @@ const GROUPS = [
         mode: 'weight',
         title: '저울',
         icon: '⚖️',
-        hint: '통째로 저울에 올린 무게. 빈 통 무게는 앱이 뺍니다. 창고의 안 뜯은 통은 따로 적어주세요. 저울이 넘치면 「넘침」을 누르세요',
+        hint: '쓰고 있는 통·봉지를 통째로 저울에 올린 무게. 빈 용기 무게는 앱이 뺍니다. 안 뜯은 것은 미개봉 칸에 따로 적어주세요. 저울이 넘치면 「넘침」을 누르세요',
     },
 ];
 
@@ -316,7 +316,7 @@ function InventoryCount({ onClose }) {
                                                             ? `직전 ${Number(prev.quantity)}${item.count_unit} 넘음`
                                                             : `직전 ${Number(prev.quantity)}${item.count_unit}`}
                                                         {item.measure_mode === 'weight' && prev.spare_count > 0
-                                                            ? ` · 미개봉 ${Number(prev.spare_count)}통`
+                                                            ? ` · 미개봉 ${Number(prev.spare_count)}${item.container_unit ?? '통'}`
                                                             : ''}
                                                     </span>
                                                 )}
@@ -333,7 +333,7 @@ function InventoryCount({ onClose }) {
                                                             onChange={(e) => setValue(item.id, 'spare', e.target.value)}
                                                             aria-label={`${item.name} 미개봉 수량`}
                                                         />
-                                                        <span className="ic-unit">통</span>
+                                                        <span className="ic-unit">{item.container_unit ?? '통'}</span>
                                                     </div>
                                                 </div>
                                             )}

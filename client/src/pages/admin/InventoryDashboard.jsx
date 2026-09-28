@@ -37,8 +37,9 @@ function remainText(r) {
     if (r.measure_mode === 'weight') {
         // 저울이 넘친 통은 '이 이상'이다(저울 최대 무게를 넘어 잴 수 없었다).
         const more = r.at_least ? ' 이상' : '';
-        if (r.tare_missing) return `${num(r.quantity)}g${more} (빈 통 무게 미측정)`;
-        const spare = Number(r.spare_count) > 0 ? ` + 미개봉 ${num(r.spare_count)}통` : '';
+        const unit = r.container_unit ?? '통';
+        if (r.tare_missing) return `${num(r.quantity)}g${more} (빈 ${unit} 무게 미측정)`;
+        const spare = Number(r.spare_count) > 0 ? ` + 미개봉 ${num(r.spare_count)}${unit}` : '';
         return `${num(r.net)}g${more}${spare}`;
     }
     if (r.measure_mode === 'each') return `${num(r.quantity)}${r.count_unit}`;
@@ -196,7 +197,9 @@ function InventoryDashboard({ onBack }) {
                                         {remainText(r)}
                                         {r.measure_mode === 'weight' && r.total_ratio != null && (
                                             <span className="inv-ratio">
-                                                ({num(r.total_ratio)}통{r.at_least ? ' 이상' : ''})
+                                                ({num(r.total_ratio)}
+                                                {r.container_unit ?? '통'}
+                                                {r.at_least ? ' 이상' : ''})
                                             </span>
                                         )}
                                         {r.measure_mode === 'pack' && r.amount != null && (
