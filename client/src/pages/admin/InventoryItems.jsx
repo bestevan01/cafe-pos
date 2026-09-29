@@ -200,9 +200,13 @@ function ModeCard({
                             빼기
                         </button>
 
-                        {/* 저울이 넘치면 '○g 이상'만 안다. 기준이 그보다 높으면 주문이 필요한지 판단할 수 없다. */}
+                        {/* 저울이 넘치면 '○g 이상'만 안다. 기준이 그보다 높으면 주문이 필요한지 판단할 수 없다.
+                            단, 가득 찬 용기(내용물 + 빈 용기)가 저울 최대 무게 안이면 넘칠 일이 없으니 경고하지 않는다
+                            (원두 500g + 봉지 28g = 528g처럼). 가득 찼을 때 무게를 모르면 넘칠 수 있다고 본다. */}
                         {mode.key === 'weight' &&
                             item.low_threshold != null &&
+                            (item.count_per_pack == null ||
+                                Number(item.count_per_pack) + Number(item.tare_g ?? 0) > scaleMax) &&
                             Number(item.low_threshold) >= scaleMax - Number(item.tare_g ?? 0) && (
                                 <span className="ii-warn">
                                     ⚠️ 주문 기준이 저울로 잴 수 있는 양(
