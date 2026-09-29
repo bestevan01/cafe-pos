@@ -40,7 +40,7 @@ router.get('/today', async (req, res) => {
 
         const [counts] = await pool.query(
             `SELECT id, slot, slot_label, DATE_FORMAT(count_date, '%Y-%m-%d') AS count_date, counted_at,
-                    counted_by_id, counted_by_name, memo
+                    counted_by_id, counted_by_name, memo, is_draft, draft_values, updated_at
              FROM inventory_counts
              WHERE count_date = CURDATE()`,
         );
@@ -50,23 +50,31 @@ router.get('/today', async (req, res) => {
         for (const c of counts) bySlot[c.slot] = c;
 
         // 이미 낸 회차는 적었던 수치까지 함께 보낸다(수정 모드로 열기 위해).
-        for (const key of slotKeys) {
+        // 임시 저장도 같은 모양으로 보낸다 — 화면은 둘을 같은 방식으로 채운다. 비워 둔 칸은 null이다.
+        for (const key of Object.keys(bySlot)) {
             if (!bySlot[key]) continue;
+            const { draft_values: draft, ...count } = bySlot[key];
+            if (count.is_draft === 1) {
+                bySlot[key] = { ...count, is_draft: true, items: draftRows(draft) };
+                continue;
+            }
             const [rows] = await pool.query(
                 `SELECT item_id, item_label, quantity, spare_count, over_scale, count_unit, measure_mode
                  FROM inventory_count_items
                  WHERE count_id = ?
                  ORDER BY sort_order, id`,
-                [bySlot[key].id],
+                [count.id],
             );
-            bySlot[key] = { ...bySlot[key], items: rows };
+            bySlot[key] = { ...count, is_draft: false, items: rows };
         }
 
         // 직전 회차의 수치도 보낸다. 같은 품목이 얼마였는지 옆에 보이면 자리를 헷갈리지 않는다.
         // slot은 'HHMM'이라 문자열 정렬이 곧 시간 순이다(FIELD 목록이 필요 없다).
+        // 임시 저장은 비교 기준이 되지 못한다(칸이 비어 있고, 아직 믿을 수 있는 기록도 아니다).
         const [[prev]] = await pool.query(
             `SELECT id, DATE_FORMAT(count_date, '%Y-%m-%d') AS count_date, slot, slot_label
              FROM inventory_counts
+             WHERE is_draft = 0
              ORDER BY count_date DESC, slot DESC
              LIMIT 1`,
         );
@@ -133,7 +141,8 @@ function buildCountRows(items, body, scaleMax) {
     const rows = [];
     for (const item of items) {
         const raw = byId.get(item.id);
-        let quantity = Number(raw?.quantity);
+        // 빈 칸은 0이 아니다. Number(null)·Number('')가 0이 되어 '다 떨어졌다'로 기록되지 않게 먼저 거른다.
+        let quantity = raw?.quantity == null || raw.quantity === '' ? NaN : Number(raw.quantity);
         const isWeight = item.measure_mode === 'weight';
         const over = isWeight && (raw?.over_scale === true || (Number.isFinite(quantity) && quantity >= scaleMax));
         if (over) quantity = scaleMax;
@@ -169,6 +178,70 @@ function buildCountRows(items, body, scaleMax) {
     return { rows };
 }
 
+/** 빈 칸이면 null, 숫자가 아니거나 음수면 NaN. @param {any} v */
+const numOrNull = (v) => {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : NaN;
+};
+
+/**
+ * 임시 저장할 값을 고른다. 적은 칸만 남기고 빈 칸은 비워 둔다 — 0으로 채우면 '다 떨어졌다'가 된다.
+ *
+ * 확정 기록(buildCountRows)과 달리 품목 정보를 복사해 두지 않고 적은 숫자만 남긴다.
+ * 품목 정보는 확정하는 순간의 값으로 buildCountRows가 복사한다. 그사이 관리자가 품목을 고쳐도
+ * 확정 기록은 한 시점의 품목 정보로 일관된다.
+ *
+ * @param {any[]} items 조사 대상 품목
+ * @param {any} body
+ * @param {number} scaleMax 저울 최대 무게(g)
+ * @returns {{error: string}|{values: Record<number, {quantity: number|null, spare: number|null, over: boolean}>}}
+ */
+function buildDraftValues(items, body, scaleMax) {
+    const input = Array.isArray(body.items) ? body.items : [];
+    /** @type {Map<number, any>} */
+    const byId = new Map(input.map((/** @type {any} */ r) => [Number(r.item_id), r]));
+
+    /** @type {Record<number, {quantity: number|null, spare: number|null, over: boolean}>} */
+    const values = {};
+    for (const item of items) {
+        const raw = byId.get(item.id);
+        if (raw === undefined) continue;
+        const isWeight = item.measure_mode === 'weight';
+        let quantity = numOrNull(raw.quantity);
+        const spare = isWeight ? numOrNull(raw.spare_count) : null;
+        if (Number.isNaN(quantity)) return { error: `"${item.name}" 수량을 확인해주세요.` };
+        if (Number.isNaN(spare)) return { error: `"${item.name}" 미개봉 수량을 확인해주세요.` };
+        // 넘친 통은 확정 기록과 같은 규칙이다. 숫자는 확정할 때 저울 최대 무게로 채운다.
+        const over = isWeight && (raw.over_scale === true || (quantity !== null && quantity >= scaleMax));
+        if (over) quantity = null;
+        if (quantity === null && spare === null && !over) continue;
+        values[item.id] = { quantity, spare, over };
+    }
+    return { values };
+}
+
+/**
+ * 임시 저장 값을 확정 기록의 품목 행과 같은 모양으로 돌려준다. 화면이 둘을 같은 방식으로 채운다.
+ * 품목에서 빠진 칸(비워 둔 칸)은 행이 없고, 행 안의 빈 값은 null이다.
+ * @param {string|null} raw
+ */
+function draftRows(raw) {
+    /** @type {Record<string, any>} */
+    let values = {};
+    try {
+        values = JSON.parse(raw ?? '{}') ?? {};
+    } catch {
+        values = {};
+    }
+    return Object.entries(values).map(([id, v]) => ({
+        item_id: Number(id),
+        quantity: v?.quantity ?? null,
+        spare_count: v?.spare ?? null,
+        over_scale: v?.over ? 1 : 0,
+    }));
+}
+
 /**
  * 방금 낸 조사에 기준 미달 품목이 있으면 관리자에게 알린다.
  *
@@ -196,20 +269,39 @@ const COUNT_ITEM_COLUMNS = `(count_id, item_id, item_label, measure_mode, count_
                              count_per_pack, base_unit, tare_g, low_threshold, quantity, spare_count, over_scale,
                              container_unit, sort_order)`;
 
+/**
+ * 본문을 저장할 모양으로 만든다. 임시 저장이면 적은 칸만, 제출이면 모든 품목을 요구한다.
+ * @param {any[]} items @param {any} body @param {boolean} draft
+ */
+async function buildBody(items, body, draft) {
+    const scaleMax = await getScaleMax();
+    const built = draft ? buildDraftValues(items, body, scaleMax) : buildCountRows(items, body, scaleMax);
+    const memo =
+        String(body.memo ?? '')
+            .trim()
+            .slice(0, 500) || null;
+    return { built, memo };
+}
+
 // 회차 제출. (날짜, 회차)에 UNIQUE가 걸려 있어 같은 회차를 두 번 내면 409로 막힌다.
+//
+// draft: true면 임시 저장이다. 모든 칸을 채우지 못한 채 자리를 비워야 할 때 쓴다.
+// 임시 저장은 기록이 아니다 — 현재 재고·조사 기록·주문 필요 알림 어디에도 잡히지 않고,
+// 조사 시각 알림도 그 회차를 '아직 안 함'으로 본다. 모든 칸을 채워 제출(PUT)해야 기록이 된다.
+// 임시 저장도 그 회차 자리를 차지한다. 이어서 하는 사람은 새로 내지 않고 그 기록을 채운다(PUT).
 router.post('/counts', async (req, res) => {
+    const draft = req.body.draft === true;
     const items = await loadCountItems().catch(() => null);
     if (!items) return res.status(500).json({ success: false, message: '품목을 불러오지 못했습니다.' });
     if (items.length === 0) {
         return res.status(400).json({ success: false, message: '조사할 품목이 없습니다. 관리자에게 문의하세요.' });
     }
 
-    const built = buildCountRows(items, req.body, await getScaleMax());
+    const { built, memo } = await buildBody(items, req.body, draft);
     if ('error' in built) return res.status(400).json({ success: false, message: built.error });
-    const memo =
-        String(req.body.memo ?? '')
-            .trim()
-            .slice(0, 500) || null;
+    if ('values' in built && Object.keys(built.values).length === 0 && !memo) {
+        return res.status(400).json({ success: false, message: '입력한 값이 없습니다.' });
+    }
 
     const conn = await pool.getConnection();
     try {
@@ -221,13 +313,16 @@ router.post('/counts', async (req, res) => {
         // 회차는 CURDATE()와 같은 문장에서 정한다. 경계 시각에 걸쳐도 날짜·회차·시각이 어긋나지 않는다.
         // 이름은 스냅샷으로 함께 남긴다 — 나중에 관리자가 시각을 바꿔도 지난 기록은 그대로여야 한다.
         const [ins] = await conn.query(
-            `INSERT INTO inventory_counts (count_date, slot, slot_label, counted_by_id, counted_by_name, memo)
-             VALUES (CURDATE(), ${slotSql(slots)}, NULL, ?, ?, ?)`,
-            [req.user.id, req.user.name, memo],
+            `INSERT INTO inventory_counts (count_date, slot, slot_label, counted_by_id, counted_by_name, memo,
+                                           is_draft, draft_values)
+             VALUES (CURDATE(), ${slotSql(slots)}, NULL, ?, ?, ?, ?, ?)`,
+            [req.user.id, req.user.name, memo, draft ? 1 : 0, 'values' in built ? JSON.stringify(built.values) : null],
         );
-        await conn.query(`INSERT INTO inventory_count_items ${COUNT_ITEM_COLUMNS} VALUES ?`, [
-            built.rows.map((r) => [ins.insertId, ...r]),
-        ]);
+        if ('rows' in built) {
+            await conn.query(`INSERT INTO inventory_count_items ${COUNT_ITEM_COLUMNS} VALUES ?`, [
+                built.rows.map((r) => [ins.insertId, ...r]),
+            ]);
+        }
         const [[saved]] = await conn.query('SELECT slot FROM inventory_counts WHERE id = ?', [ins.insertId]);
         await conn.query('UPDATE inventory_counts SET slot_label = ? WHERE id = ?', [
             labelOf[saved.slot] ?? saved.slot,
@@ -235,15 +330,17 @@ router.post('/counts', async (req, res) => {
         ]);
         await conn.commit();
 
-        req.app.get('io').emit('inventory_updated');
-        // 조사를 마친 순간 기준 미달 품목이 있으면 바로 알린다. 정해진 시각까지 기다리면
-        // 이미 주문할 타이밍을 놓친 뒤일 수 있다.
-        void notifyIfLow(req.app.get('io'));
-        res.json({ success: true, id: ins.insertId, slot: saved.slot, slot_label: labelOf[saved.slot] });
+        if (!draft) {
+            req.app.get('io').emit('inventory_updated');
+            // 조사를 마친 순간 기준 미달 품목이 있으면 바로 알린다. 정해진 시각까지 기다리면
+            // 이미 주문할 타이밍을 놓친 뒤일 수 있다.
+            void notifyIfLow(req.app.get('io'));
+        }
+        res.json({ success: true, id: ins.insertId, draft, slot: saved.slot, slot_label: labelOf[saved.slot] });
     } catch (/** @type {any} */ err) {
         await conn.rollback();
         if (err && err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ success: false, message: '이 회차 조사가 이미 제출되었습니다.' });
+            return res.status(409).json({ success: false, message: '이 회차 조사가 이미 저장되어 있습니다.' });
         }
         console.error('[🔥 POST /api/inventory/counts 에러]', err);
         res.status(500).json({ success: false, message: '재고 조사 제출에 실패했습니다.', debug_info: debugInfo(err) });
@@ -253,29 +350,63 @@ router.post('/counts', async (req, res) => {
 });
 
 // 당일 수정. 지난 날짜는 고치지 못한다 — 재고 기록도 사후에 바뀌면 추이를 믿을 수 없다.
-// counted_by와 counted_at은 그대로 둔다(원래 누가 언제 셌는지가 기록의 핵심).
+//
+// 세 갈래다.
+//  - 임시 저장을 다시 임시 저장(draft: true): 적은 값만 바꾼다.
+//  - 임시 저장을 제출: 모든 칸이 차 있어야 한다. 이때 비로소 기록이 되므로 제출 시각과
+//    제출한 사람을 지금으로 적는다 — 기록에 남는 사람은 숫자를 확인하고 확정한 사람이다.
+//  - 제출한 기록을 고침: counted_by와 counted_at은 그대로 둔다(원래 누가 언제 셌는지가 기록의 핵심).
+// 제출한 기록을 임시 저장으로 되돌리지는 못한다. 이미 현재 재고와 알림에 쓰인 기록이 사라지게 된다.
 router.put('/counts/:id', async (req, res) => {
+    const draft = req.body.draft === true;
     const items = await loadCountItems().catch(() => null);
     if (!items) return res.status(500).json({ success: false, message: '품목을 불러오지 못했습니다.' });
 
-    const built = buildCountRows(items, req.body, await getScaleMax());
+    const { built, memo } = await buildBody(items, req.body, draft);
     if ('error' in built) return res.status(400).json({ success: false, message: built.error });
-    const memo =
-        String(req.body.memo ?? '')
-            .trim()
-            .slice(0, 500) || null;
 
     const conn = await pool.getConnection();
     try {
-        const [[row]] = await conn.query('SELECT id FROM inventory_counts WHERE id = ? AND count_date = CURDATE()', [
-            req.params.id,
-        ]);
+        await conn.beginTransaction();
+        // 두 사람이 같은 임시 저장을 동시에 제출하지 않도록 잠근다.
+        const [[row]] = await conn.query(
+            'SELECT id, is_draft, count_date = CURDATE() AS is_today FROM inventory_counts WHERE id = ? FOR UPDATE',
+            [req.params.id],
+        );
         if (!row) {
+            await conn.rollback();
+            return res.status(404).json({ success: false, message: '조사 기록을 찾을 수 없습니다.' });
+        }
+        if (row.is_today !== 1) {
+            await conn.rollback();
             return res.status(403).json({ success: false, message: '오늘 조사만 수정할 수 있습니다.' });
         }
 
-        await conn.beginTransaction();
-        await conn.query('UPDATE inventory_counts SET memo = ? WHERE id = ?', [memo, row.id]);
+        if ('values' in built) {
+            if (row.is_draft !== 1) {
+                await conn.rollback();
+                return res.status(409).json({ success: false, message: '이미 제출된 조사는 임시 저장할 수 없습니다.' });
+            }
+            await conn.query('UPDATE inventory_counts SET memo = ?, draft_values = ? WHERE id = ?', [
+                memo,
+                JSON.stringify(built.values),
+                row.id,
+            ]);
+            await conn.commit();
+            return res.json({ success: true, draft: true });
+        }
+
+        if (row.is_draft === 1) {
+            await conn.query(
+                `UPDATE inventory_counts
+                 SET is_draft = 0, draft_values = NULL, memo = ?,
+                     counted_at = NOW(), counted_by_id = ?, counted_by_name = ?
+                 WHERE id = ?`,
+                [memo, req.user.id, req.user.name, row.id],
+            );
+        } else {
+            await conn.query('UPDATE inventory_counts SET memo = ? WHERE id = ?', [memo, row.id]);
+        }
         // 품목이 추가·은퇴했을 수 있어 부분 수정 대신 통째로 다시 쓴다.
         await conn.query('DELETE FROM inventory_count_items WHERE count_id = ?', [row.id]);
         await conn.query(`INSERT INTO inventory_count_items ${COUNT_ITEM_COLUMNS} VALUES ?`, [
@@ -285,13 +416,31 @@ router.put('/counts/:id', async (req, res) => {
 
         req.app.get('io').emit('inventory_updated');
         void notifyIfLow(req.app.get('io'));
-        res.json({ success: true });
+        res.json({ success: true, draft: false, finalized: row.is_draft === 1 });
     } catch (/** @type {any} */ err) {
         await conn.rollback();
         console.error(`[🔥 PUT /api/inventory/counts/${req.params.id} 에러]`, err);
         res.status(500).json({ success: false, message: '재고 조사 수정에 실패했습니다.', debug_info: debugInfo(err) });
     } finally {
         conn.release();
+    }
+});
+
+// 임시 저장 버리기. 제출한 기록은 지우지 못한다(기록은 고칠 수만 있다).
+// 예전 회차에 임시 저장이 남아 있는데 새로 세고 싶을 때 쓴다.
+router.delete('/counts/:id', async (req, res) => {
+    try {
+        const [del] = await pool.query(
+            'DELETE FROM inventory_counts WHERE id = ? AND is_draft = 1 AND count_date = CURDATE()',
+            [req.params.id],
+        );
+        if (del.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: '지울 임시 저장이 없습니다.' });
+        }
+        res.json({ success: true });
+    } catch (/** @type {any} */ err) {
+        console.error(`[🔥 DELETE /api/inventory/counts/${req.params.id} 에러]`, err);
+        res.status(500).json({ success: false, message: '임시 저장을 지우지 못했습니다.', debug_info: debugInfo(err) });
     }
 });
 

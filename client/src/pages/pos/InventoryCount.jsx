@@ -64,6 +64,8 @@ function InventoryCount({ onClose }) {
     // 매장 저울의 최대 무게(g). 이 이상은 잴 수 없어 '넘침'으로 받는다.
     const [scaleMax, setScaleMax] = useState(1000);
     const [memo, setMemo] = useState('');
+    // 저장하지 않은 입력이 있는지. 그대로 닫으면 사라지므로 닫기 전에 묻는다.
+    const [dirty, setDirty] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -77,22 +79,28 @@ function InventoryCount({ onClose }) {
             setSlots(bySlot);
             setSlotList(available ?? []);
             setOffDay(Boolean(res.data.off_day));
-            setSlot(cur);
             setPrevious(prev ?? {});
             setScaleMax(Number(res.data.scale_max_g) || 1000);
 
-            const mine = bySlot?.[cur] ?? null;
+            // 지금 회차에 기록이 없어도 오늘 임시 저장해 둔 조사가 있으면 그걸 이어서 연다.
+            // 조사하다 자리를 비운 사이 회차 경계를 넘길 수 있다 — 그때 빈 화면이 뜨면 적어 둔 숫자를
+            // 잃어버린 줄 안다. 이어서 제출하면 처음 저장한 회차로 기록된다(숫자를 센 때가 그 회차다).
+            const draft = Object.values(bySlot ?? {})
+                .filter((c) => c?.is_draft)
+                .sort((a, b) => String(b.slot).localeCompare(String(a.slot)))[0];
+            const mine = bySlot?.[cur] ?? draft ?? null;
+            setSlot(mine?.slot ?? cur);
             setExisting(mine);
             if (mine) {
-                // 이미 낸 회차면 그때 적은 값으로 채워 '수정' 모드로 연다.
+                // 이미 낸(또는 임시 저장한) 회차면 그때 적은 값으로 채운다. 임시 저장의 빈 칸은 null로 온다.
                 /** @type {Record<string, {quantity: string, spare: string, over?: boolean}>} */
                 const filled = {};
                 for (const r of mine.items ?? []) {
                     if (r.item_id == null) continue;
                     const over = r.over_scale === 1;
                     filled[r.item_id] = {
-                        quantity: over ? '' : String(Number(r.quantity)),
-                        spare: String(Number(r.spare_count ?? 0)),
+                        quantity: over || r.quantity == null ? '' : String(Number(r.quantity)),
+                        spare: r.spare_count == null ? '' : String(Number(r.spare_count)),
                         over,
                     };
                 }
@@ -102,6 +110,7 @@ function InventoryCount({ onClose }) {
                 setValues({});
                 setMemo('');
             }
+            setDirty(false);
         } catch {
             notify('재고 조사 정보를 불러오지 못했습니다.', { icon: '⚠️', dedupeKey: 'load-inventory' });
         } finally {
@@ -116,6 +125,7 @@ function InventoryCount({ onClose }) {
 
     /** @param {number} id @param {'quantity'|'spare'} field @param {string} v */
     const setValue = (id, field, v) => {
+        setDirty(true);
         setValues((prev) => {
             const cur = prev[id] ?? { quantity: '', spare: '' };
             return { ...prev, [id]: { ...cur, [field]: clean(v) } };
@@ -130,6 +140,7 @@ function InventoryCount({ onClose }) {
     const setWeight = (id, v) => {
         const cleaned = clean(v);
         const over = cleaned !== '' && Number(cleaned) >= scaleMax;
+        setDirty(true);
         setValues((prev) => {
             const cur = prev[id] ?? { quantity: '', spare: '' };
             return { ...prev, [id]: { ...cur, quantity: over ? '' : cleaned, over: over || cur.over } };
@@ -138,6 +149,7 @@ function InventoryCount({ onClose }) {
 
     /** '넘침'을 켜고 끈다. 켜면 적어 둔 무게는 지운다. @param {number} id */
     const toggleOver = (id) => {
+        setDirty(true);
         setValues((prev) => {
             const cur = prev[id] ?? { quantity: '', spare: '' };
             return { ...prev, [id]: { ...cur, quantity: '', over: !cur.over } };
@@ -156,31 +168,51 @@ function InventoryCount({ onClose }) {
     );
 
     const filledCount = items.filter(isFilled).length;
+    const complete = items.length > 0 && filledCount === items.length;
+    const isDraft = Boolean(existing?.is_draft);
+    // 이미 제출한 기록. 임시 저장으로 되돌릴 수 없으니(현재 재고·알림에 이미 쓰였다) 빈 칸이 있으면 막는다.
+    const isFinal = Boolean(existing) && !isDraft;
 
+    /**
+     * 저장. 모든 칸이 차 있으면 제출(기록이 된다), 비어 있는 칸이 있으면 임시 저장이다.
+     * 임시 저장은 기록이 아니다 — 현재 재고·주문 필요 알림에 잡히지 않고, 나중에 이어서 채워 제출해야 한다.
+     */
     const submit = async () => {
         const missing = items.find((i) => !isFilled(i));
-        if (missing) {
+        const draft = Boolean(missing);
+        if (missing && isFinal) {
             notify(`"${missing.name}" 수량을 적어주세요.`, { icon: '⚠️' });
             return;
         }
-        if (
-            !(await confirm(existing ? '조사 기록을 고치시겠습니까?' : '재고 조사를 제출하시겠습니까?', {
-                confirmText: existing ? '수정' : '제출',
-            }))
-        ) {
+        if (draft && !dirty && isDraft) {
+            // 바뀐 게 없으면 다시 저장할 필요가 없다. 자리를 비우려던 것이니 그냥 닫는다.
+            onClose();
+            return;
+        }
+        const question = draft
+            ? `${items.length - filledCount}개 품목이 비어 있어 임시 저장합니다. 임시 저장은 아직 기록이 아닙니다 — 나중에 이어서 모두 채운 뒤 제출해주세요.`
+            : isFinal
+              ? '조사 기록을 고치시겠습니까?'
+              : '재고 조사를 제출하시겠습니까?';
+        if (!(await confirm(question, { confirmText: draft ? '임시 저장' : isFinal ? '수정' : '제출' }))) {
             return;
         }
 
         setSaving(true);
         const body = {
+            draft,
             items: items.map((i) => {
-                const over = i.measure_mode === 'weight' && Boolean(values[i.id]?.over);
+                const v = values[i.id];
+                const over = i.measure_mode === 'weight' && Boolean(v?.over);
+                const quantity = String(v?.quantity ?? '');
+                const spare = String(v?.spare ?? '');
                 return {
                     item_id: i.id,
                     // 넘친 통은 서버가 저울 최대 무게로 기록한다('이 이상').
-                    quantity: over ? scaleMax : Number(values[i.id].quantity),
+                    // 빈 칸은 null로 보낸다. 0은 '다 떨어졌다'는 뜻이라 구별해야 한다.
+                    quantity: over ? scaleMax : quantity === '' ? null : Number(quantity),
                     over_scale: over,
-                    spare_count: i.measure_mode === 'weight' ? Number(values[i.id]?.spare || 0) : 0,
+                    spare_count: i.measure_mode === 'weight' && spare !== '' ? Number(spare) : null,
                 };
             }),
             memo,
@@ -188,25 +220,83 @@ function InventoryCount({ onClose }) {
         try {
             if (existing) {
                 await axios.put(`/api/inventory/counts/${existing.id}`, body, authCfg());
-                notify('재고 조사 기록을 수정했습니다.', { icon: '✅' });
+                notify(
+                    draft
+                        ? '임시 저장했습니다.'
+                        : isDraft
+                          ? `${existing.slot_label ?? '재고'} 조사를 제출했습니다.`
+                          : '재고 조사 기록을 수정했습니다.',
+                    { icon: draft ? '📝' : '✅' },
+                );
             } else {
                 const res = await axios.post('/api/inventory/counts', body, authCfg());
                 // 어느 회차로 기록됐는지는 서버가 알려준다. 경계 시각을 넘겨 제출하면 화면이
                 // 들고 있던 회차와 실제로 저장된 회차가 다를 수 있다.
-                notify(`${res.data?.slot_label ?? '재고'} 조사를 제출했습니다.`, { icon: '✅' });
+                notify(
+                    draft
+                        ? `${res.data?.slot_label ?? '재고'} 조사를 임시 저장했습니다.`
+                        : `${res.data?.slot_label ?? '재고'} 조사를 제출했습니다.`,
+                    { icon: draft ? '📝' : '✅' },
+                );
             }
             onClose();
         } catch (/** @type {any} */ err) {
-            if (err?.response?.status === 409) {
-                notify('이 회차는 다른 직원이 먼저 제출했습니다. 그 기록을 불러옵니다.', { icon: '⚠️' });
+            const status = err?.response?.status;
+            if (status === 409 || status === 404) {
+                // 다른 기기에서 먼저 저장했거나, 이어서 하던 임시 저장이 그사이 제출·삭제됐다.
+                notify(`${err.response.data?.message ?? '기록이 바뀌었습니다.'} 최신 기록을 불러옵니다.`, {
+                    icon: '⚠️',
+                });
                 setLoading(true);
                 await load();
             } else {
-                notify(err?.response?.data?.message || '제출에 실패했습니다.', { icon: '⚠️' });
+                notify(err?.response?.data?.message || '저장에 실패했습니다.', { icon: '⚠️' });
             }
         } finally {
             setSaving(false);
         }
+    };
+
+    /** 저장하지 않은 입력이 있으면 닫기 전에 묻는다. 모르고 닫으면 적은 숫자가 모두 사라진다. */
+    const close = async () => {
+        if (
+            dirty &&
+            !(await confirm(
+                isFinal
+                    ? '고친 내용은 저장되지 않습니다.'
+                    : '저장하지 않은 입력은 사라집니다. 자리를 비워야 하면 「임시 저장」을 눌러주세요.',
+                {
+                    title: '그냥 닫을까요?',
+                    confirmText: '그냥 닫기',
+                    cancelText: '계속 입력',
+                    danger: true,
+                },
+            ))
+        ) {
+            return;
+        }
+        onClose();
+    };
+
+    /** 임시 저장을 버리고 지금 회차로 새로 시작한다. 예전 회차에 하다 만 조사가 남아 있을 때 쓴다. */
+    const discardDraft = async () => {
+        if (!existing?.is_draft) return;
+        if (
+            !(await confirm('임시 저장한 숫자를 지우고 새로 시작할까요?', {
+                confirmText: '지우기',
+                danger: true,
+            }))
+        ) {
+            return;
+        }
+        try {
+            await axios.delete(`/api/inventory/counts/${existing.id}`, authCfg());
+            notify('임시 저장을 지웠습니다.', { icon: '🗑️' });
+        } catch (/** @type {any} */ err) {
+            notify(err?.response?.data?.message || '임시 저장을 지우지 못했습니다.', { icon: '⚠️' });
+        }
+        setLoading(true);
+        await load();
     };
 
     return (
@@ -220,7 +310,10 @@ function InventoryCount({ onClose }) {
                 .ic-slot { font-size: .78rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--bg-color, #f2f2f2); color: var(--text-secondary, #888); }
                 .ic-slot.now { background: var(--accent-bg, #e8f0fe); color: var(--accent, #1a73e8); }
                 .ic-slot.done { background: var(--success-bg); color: var(--success); }
+                .ic-slot.draft { background: var(--warning-bg, #fff3e0); color: var(--warning, #ef6c00); }
                 .ic-note { margin: 8px 0 0; font-size: .82rem; color: var(--text-secondary, #888); }
+                .ic-note.draft { color: var(--warning, #ef6c00); word-break: keep-all; }
+                .ic-link { padding: 0; margin-left: 4px; border: none; background: none; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
                 .ic-body { flex: 1; overflow-y: auto; padding: 8px 20px 16px; }
 
                 .ic-group { margin-top: 16px; }
@@ -267,10 +360,12 @@ function InventoryCount({ onClose }) {
                         {slotList.map((s, _i, all) => (
                             <span
                                 key={s.slot_key}
-                                className={`ic-slot ${s.slot_key === slot ? 'now' : ''} ${slots[s.slot_key] ? 'done' : ''}`}
+                                className={`ic-slot ${s.slot_key === slot ? 'now' : ''} ${
+                                    slots[s.slot_key] ? (slots[s.slot_key].is_draft ? 'draft' : 'done') : ''
+                                }`}
                             >
                                 {slotNames(all)(s.slot_key)}
-                                {slots[s.slot_key] ? ' 완료' : ''}
+                                {slots[s.slot_key] ? (slots[s.slot_key].is_draft ? ' 임시 저장' : ' 완료') : ''}
                             </span>
                         ))}
                     </div>
@@ -279,9 +374,18 @@ function InventoryCount({ onClose }) {
                             오늘은 정해진 조사 회차가 없는 날입니다. 그래도 조사하면 시각에 맞는 회차로 기록됩니다.
                         </p>
                     )}
-                    {existing && (
+                    {isFinal && (
                         <p className="ic-note">
                             {existing.counted_by_name}님이 제출했습니다. 고쳐서 다시 저장할 수 있습니다.
+                        </p>
+                    )}
+                    {isDraft && (
+                        <p className="ic-note draft">
+                            {existing.counted_by_name}님이 {existing.slot_label ?? ''} 조사를 임시 저장해 두었습니다. 빈
+                            칸을 모두 채워 제출해야 기록됩니다.
+                            <button type="button" className="ic-link" onClick={discardDraft}>
+                                지우고 새로 시작
+                            </button>
                         </p>
                     )}
                 </div>
@@ -401,22 +505,26 @@ function InventoryCount({ onClose }) {
                             className="ic-memo"
                             placeholder="특이사항이 있으면 적어주세요 (선택)"
                             value={memo}
-                            onChange={(e) => setMemo(e.target.value)}
+                            onChange={(e) => {
+                                setDirty(true);
+                                setMemo(e.target.value);
+                            }}
                         />
                     )}
                 </div>
 
                 <div className="ic-foot">
                     <span className="ic-count">{items.length > 0 && `${filledCount} / ${items.length}`}</span>
-                    <button className="ic-btn ghost" onClick={onClose}>
+                    <button className="ic-btn ghost" onClick={close}>
                         닫기
                     </button>
+                    {/* 빈 칸이 있으면 임시 저장, 다 채우면 제출. 누르기 전에 어느 쪽인지 버튼에서 보인다. */}
                     <button
                         className="ic-btn primary"
                         onClick={submit}
                         disabled={saving || loading || items.length === 0}
                     >
-                        {saving ? '저장 중…' : existing ? '수정 저장' : '제출'}
+                        {saving ? '저장 중…' : isFinal ? '수정 저장' : complete ? '제출' : '임시 저장'}
                     </button>
                 </div>
             </div>
