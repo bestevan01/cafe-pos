@@ -43,6 +43,7 @@
  * @typedef {object} WorkerScope
  * @property {() => Promise<void>} skipWaiting
  * @property {ServiceWorkerRegistration} registration
+ * @property {{href: string}} location 이 워커 스크립트의 주소
  * @property {{
  *     claim(): Promise<void>,
  *     matchAll(options?: {type?: string, includeUncontrolled?: boolean}): Promise<WindowClientLike[]>,
@@ -58,6 +59,13 @@
  */
 
 const sw = /** @type {WorkerScope} */ (/** @type {unknown} */ (self));
+
+// 어느 매장 알림인지 제목 앞에 [매장명]을 붙인다. 매장명은 빌드 환경변수라 이 파일이 읽을 수 없어,
+// 앱이 등록할 때 주소(?store=)에 실어 보낸다(browserNotify의 workerUrl). 없으면 붙이지 않는다.
+const storeLabel = new URL(sw.location.href).searchParams.get('store')?.trim() || '';
+
+/** @param {string} title */
+const withStore = (title) => (storeLabel ? `[${storeLabel}] ${title}` : title);
 
 // 새 워커를 곧바로 쓰게 한다. 기본 동작은 열려 있는 탭이 모두 닫힐 때까지 기다리는 것이라,
 // 알림 형식을 고쳐도 한참 동안 옛 워커가 남는다.
@@ -84,7 +92,7 @@ sw.addEventListener(
         }
 
         event.waitUntil(
-            sw.registration.showNotification(data.title || '알림', {
+            sw.registration.showNotification(withStore(data.title || '알림'), {
                 body: data.body || '',
                 icon: '/logo.svg',
                 badge: '/logo.svg',

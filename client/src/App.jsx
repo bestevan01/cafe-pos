@@ -14,6 +14,7 @@ import {
     runAlertAction,
     registerAlertAction,
     listenForAlertActions,
+    syncWorker,
 } from './utils/browserNotify';
 import NotificationSettings from './pages/auth/NotificationSettings.jsx';
 import Login from './pages/auth/Login';
@@ -315,6 +316,11 @@ function App() {
     // 서비스 워커를 통해 들어온 동작을 받는다(탭이 닫혀 있을 때 온 푸시를 누른 경우).
     // 로그인 여부와 상관없이 한 번 연결한다 — 받은 동작은 위에서 등록될 때까지 맡아둔다.
     useEffect(() => listenForAlertActions(), []);
+
+    // 알림 제목에 붙는 매장명이 서비스 워커에도 전해지도록, 이미 등록된 워커를 지금 주소로 맞춘다.
+    useEffect(() => {
+        void syncWorker();
+    }, []);
 
     // 캐셔 사용 중 순단(재연결) 시 자리 자동 재선점.
     // 재연결되면 소켓 ID가 바뀌어 서버가 이전 소켓 기준으로 자리를 비워버리므로,
