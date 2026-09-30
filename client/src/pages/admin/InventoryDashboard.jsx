@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import { socket, onResync } from '../../utils/socket';
 import { useNotification } from '../../hooks/useNotification';
+import { useAdminView } from '../../hooks/useAdminView';
 import InventoryItems from './InventoryItems';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -60,7 +61,7 @@ function remainText(r) {
  */
 function InventoryDashboard({ onBack }) {
     const { notify } = useNotification();
-    const [view, setView] = useState(/** @type {'home'|'items'} */ ('home'));
+    const [view, setView] = useAdminView('inventory', /** @type {'home'|'items'} */ ('home'));
     const [latest, setLatest] = useState(/** @type {any} */ (null));
     const [history, setHistory] = useState(/** @type {any[]} */ ([]));
     const [openId, setOpenId] = useState(/** @type {number|null} */ (null));
@@ -117,7 +118,7 @@ function InventoryDashboard({ onBack }) {
     );
 
     return (
-        <StatsLayout title="📦 재고 현황" onBack={onBack} actions={<ThemeToggle />} pageActions={navActions}>
+        <StatsLayout title="📦 재고 현황" onBack={onBack} actions={<AdminUserMenu />} pageActions={navActions}>
             <style>{`
                 .inv-nav { padding: 8px 14px; font-size: .9rem; font-weight: 700; border: 1px solid var(--border-color, #ddd); border-radius: 10px; background: var(--card-bg, #fff); color: var(--text-primary, #333); cursor: pointer; font-family: inherit; }
                 .inv-when { font-size: .85rem; color: var(--text-secondary, #888); margin: 0 0 12px; }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { socket, onResync } from '../../utils/socket';
 import { debounce } from '../../utils/debounce';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import { useNotification } from '../../hooks/useNotification';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
@@ -106,7 +106,7 @@ function AdvancedStats({ onBack }) {
         <StatsLayout
             title="📊 고급 매출 분석"
             onBack={onBack}
-            actions={<ThemeToggle />}
+            actions={<AdminUserMenu />}
             summary={<SummaryTiles items={summaryItems} loading={loading} />}
         >
             {/* 성격이 같은 '구간별 매출' 두 개를 나란히 두어 서로 비교되게 한다 */}

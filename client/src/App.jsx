@@ -23,6 +23,7 @@ import ProfileAuth from './pages/auth/ProfileAuth.jsx';
 import EditProfile from './pages/auth/EditProfile.jsx';
 import ForcePasswordChange from './pages/auth/ForcePasswordChange';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import { openAdminView, resetAdminViews } from './hooks/useAdminView';
 import { useTheme } from './hooks/useTheme';
 import { useNotification } from './hooks/useNotification';
 import { suppressAutoPasskeyOnce } from './utils/loginMemory';
@@ -71,9 +72,6 @@ function App() {
     const [showHygiene, setShowHygiene] = useState(false);
     const [showInventory, setShowInventory] = useState(false);
     const [showAlerts, setShowAlerts] = useState(false);
-    // 관리자 대시보드에서 바로 열 화면(알림을 눌러 들어온 경우). 대시보드가 받아서 쓰고 비운다.
-    // 이벤트로 알리면 대시보드가 아직 안 떠 있을 때(알림 설정 화면에서 누른 경우 등) 사라진다.
-    const [adminJump, setAdminJump] = useState(/** @type {string|null} */ (null));
     const [showProfile, setShowProfile] = useState(false);
     const [isProfileVerified, setIsProfileVerified] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -127,6 +125,7 @@ function App() {
         setAdminStaffMode(false);
         setShowProfile(false);
         setIsProfileVerified(false);
+        resetAdminViews();
     }, []);
 
     // 사용자가 직접 로그아웃 버튼을 눌렀을 때 (자동/세션만료 경로와 구분해 성공 안내)
@@ -307,7 +306,7 @@ function App() {
             registerAlertAction('open_inventory_status', () => {
                 toMain();
                 setAdminStaffMode(false);
-                setAdminJump('inventory');
+                openAdminView('inventory');
             }),
         ];
         return () => offs.forEach((off) => off());
@@ -425,8 +424,6 @@ function App() {
                     onEditProfile={() => setShowProfile(true)}
                     onEnterStaffMode={() => setAdminStaffMode(true)}
                     onOpenAlerts={() => setShowAlerts(true)}
-                    jumpTo={adminJump}
-                    onJumped={() => setAdminJump(null)}
                 />
                 {showProfile && (
                     <ProfileAuth

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import { useNotification } from '../../hooks/useNotification';
 import { useDragSort } from '../../hooks/useDragSort';
 import SlotSchedule from '../../components/SlotSchedule';
@@ -394,7 +394,7 @@ function InventoryItems({ onBack }) {
     const retired = items.filter((i) => !i.is_active);
 
     return (
-        <StatsLayout title="📋 재고 품목 관리" onBack={onBack} actions={<ThemeToggle />}>
+        <StatsLayout title="📋 재고 품목 관리" onBack={onBack} actions={<AdminUserMenu />}>
             <style>{`
                 .ii-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border-color, #f1f1f1); background: var(--card-bg, #fff); }
                 .ii-row.dragging { opacity: .5; }

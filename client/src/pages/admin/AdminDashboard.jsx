@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import SalesDashboard from './SalesDashboard';
 import SettlementDashboard from './SettlementDashboard';
 import MenuDashboard from './MenuDashboard';
@@ -7,10 +6,9 @@ import UsersDashboard from './UsersDashboard';
 import CostAnalysis from './CostAnalysis';
 import HygieneDashboard from './HygieneDashboard';
 import InventoryDashboard from './InventoryDashboard';
-import { socket } from '../../utils/socket';
-import { useTheme } from '../../hooks/useTheme';
-import { useNotification } from '../../hooks/useNotification';
 import StoreBadge from '../../components/StoreBadge';
+import AdminUserMenu, { AdminMenuProvider } from '../../components/AdminUserMenu';
+import { useAdminView } from '../../hooks/useAdminView';
 
 /**
  * @param {object} props
@@ -19,43 +17,18 @@ import StoreBadge from '../../components/StoreBadge';
  * @param {() => void} props.onEditProfile
  * @param {() => void} props.onEnterStaffMode  캐셔/주방 화면으로 전환
  * @param {() => void} props.onOpenAlerts  알림 설정 열기
- * @param {string|null} [props.jumpTo]  바로 열 화면(알림을 눌러 들어온 경우)
- * @param {() => void} [props.onJumped]  jumpTo를 받아 쓴 뒤 부른다
  */
-function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode, onOpenAlerts, jumpTo, onJumped }) {
-    const [view, setView] = useState('home');
+function AdminDashboard(props) {
+    return (
+        <AdminMenuProvider {...props}>
+            <AdminScreens />
+        </AdminMenuProvider>
+    );
+}
 
-    // 알림을 눌러 들어온 경우 해당 화면을 연다(App.jsx의 open_inventory_status).
-    // 받은 뒤에는 비운다 — 남겨두면 홈으로 돌아올 때마다 다시 그 화면으로 튄다.
-    useEffect(() => {
-        if (!jumpTo) return;
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- 바깥에서 들어온 요청을 화면 상태로 옮기는 한 번뿐인 동기화
-        setView(jumpTo);
-        onJumped?.();
-    }, [jumpTo, onJumped]);
-    const { notify, confirm } = useNotification();
-    const { theme, setTheme } = useTheme();
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isThemeSubOpen, setIsThemeSubOpen] = useState(false);
-
-    // 데드 스위치: 캐셔 잠금이 꼬여 아무도 접속하지 못할 때 강제 해제
-    const handleForceReleaseCashier = async () => {
-        const ok = await confirm(
-            '현재 정상적으로 캐셔를 사용 중인 직원이 있다면 충돌할 수 있습니다.\n' +
-                '캐셔 자리가 멈춰서 아무도 접속하지 못할 때만 사용하세요.',
-            { title: '🚨 캐셔 잠금 강제 해제', confirmText: '강제 해제', danger: true },
-        );
-        if (!ok) return;
-
-        socket.emit(
-            'force_release_cashier',
-            /** @param {any} res */ (res) => {
-                if (res?.success)
-                    notify('캐셔 잠금을 해제했습니다. 이제 직원이 캐셔로 접속할 수 있습니다.', { icon: '✅' });
-                else notify('해제 실패: ' + (res?.message || '알 수 없는 오류'), { icon: '⚠️' });
-            },
-        );
-    };
+function AdminScreens() {
+    // 알림 설정 등에 다녀와도 보던 화면이 그대로 열리도록 컴포넌트 밖에 기억한다(hooks/useAdminView.js).
+    const [view, setView] = useAdminView('dashboard', 'home');
 
     // 화면 전환 라우팅
     if (view === 'sales') return <SalesDashboard onBack={() => setView('home')} />;
@@ -72,98 +45,7 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode, o
         <div className="admin-container">
             {/* 상단 우측 헤더 영역 — 이름 드롭다운 하나로 PC/모바일 공통 */}
             <div className="top-right-header">
-                <div className="user-menu">
-                    <button
-                        className="btn-user-dropdown"
-                        onClick={() => {
-                            setIsDropdownOpen(!isDropdownOpen);
-                            setIsThemeSubOpen(false);
-                        }}
-                    >
-                        👤 {userName}님 ▼
-                    </button>
-
-                    {isDropdownOpen && (
-                        <div className="dropdown-panel">
-                            <div className="dropdown-theme-wrap">
-                                <button
-                                    className="dropdown-item dropdown-theme-toggle"
-                                    onClick={() => setIsThemeSubOpen(!isThemeSubOpen)}
-                                >
-                                    <span>🎨 테마 변경</span>
-                                    <span className="dropdown-sub-arrow">‹</span>
-                                </button>
-                                {isThemeSubOpen && (
-                                    <div className="dropdown-submenu">
-                                        <button
-                                            className={`dropdown-item ${theme === 'light' ? 'active' : ''}`}
-                                            onClick={() => setTheme('light')}
-                                        >
-                                            ☀️ 라이트 모드
-                                        </button>
-                                        <button
-                                            className={`dropdown-item ${theme === 'dark' ? 'active' : ''}`}
-                                            onClick={() => setTheme('dark')}
-                                        >
-                                            🌙 다크 모드
-                                        </button>
-                                        <button
-                                            className={`dropdown-item ${theme === 'system' ? 'active' : ''}`}
-                                            onClick={() => setTheme('system')}
-                                        >
-                                            💻 시스템 설정
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                            <button
-                                onClick={() => {
-                                    setIsDropdownOpen(false);
-                                    onEnterStaffMode();
-                                }}
-                                className="dropdown-item"
-                            >
-                                🛒 캐셔/주방 화면
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setIsDropdownOpen(false);
-                                    onEditProfile();
-                                }}
-                                className="dropdown-item"
-                            >
-                                ⚙️ 내 정보
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setIsDropdownOpen(false);
-                                    onOpenAlerts();
-                                }}
-                                className="dropdown-item"
-                            >
-                                🔔 알림 설정
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setIsDropdownOpen(false);
-                                    handleForceReleaseCashier();
-                                }}
-                                className="dropdown-item danger"
-                            >
-                                🚨 캐셔 강제 해제
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setIsDropdownOpen(false);
-                                    onLogout();
-                                }}
-                                className="dropdown-item logout"
-                            >
-                                🚪 로그아웃
-                            </button>
-                        </div>
-                    )}
-                </div>
+                <AdminUserMenu showName />
             </div>
 
             <style>
@@ -194,30 +76,6 @@ function AdminDashboard({ userName, onLogout, onEditProfile, onEnterStaffMode, o
                     position: absolute; top: 15px; right: 20px;
                     display: flex; gap: 10px; align-items: center; z-index: 100;
                 }
-
-                /* 이름 드롭다운 — PC/모바일 공통(화면 크기와 무관하게 동일한 형태) */
-                .user-menu { position: relative; }
-
-                .btn-user-dropdown { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color, #ccc); background-color: var(--card-bg, #fff); color: var(--text-primary, #333); font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 5px; }
-
-                /* min-width 고정값 대신 가장 긴 항목(캐셔/주방 화면, 캐셔 강제 해제)에 맞춰 너비 자동 결정 */
-                .dropdown-panel { position: absolute; top: 110%; right: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: visible; width: max-content; z-index: 10000; }
-
-                .dropdown-item { padding: 12px 15px; background: none; border: none; border-bottom: 1px solid var(--border-color, #eee); text-align: left; font-size: 0.9rem; font-weight: bold; color: var(--text-primary, #333); cursor: pointer; transition: background-color 0.2s; white-space: nowrap; }
-                .dropdown-item:last-child { border-bottom: none; }
-                /* 테마 변경은 하위 메뉴를 담는 div 안에 들어 있다. 하위 메뉴가 접혀 있으면 그 div의
-                   유일한 자식이라 위 :last-child 규칙에 걸려 아래 선이 사라진다(펼치면 다시 생긴다).
-                   실제로는 메뉴의 첫 줄이므로 선을 되살린다. */
-                .dropdown-theme-wrap > .dropdown-item { border-bottom: 1px solid var(--border-color, #eee); }
-                .dropdown-item.logout, .dropdown-item.danger { color: var(--danger); }
-                .dropdown-item:active { background-color: var(--border-color, #f0f0f0); }
-                .dropdown-item.active { color: var(--accent); font-weight: 800; }
-                .dropdown-theme-wrap { position: relative; }
-                /* dropdown-theme-wrap에 한 겹 더 감싸져 있어 flex stretch를 못 받고 내용물 크기로만 줄어들던 문제 수정 */
-                /* + 화살표를 오른쪽 끝(space-between)이 아니라 텍스트 바로 옆에 붙임 */
-                .dropdown-theme-toggle { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; }
-                .dropdown-sub-arrow { color: var(--text-secondary, #999); font-size: 1.1rem; line-height: 1; }
-                .dropdown-submenu { position: absolute; right: calc(100% + 6px); top: 0; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden; min-width: 150px; z-index: 10001; }
 
                 /* 대시보드 카드 그리드 */
                 /* min-height: 0이 있어야 flex 자식이 내용 높이 아래로 줄어들어 스크롤이 생긴다.

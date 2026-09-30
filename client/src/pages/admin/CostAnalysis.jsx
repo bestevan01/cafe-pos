@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { socket, onResync } from '../../utils/socket';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import { useNotification } from '../../hooks/useNotification';
+import { useAdminView } from '../../hooks/useAdminView';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
 import BarList from '../../components/stats/BarList';
@@ -32,7 +33,7 @@ function CostAnalysis({ onBack }) {
     const [ingredients, setIngredients] = useState(/** @type {import('../../types').Ingredient[]} */ ([]));
     const [menus, setMenus] = useState(/** @type {import('../../types').MenuWithRecipe[]} */ ([]));
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('analysis'); // 'analysis'(기본) | 'ingredients' | 'recipes'
+    const [view, setView] = useAdminView('cost', 'analysis'); // 'analysis'(기본) | 'ingredients' | 'recipes'
 
     const [selectedMenuId, setSelectedMenuId] = useState(/** @type {string|null} */ (null));
     // {ingredient_id: '값'} — 입력칸 값이라 문자열
@@ -708,7 +709,7 @@ function CostAnalysis({ onBack }) {
     // 원재료 관리 탭
     if (view === 'ingredients') {
         return (
-            <StatsLayout title="🧺 원재료 관리" onBack={() => setView('analysis')} actions={<ThemeToggle />}>
+            <StatsLayout title="🧺 원재료 관리" onBack={() => setView('analysis')} actions={<AdminUserMenu />}>
                 {styleTag}
                 {ingredientsCard}
             </StatsLayout>
@@ -718,7 +719,7 @@ function CostAnalysis({ onBack }) {
     // 메뉴별 레시피 탭
     if (view === 'recipes') {
         return (
-            <StatsLayout title="📝 메뉴별 레시피" onBack={() => setView('analysis')} actions={<ThemeToggle />}>
+            <StatsLayout title="📝 메뉴별 레시피" onBack={() => setView('analysis')} actions={<AdminUserMenu />}>
                 {styleTag}
                 {recipeCard}
             </StatsLayout>
@@ -727,7 +728,7 @@ function CostAnalysis({ onBack }) {
 
     // 기본: 원가·순익 분석(통계) — 우측 상단 버튼으로 편집 탭 이동
     return (
-        <StatsLayout title="💰 원가 · 순익 분석" onBack={onBack} actions={<ThemeToggle />} pageActions={navActions}>
+        <StatsLayout title="💰 원가 · 순익 분석" onBack={onBack} actions={<AdminUserMenu />} pageActions={navActions}>
             {styleTag}
             {analysisCard}
         </StatsLayout>

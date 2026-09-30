@@ -104,3 +104,28 @@ body {
         background-color 0.3s ease,
         color 0.3s ease; /* 테마 변경 시 부드럽게 전환 */
 }
+
+/* 5. 관리자 하위 화면 제목 — 화면마다 크기가 제각각이던 것을 한곳에서 정한다.
+   값은 StatsLayout에서 iPhone SE까지 맞춰 둔 것: 좁은 화면에서도 헤더가 두 줄로 접히지 않게
+   줄바꿈을 막고, 420px 이하에서는 넘치는 제목을 말줄임한다.
+   말줄임이 되려면 제목을 감싼 flex 영역에도 min-width: 0이 있어야 한다(각 페이지 헤더). */
+.admin-page-title {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    white-space: nowrap;
+    min-width: 0;
+}
+@media (max-width: 768px) {
+    .admin-page-title {
+        font-size: 1.2rem;
+    }
+}
+@media (max-width: 420px) {
+    .admin-page-title {
+        font-size: 1.05rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}

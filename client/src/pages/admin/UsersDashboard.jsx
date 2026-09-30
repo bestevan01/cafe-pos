@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import axios from 'axios';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
@@ -167,7 +167,6 @@ function UsersDashboard({ onBack }) {
                     border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08));
                 }
                 .header-left { display: flex; align-items: center; gap: 15px; }
-                .users-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (PC 테이블) */
@@ -231,8 +230,7 @@ function UsersDashboard({ onBack }) {
                         /* 세로로 쌓으면 고정 바가 화면을 계속 차지한다. 한 줄로 유지하고 sticky도 그대로 둔다. */
                         flex-direction: row; align-items: center; gap: 8px;
                     }
-                    .header-left { width: 100%; gap: 10px; padding-right: 40px; box-sizing: border-box; }
-                    .users-title { font-size: 1.5rem; }
+                    .header-left { width: 100%; min-width: 0; gap: 10px; }
                     /* 헤더가 한 줄 flex로 유지되므로 absolute로 띄울 필요가 없다.
                        띄워두면 sticky 헤더의 padding 위로 올라가 잘린다. */
                     .theme-wrapper { position: static; flex-shrink: 0; }
@@ -259,10 +257,10 @@ function UsersDashboard({ onBack }) {
                     <Button variant="neutral" icon="⬅" onClick={onBack}>
                         뒤로
                     </Button>
-                    <h1 className="users-title">👥 직원 관리</h1>
+                    <h1 className="admin-page-title">👥 직원 관리</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle />
+                    <AdminUserMenu />
                 </div>
             </div>
 

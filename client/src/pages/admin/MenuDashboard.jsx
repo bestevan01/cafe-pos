@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
@@ -175,7 +175,6 @@ function MenuDashboard({ onBack }) {
                     border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08));
                 }
                 .header-left { display: flex; align-items: center; gap: 15px; }
-                .menu-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
                 .theme-wrapper { display: flex; align-items: center; }
 
                 /* 컨텐츠 영역 (폼 + 리스트) */
@@ -242,7 +241,7 @@ function MenuDashboard({ onBack }) {
                                             flex-direction: row; align-items: center; gap: 8px;
                                             margin: -15px -15px 16px -15px; padding: 10px 15px;
                                         }
-                    .header-left { width: 100%; }
+                    .header-left { width: 100%; min-width: 0; gap: 10px; }
                     /* 헤더가 한 줄 flex로 유지되므로 absolute로 띄울 필요가 없다.
                        띄워두면 sticky 헤더의 padding 위로 올라가 잘린다. */
                     .theme-wrapper { position: static; flex-shrink: 0; }
@@ -283,10 +282,10 @@ function MenuDashboard({ onBack }) {
                     <Button variant="neutral" icon="⬅" onClick={onBack}>
                         뒤로
                     </Button>
-                    <h1 className="menu-title">📋 메뉴 관리</h1>
+                    <h1 className="admin-page-title">📋 메뉴 관리</h1>
                 </div>
                 <div className="theme-wrapper">
-                    <ThemeToggle />
+                    <AdminUserMenu />
                 </div>
             </div>
 

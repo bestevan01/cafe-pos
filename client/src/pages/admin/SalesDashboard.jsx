@@ -4,10 +4,11 @@ import { socket, onResync } from '../../utils/socket';
 import { debounce } from '../../utils/debounce';
 import * as XLSX from 'xlsx';
 import AdvancedStats from './AdvancedStats.jsx';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
+import { useAdminView } from '../../hooks/useAdminView';
 
 /**
  * @param {object} props
@@ -44,7 +45,7 @@ function SalesDashboard({ onBack }) {
     const [sortConfig, setSortConfig] = useState(
         /** @type {{key: string|null, direction: 'asc'|'desc'|'default'}} */ ({ key: null, direction: 'default' }),
     );
-    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useAdminView('sales.advanced', false);
 
     // API 권한 토큰
     const getAuthHeader = () => ({
@@ -297,7 +298,6 @@ function SalesDashboard({ onBack }) {
                 }
                 .sales-page-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; flex-shrink: 0; }
                 .header-left, .header-right { display: flex; align-items: center; gap: 10px; }
-                .sales-title { margin: 0; color: var(--text-primary, #333); font-size: 1.8rem; white-space: nowrap; }
                 
                 .sl-hdr-btn { white-space: nowrap; }
                 
@@ -382,11 +382,11 @@ function SalesDashboard({ onBack }) {
                     <Button variant="neutral" icon="⬅" onClick={onBack}>
                         뒤로
                     </Button>
-                    <h2 className="sales-title">💰 매출 통계</h2>
+                    <h2 className="admin-page-title">💰 매출 통계</h2>
                 </div>
                 <div className="header-right">
                     <div className="theme-wrapper">
-                        <ThemeToggle />
+                        <AdminUserMenu />
                     </div>
                 </div>
             </div>

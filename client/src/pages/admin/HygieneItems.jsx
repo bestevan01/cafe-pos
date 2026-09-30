@@ -3,7 +3,7 @@ import axios from 'axios';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
 import Button from '../../components/ui/Button';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import { useNotification } from '../../hooks/useNotification';
 import { useDragSort } from '../../hooks/useDragSort';
 import SlotSchedule from '../../components/SlotSchedule';
@@ -154,7 +154,7 @@ function HygieneItems({ onBack }) {
     };
 
     return (
-        <StatsLayout title="⚙️ 점검 설정" onBack={onBack} actions={<ThemeToggle />}>
+        <StatsLayout title="⚙️ 점검 설정" onBack={onBack} actions={<AdminUserMenu />}>
             <style>{`
                 .hyg-row { display: grid; grid-template-columns: 26px 108px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color, #eee); background: var(--card-bg, #fff); }
                 /* 잡은 행은 공중에 뜬 것처럼 보여야 어디로 가고 있는지 눈으로 쫓을 수 있다.
