@@ -906,7 +906,7 @@ function Cashier({ onlyOrder = false, isCashier = false }) {
                 .btn-cancel { background-color: var(--danger); color: white; }
                 .btn-pay { background-color: var(--success); color: white; }
                 .btn-deliver { background-color: var(--accent); color: white; }
-                .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+                .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10000; }
                 .modal-content { background-color: var(--card-bg, white); padding: 30px; border-radius: var(--radius-lg); text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 90%; max-width: 450px; box-sizing: border-box; }
                 .btn-modal-opt { flex: 1; padding: 20px; border: none; border-radius: var(--radius-md); color: white; font-size: 1.1rem; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.2s; }
                 .btn-modal-opt:active { opacity: 0.8; }
