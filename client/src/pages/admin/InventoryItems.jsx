@@ -11,13 +11,14 @@ const MODES = [
     {
         key: 'pack',
         label: '봉·줄로 세는 것',
-        hint: '직원은 「안 뜯은 개수 + 뜯어 쓰는 것의 남은 비율」을 하나의 숫자로 적습니다(2봉 + 30% → 2.3). 한 봉이 몇 개인지 적어두면 개수로도 함께 보여줍니다. 빨대처럼 봉마다 개수가 다르면 비워두세요 — 틀린 환산을 보여주느니 안 보여주는 편이 낫습니다.',
+        // 봉마다 개수가 들쭉날쭉한 품목(빨대)은 환산을 비워 두게 한다. 틀린 환산을 보여주느니 안 보여주는 편이 낫다.
+        hint: '직원은 「다 찬 것의 개수 + 쓰던 것의 남은 비율」을 숫자 하나로 적습니다(다 찬 2봉 + 쓰던 봉 30% → 2.3). 한 단위가 몇 개인지 적으면 개수로도 보여줍니다. 빨대처럼 일정하지 않으면 비워두세요. 과자처럼 낱개로 세는 것은 단위를 「개」, 1개 = 1개로 두세요.',
     },
     { key: 'each', label: '냉장고', hint: '냉장고 안의 개수를 낱개로 셉니다.' },
     {
         key: 'weight',
         label: '저울',
-        hint: '미개봉 개수를 세고, 쓰고 있는 용기는 통째로 저울에 올린 무게에서 빈 용기 무게를 뺍니다. 용기 이름(통·봉 등)을 고르면 직원 화면에도 그 이름으로 나옵니다. 빈 용기 무게는 다 쓴 용기를 세척·건조한 뒤 재서 넣으면, 그동안 쌓인 기록의 실제 양도 함께 드러납니다.',
+        hint: '직원은 미개봉 용기 개수와, 쓰고 있는 용기를 통째로 저울에 올린 무게를 적습니다. 빈 용기 무게는 다 쓴 용기를 씻어 말린 뒤 재서 넣어주세요. 나중에 넣어도 지난 기록에 반영됩니다.',
     },
 ];
 
@@ -85,9 +86,8 @@ function ModeCard({
                         g
                     </span>
                     <span className="ii-hint">
-                        이보다 무거운 용기(거의 가득 찬 것)는 직원이 「넘침」으로 기록하고, 앱은 &lsquo;○g
-                        이상&rsquo;으로 봅니다. 주문 기준은 저울로 잴 수 있는 양(저울 최대 무게 − 빈 용기 무게)보다 낮게
-                        잡아야 판단할 수 있습니다.
+                        이보다 무거우면 직원이 「넘침」으로 기록합니다. 주문 기준은 &lsquo;저울 최대 무게 − 빈 용기
+                        무게&rsquo;보다 낮게 잡아주세요.
                     </span>
                 </div>
             )}
@@ -209,10 +209,8 @@ function ModeCard({
                                 Number(item.count_per_pack) + Number(item.tare_g ?? 0) > scaleMax) &&
                             Number(item.low_threshold) >= scaleMax - Number(item.tare_g ?? 0) && (
                                 <span className="ii-warn">
-                                    ⚠️ 주문 기준이 저울로 잴 수 있는 양(
-                                    {Math.max(0, scaleMax - Number(item.tare_g ?? 0)).toLocaleString()}g)보다 높아, 가득
-                                    찬 {item.container_unit ?? '통'}은(는) 주문이 필요한지 판단할 수 없습니다. 기준을
-                                    낮춰주세요.
+                                    ⚠️ 주문 기준을 {Math.max(0, scaleMax - Number(item.tare_g ?? 0)).toLocaleString()}g
+                                    아래로 낮춰주세요. 저울이 넘치면 주문이 필요한지 판단할 수 없습니다.
                                 </span>
                             )}
                     </div>
@@ -514,9 +512,8 @@ function InventoryItems({ onBack }) {
 
             <StatCard title="세는 단위" icon="📏" wide subtitle={`${units.length}개`}>
                 <p className="ii-hint">
-                    품목에서 고를 수 있는 단위입니다. 여기서 정해두면 &lsquo;봉&rsquo;과 &lsquo;봉지&rsquo;가 섞이지
-                    않습니다. 1줄이 몇 개인지는 단위가 아니라 품목마다 따로 정합니다 — 같은 &lsquo;줄&rsquo;이어도
-                    컵홀더 종류마다 개수가 다르기 때문입니다.
+                    품목에서 고를 수 있는 단위 목록입니다. 여기 추가해도 품목은 바뀌지 않으니 품목마다 단위를
+                    골라주세요. 한 단위가 몇 개인지는 품목에서 정합니다.
                 </p>
                 <div className="ii-units">
                     {units.map((u) => (

@@ -27,9 +27,12 @@ const num = (/** @type {number} */ n) => Number(n).toLocaleString(undefined, { m
 /**
  * 한 품목의 남은 양을 사람이 읽는 말로.
  *
- * 봉 단위 품목은 '0.8봉'처럼 한 덩어리로 보여주면 위험이 묻힌다. 0.8봉은 안 뜯은 여분이
- * 하나도 없다는 뜻이고, 1.2봉은 한 봉이 통째로 남아 있다는 뜻인데 숫자만 보면 비슷해 보인다.
- * 그래서 안 뜯은 개수와 뜯어 쓰는 것의 남은 비율을 갈라 적는다.
+ * 봉 단위 품목은 '0.8봉'처럼 한 덩어리로 보여주면 위험이 묻힌다. 0.8봉은 여분이 하나도 없이
+ * 쓰던 것만 남았다는 뜻이고, 1.2봉은 한 봉이 통째로 남아 있다는 뜻인데 숫자만 보면 비슷해 보인다.
+ * 그래서 다 찬 개수와 쓰던 것의 남은 비율을 갈라 적는다. 여분이 없을 때만 '여분 없음'을 붙인다.
+ *
+ * '미개봉/뜯은 것'이라 부르지 않는다. 박스를 먼저 다 뜯어 두는 매장에서는 가득 찬 줄도 뜯은 박스 안에
+ * 있어 '미개봉 10줄'이 사실과 달라 보였다. 판단에 필요한 건 포장 상태가 아니라 가득 찬 게 몇 개인지다.
  *
  * 저울 품목은 무게보다 통 단위가 와닿는다 — 눈대중으로 '0.5통'이라 부르던 감각이라서다.
  * @param {any} r
@@ -45,12 +48,12 @@ function remainText(r) {
     }
     if (r.measure_mode === 'each') return `${num(r.quantity)}${r.count_unit}`;
 
-    // 창고 품목
-    const unopened = Number(r.unopened ?? 0);
-    const opened = Number(r.opened_ratio ?? 0);
-    const head = unopened > 0 ? `미개봉 ${num(unopened)}${r.count_unit}` : '미개봉 없음';
-    const tail = opened > 0 ? ` · 뜯은 것 ${Math.round(opened * 100)}%` : '';
-    return head + tail;
+    // 창고 품목. 정수부가 다 찬 개수, 소수부가 쓰던 것의 남은 비율이다(서버 필드명은 unopened·opened_ratio).
+    const full = Number(r.unopened ?? 0);
+    const ratio = Number(r.opened_ratio ?? 0);
+    const using = ratio > 0 ? `쓰던 것 ${Math.round(ratio * 100)}%` : '';
+    if (full > 0) return using ? `${num(full)}${r.count_unit} + ${using}` : `${num(full)}${r.count_unit}`;
+    return using ? `여분 없음 · ${using}` : '없음';
 }
 
 /**
@@ -164,7 +167,7 @@ function InventoryDashboard({ onBack }) {
                 {!latest?.count ? (
                     <p className="inv-empty">아직 재고 조사 기록이 없습니다.</p>
                 ) : low.length === 0 ? (
-                    <p className="inv-ok">모든 품목이 기준치 이상입니다.</p>
+                    <p className="inv-ok">주문이 필요한 품목이 없습니다.</p>
                 ) : (
                     <div className="inv-low">
                         {low.map((/** @type {any} */ r) => (
@@ -221,7 +224,7 @@ function InventoryDashboard({ onBack }) {
                                     {r.low_unknown && (
                                         <span
                                             className="inv-tag unknown"
-                                            title="저울이 넘쳐 정확한 양을 모르는데, 주문 기준이 저울로 잴 수 있는 양보다 높습니다. 품목 관리에서 기준을 낮춰주세요."
+                                            title="저울이 넘쳐 주문이 필요한지 판단할 수 없습니다. 품목 관리에서 주문 기준을 낮춰주세요."
                                         >
                                             판단 불가
                                         </span>

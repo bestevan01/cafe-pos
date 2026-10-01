@@ -67,7 +67,8 @@ function evaluate(it, prev) {
         total_ratio: total !== null && perPack ? Number((total / perPack).toFixed(2)) : null,
         // 환산값: 2.3봉 × 500g = 1150g. 환산값이 없으면 내보내지 않는다(거짓 숫자를 만들지 않는다).
         amount: isWeight ? total : perPack ? Number((quantity * perPack).toFixed(2)) : null,
-        // 봉 단위 품목은 정수부가 '안 뜯은 개수', 소수부가 '뜯어 쓰는 것의 남은 비율'이다.
+        // 봉 단위 품목은 정수부가 '다 찬 개수', 소수부가 '쓰던 것의 남은 비율'이다.
+        // (필드 이름은 처음 부르던 대로 unopened·opened_ratio다. 박스를 뜯어 두어도 가득 찬 줄은 정수부에 든다)
         // 0.8봉과 1.2봉은 숫자가 비슷해도 사정이 전혀 다르다 — 앞은 여분이 없고 뒤는 한 봉이
         // 통째로 남아 있다. 한 덩어리로 보여주면 그 차이가 묻히므로 쪼개어 내보낸다.
         unopened: isWeight ? spare : Math.floor(quantity),
