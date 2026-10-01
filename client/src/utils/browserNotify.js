@@ -11,7 +11,25 @@
  * 부르는 쪽이 앱 안 토스트로 대신 보여주면 정보를 잃지 않는다.
  */
 
+import { getStoreInfo } from './storeInfo';
+
 const STORAGE_KEY = 'browserAlertsOn';
+
+// ============================================================
+// 어느 매장 알림인지 — 제목 앞에 [매장명]
+// ============================================================
+// 매장마다 서버가 따로라 알림 문구만으로는 어느 매장 것인지 알 수 없다. 운영체제 알림에 붙는
+// 도메인 줄은 작고 알아보기 어렵다. 알림이 쌓이거나 잠금화면에서 본문이 잘려도 제목 첫머리는
+// 남으므로 거기에 붙인다.
+//
+// 매장명은 빌드 시점 환경변수(VITE_STORE_NAME)라 서버는 모른다. 그래서 서버 문구를 고치지 않고
+// 알림을 띄우는 쪽(여기와 서비스 워커)에서 붙인다. 서비스 워커는 이 값을 읽을 수 없으므로
+// 등록할 때 주소에 실어 보낸다(workerUrl).
+
+const storeLabel = getStoreInfo()?.label ?? '';
+
+/** @param {string} title */
+const withStore = (title) => (storeLabel ? `[${storeLabel}] ${title}` : title);
 
 // ============================================================
 // 알림을 눌렀을 때 할 일 (공통)
@@ -164,7 +182,7 @@ export async function requestPermission() {
 export function show(alert) {
     if (!isEnabled()) return false;
     try {
-        const n = new Notification(alert.title, {
+        const n = new Notification(withStore(alert.title), {
             body: alert.body,
             // 같은 종류의 알림이 쌓이지 않고 최신 것으로 덮인다.
             tag: alert.key ?? 'app',
@@ -190,6 +208,13 @@ export function show(alert) {
 // 탭이 닫혀 있어도 브라우저가 대신 받게 한다. 둘은 같은 tag를 써서 겹쳐도 하나로 합쳐진다.
 
 const SW_PATH = '/sw.js';
+
+/**
+ * 서비스 워커 주소. 매장명을 ?store= 로 실어 보낸다 — 워커는 import.meta.env를 못 읽는다.
+ * 주소가 바뀌면 브라우저는 같은 등록을 새 스크립트로 갱신한다. 구독(endpoint)은 등록에 딸려 있어
+ * 그대로 유지된다.
+ */
+const workerUrl = storeLabel ? `${SW_PATH}?store=${encodeURIComponent(storeLabel)}` : SW_PATH;
 
 /** 이 브라우저가 웹 푸시를 할 수 있는가. */
 export const pushSupported = () =>
@@ -363,8 +388,25 @@ function urlBase64ToUint8Array(base64) {
 
 /** 서비스 워커를 등록하고 준비될 때까지 기다린다. */
 async function ready() {
-    await navigator.serviceWorker.register(SW_PATH);
+    await navigator.serviceWorker.register(workerUrl);
     return navigator.serviceWorker.ready;
+}
+
+/**
+ * 이미 등록된 서비스 워커를 지금 주소로 다시 등록한다. 앱이 켜질 때 한 번 부른다.
+ *
+ * 등록은 알림 설정 화면에서만 일어나서, 그 화면에 다시 들어가지 않는 기기는 옛 주소(매장명 없는
+ * 워커)에 머문다. 매장명이 바뀌었을 때도 마찬가지다. 등록이 없는 기기는 건드리지 않는다 —
+ * 푸시를 켜지 않은 사람에게 워커를 새로 깔 이유가 없다.
+ */
+export async function syncWorker() {
+    if (!pushSupported()) return;
+    try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) await navigator.serviceWorker.register(workerUrl);
+    } catch {
+        // 다음 실행이나 알림 설정 화면에서 다시 맞춰진다.
+    }
 }
 
 /** 지금 이 기기의 구독. 없으면 null. */

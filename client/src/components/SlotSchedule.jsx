@@ -165,11 +165,11 @@ function SlotSchedule({ endpoint, title, work, emptyHint }) {
                 .is-btn.ghost { height: 34px; background: none; border: 1px solid var(--border-color, #ddd); color: var(--text-secondary, #999); }
             `}</style>
 
+            {/* 회차는 직원 화면이 시각으로 자동으로 고른다. 조금 늦어도 다음 회차와의 가운데까지는 원래 회차다.
+                회차가 없는 요일은 미운영일로 보고 알림을 보내지 않는다. 회차를 바꿔도 이미 낸 기록은 그대로다. */}
             <p className="is-hint">
-                직원 화면이 이 시각을 보고 회차를 자동으로 고릅니다. 조금 늦게 {work}해도 다음 회차와의 가운데를 넘지
-                않으면 원래 회차로 들어갑니다 — 각 회차 아래가 그 범위입니다. 요일마다 운영 시간이 다르면 회차마다
-                요일을 골라주세요. 회차가 하나도 없는 요일은 미운영일로 보고 알림을 보내지 않습니다. 회차를 바꿔도 이미
-                낸 기록은 그대로입니다.
+                각 회차 아래 시간 안에 {work}하면 그 회차로 기록됩니다. 요일마다 운영 시간이 다르면 회차마다 요일을
+                골라주세요. 회차가 없는 요일에는 알림을 보내지 않습니다.
             </p>
 
             {!loading && slots.length === 0 && (

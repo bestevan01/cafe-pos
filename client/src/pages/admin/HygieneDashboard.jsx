@@ -4,9 +4,10 @@ import { socket, onResync } from '../../utils/socket';
 import StatsLayout from '../../components/stats/StatsLayout';
 import StatCard from '../../components/stats/StatCard';
 import Button from '../../components/ui/Button';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import HygieneItems from './HygieneItems';
 import { useNotification } from '../../hooks/useNotification';
+import { useAdminView } from '../../hooks/useAdminView';
 import { getStoreInfo } from '../../utils/storeInfo';
 import HygienePhoto from '../../components/HygienePhoto';
 
@@ -200,7 +201,7 @@ function EditLog({ edits }) {
  * @param {() => void} props.onBack
  */
 function HygieneDashboard({ onBack }) {
-    const [view, setView] = useState('records'); // 'records'(기본) | 'items'
+    const [view, setView] = useAdminView('hygiene', 'records'); // 'records'(기본) | 'items'
     const [checks, setChecks] = useState(/** @type {any[]} */ ([]));
     // 날짜별 회차 이력과, 설정하기 전의 기본 회차. 보고서가 그날 기준으로 줄을 그리는 데 쓴다.
     const [plans, setPlans] = useState(/** @type {any[]} */ ([]));
@@ -337,7 +338,7 @@ function HygieneDashboard({ onBack }) {
         <StatsLayout
             title="🧼 위생 점검"
             onBack={onBack}
-            actions={<ThemeToggle />}
+            actions={<AdminUserMenu />}
             pageActions={
                 <>
                     <Button variant="secondary" icon="⚙️" onClick={() => setView('items')}>

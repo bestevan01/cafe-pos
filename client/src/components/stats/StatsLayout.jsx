@@ -4,7 +4,7 @@ import Button from '../ui/Button';
  * 통계 페이지 공용 셸: 헤더(뒤로/제목/우측 액션) + 자동 정렬 카드 그리드.
  * 카드(StatCard)를 children으로 넣기만 하면 반응형으로 흐른다.
  *
- *   <StatsLayout title="📊 고급 매출 분석" onBack={onBack} actions={<ThemeToggle/>}>
+ *   <StatsLayout title="📊 고급 매출 분석" onBack={onBack} actions={<AdminUserMenu/>}>
  *     <StatCard ...>...</StatCard>
  *     <StatCard ...>...</StatCard>
  *   </StatsLayout>
@@ -21,7 +21,7 @@ function StatsLayout({ title, onBack, actions, pageActions, summary, children })
         <div className="stats-layout">
             <style>{`
                 .stats-layout { padding: 24px; min-height: 100dvh; background: var(--bg-color, #f4f6f8); box-sizing: border-box; transition: background-color .3s ease; }
-                /* 내용이 길어져도 뒤로/제목/테마 버튼은 항상 닿을 수 있게 상단 고정.
+                /* 내용이 길어져도 뒤로/제목/이름 메뉴는 항상 닿을 수 있게 상단 고정.
                    컨테이너 좌우 패딩을 음수 마진으로 상쇄해 배경이 화면 폭을 꽉 채운다. */
                 .stats-layout-header {
                     position: sticky; top: 0; z-index: 20;
@@ -32,7 +32,6 @@ function StatsLayout({ title, onBack, actions, pageActions, summary, children })
                     flex-wrap: wrap;
                 }
                 .stats-layout-left { display: flex; align-items: center; gap: 14px; }
-                .stats-layout-title { margin: 0; font-size: 1.8rem; font-weight: 800; color: var(--text-primary, #222); white-space: nowrap; }
                 /* 데스크탑 2열 고정: 카드가 좌→우로 채워지고, wide 카드만 한 줄 전체 차지 */
                 .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
                 /* 모바일: minmax(0,1fr)로 칸이 컨테이너를 넘지 않게 (넓은 표는 내부에서 가로 스크롤) */
@@ -43,17 +42,15 @@ function StatsLayout({ title, onBack, actions, pageActions, summary, children })
                 .stats-summary { margin-bottom: 20px; }
                 @media (max-width: 768px) {
                     .stats-layout { padding: 16px; }
-                    .stats-layout-title { font-size: 1.2rem; }
                     .stats-layout-header { margin: -16px -16px 16px -16px; padding: 10px 16px; gap: 10px; }
                     .stats-summary { margin-bottom: 16px; }
                     .stats-page-actions { gap: 8px; margin-bottom: 16px; }
                 }
                 /* iPhone SE(375px) 기준: 헤더가 두 줄로 접히면 세로 667px에서 차트가 밀린다.
-                   제목을 줄이고 줄바꿈을 막아 한 줄에 유지한다. */
+                   한 줄에 유지한다(제목 크기·말줄임은 index.css의 .admin-page-title). */
                 @media (max-width: 420px) {
                     .stats-layout-header { flex-wrap: nowrap; gap: 8px; }
                     .stats-layout-left { gap: 8px; min-width: 0; }
-                    .stats-layout-title { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; }
                 }
             `}</style>
 
@@ -62,7 +59,7 @@ function StatsLayout({ title, onBack, actions, pageActions, summary, children })
                     <Button variant="neutral" icon="⬅" onClick={onBack}>
                         뒤로
                     </Button>
-                    <h1 className="stats-layout-title">{title}</h1>
+                    <h1 className="admin-page-title">{title}</h1>
                 </div>
                 {actions && <div className="stats-layout-actions">{actions}</div>}
             </div>

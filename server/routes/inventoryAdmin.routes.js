@@ -40,6 +40,7 @@ router.get('/latest', async (req, res) => {
 const asDate = (/** @type {any} */ v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? '')) ? String(v) : null);
 
 // 구간별 조사 기록. 수치까지 한 번에 실어 보낸다 — 회차마다 상세를 부르면 왕복이 많아진다.
+// 임시 저장은 기록이 아니라 뺀다(제출해야 기록이 된다).
 router.get('/counts', async (req, res) => {
     const to = asDate(req.query.to) ?? kstDate();
     const from = asDate(req.query.from) ?? kstDate(-13);
@@ -48,7 +49,7 @@ router.get('/counts', async (req, res) => {
             `SELECT c.id, DATE_FORMAT(c.count_date, '%Y-%m-%d') AS count_date, c.slot, c.slot_label,
                     c.counted_at, c.counted_by_name, c.memo
              FROM inventory_counts c
-             WHERE c.count_date BETWEEN ? AND ?
+             WHERE c.count_date BETWEEN ? AND ? AND c.is_draft = 0
              ORDER BY c.count_date DESC, c.slot ASC`,
             [from, to],
         );

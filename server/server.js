@@ -599,6 +599,20 @@ async function ensureSchema() {
         }
     }
 
+    // 재고 조사 임시 저장. 자세한 배경은 migrations/024_inventory_count_draft.sql 참고.
+    // 기존 기록은 모두 제출된 것이므로 기본값 0(확정)이 맞다.
+    for (const [column, def] of [
+        ['is_draft', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER memo'],
+        ['draft_values', 'TEXT NULL AFTER is_draft'],
+    ]) {
+        try {
+            await pool.query(`ALTER TABLE inventory_counts ADD COLUMN ${column} ${def}`);
+        } catch (/** @type {any} */ err) {
+            if (err.code !== 'ER_DUP_FIELDNAME')
+                console.error(`⚠️ [DB] inventory_counts.${column} 추가 실패:`, err.message);
+        }
+    }
+
     // 회차마다 적용 요일을 둔다(요일마다 운영 시간이 달라서). 자세한 배경은 migrations/021_slot_days.sql 참고.
     // 기존 회차는 매일로 둔다 — 지금까지 매일 적용되던 것과 같다.
     for (const table of ['inventory_slots', 'hygiene_slots']) {
@@ -721,8 +735,9 @@ registerAlert('inventory_count_reminder', {
             if (!slot) return null;
         }
         // 이미 누가 냈으면 알리지 않는다. 할 일이 없는데 울리면 알림을 무시하는 버릇만 생긴다.
+        // 임시 저장만 있으면 아직 안 한 것이다 — 하다 만 조사가 알림으로 다시 떠올라야 마무리된다.
         const [[done]] = await pool.query(
-            'SELECT counted_by_name FROM inventory_counts WHERE count_date = CURDATE() AND slot = ? LIMIT 1',
+            'SELECT counted_by_name FROM inventory_counts WHERE count_date = CURDATE() AND slot = ? AND is_draft = 0 LIMIT 1',
             [slot.slot_key],
         );
         if (done) return null;

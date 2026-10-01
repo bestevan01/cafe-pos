@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import ThemeToggle from '../../components/ThemeToggle';
+import AdminUserMenu from '../../components/AdminUserMenu';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useNotification } from '../../hooks/useNotification';
@@ -180,7 +180,6 @@ function EventDashboard({ onBack }) {
                     border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08));
                 }
                 .header-left { display: flex; align-items: center; gap: 15px; }
-                .page-title { margin: 0; font-size: 1.8rem; color: var(--text-primary); }
 
                 .add-event-card { margin-bottom: 30px; } /* 카드 외형은 공용 <Card>가 담당 */
                 .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
@@ -217,7 +216,8 @@ function EventDashboard({ onBack }) {
                 .btn-toggle:active { transform: scale(0.95); }
 
                 @media (max-width: 768px) {
-                    .header-bar { margin: -20px -20px 16px -20px; padding: 10px 20px; }
+                    .header-bar { margin: -20px -20px 16px -20px; padding: 10px 20px; gap: 8px; }
+                    .header-left { min-width: 0; gap: 10px; }
                     .event-item { flex-direction: column; align-items: flex-start; }
                     .action-buttons { width: 100%; justify-content: flex-end; margin-top: 10px; }
                     .form-row { flex-direction: column; align-items: stretch !important; height: auto !important; min-height: auto !important; }
@@ -233,9 +233,9 @@ function EventDashboard({ onBack }) {
                     <Button variant="neutral" icon="⬅" onClick={onBack}>
                         뒤로
                     </Button>
-                    <h1 className="page-title">🎉 이벤트 관리</h1>
+                    <h1 className="admin-page-title">🎉 이벤트 관리</h1>
                 </div>
-                <ThemeToggle />
+                <AdminUserMenu />
             </div>
 
             <Card className="add-event-card">

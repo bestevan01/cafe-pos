@@ -67,7 +67,8 @@ function evaluate(it, prev) {
         total_ratio: total !== null && perPack ? Number((total / perPack).toFixed(2)) : null,
         // 환산값: 2.3봉 × 500g = 1150g. 환산값이 없으면 내보내지 않는다(거짓 숫자를 만들지 않는다).
         amount: isWeight ? total : perPack ? Number((quantity * perPack).toFixed(2)) : null,
-        // 봉 단위 품목은 정수부가 '안 뜯은 개수', 소수부가 '뜯어 쓰는 것의 남은 비율'이다.
+        // 봉 단위 품목은 정수부가 '다 찬 개수', 소수부가 '쓰던 것의 남은 비율'이다.
+        // (필드 이름은 처음 부르던 대로 unopened·opened_ratio다. 박스를 뜯어 두어도 가득 찬 줄은 정수부에 든다)
         // 0.8봉과 1.2봉은 숫자가 비슷해도 사정이 전혀 다르다 — 앞은 여분이 없고 뒤는 한 봉이
         // 통째로 남아 있다. 한 덩어리로 보여주면 그 차이가 묻히므로 쪼개어 내보낸다.
         unopened: isWeight ? spare : Math.floor(quantity),
@@ -76,6 +77,8 @@ function evaluate(it, prev) {
 }
 
 /**
+ * 제출(확정)한 조사만 본다. 임시 저장은 칸이 비어 있고 아직 기록이 아니다 — 여기서 걸러야
+ * 현재 재고 화면과 '주문 필요' 알림(제출 직후·정해진 시각 모두 이 함수를 쓴다)이 함께 걸러진다.
  * @returns {Promise<{count: any|null, rows: any[], low: any[]}>}
  */
 async function latestStatus() {
@@ -83,6 +86,7 @@ async function latestStatus() {
         `SELECT c.id, DATE_FORMAT(c.count_date, '%Y-%m-%d') AS count_date, c.slot, c.slot_label,
                 c.counted_at, c.counted_by_name, c.memo
          FROM inventory_counts c
+         WHERE c.is_draft = 0
          ORDER BY c.count_date DESC, c.slot DESC
          LIMIT 1`,
     );
@@ -91,7 +95,7 @@ async function latestStatus() {
     const [[prev]] = await pool.query(
         `SELECT c.id
          FROM inventory_counts c
-         WHERE (c.count_date < ?) OR (c.count_date = ? AND c.slot < ?)
+         WHERE c.is_draft = 0 AND ((c.count_date < ?) OR (c.count_date = ? AND c.slot < ?))
          ORDER BY c.count_date DESC, c.slot DESC
          LIMIT 1`,
         [latest.count_date, latest.count_date, latest.slot],

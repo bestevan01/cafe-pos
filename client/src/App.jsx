@@ -14,6 +14,7 @@ import {
     runAlertAction,
     registerAlertAction,
     listenForAlertActions,
+    syncWorker,
 } from './utils/browserNotify';
 import NotificationSettings from './pages/auth/NotificationSettings.jsx';
 import Login from './pages/auth/Login';
@@ -22,6 +23,7 @@ import ProfileAuth from './pages/auth/ProfileAuth.jsx';
 import EditProfile from './pages/auth/EditProfile.jsx';
 import ForcePasswordChange from './pages/auth/ForcePasswordChange';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import { openAdminView, resetAdminViews } from './hooks/useAdminView';
 import { useTheme } from './hooks/useTheme';
 import { useNotification } from './hooks/useNotification';
 import { suppressAutoPasskeyOnce } from './utils/loginMemory';
@@ -70,9 +72,6 @@ function App() {
     const [showHygiene, setShowHygiene] = useState(false);
     const [showInventory, setShowInventory] = useState(false);
     const [showAlerts, setShowAlerts] = useState(false);
-    // 관리자 대시보드에서 바로 열 화면(알림을 눌러 들어온 경우). 대시보드가 받아서 쓰고 비운다.
-    // 이벤트로 알리면 대시보드가 아직 안 떠 있을 때(알림 설정 화면에서 누른 경우 등) 사라진다.
-    const [adminJump, setAdminJump] = useState(/** @type {string|null} */ (null));
     const [showProfile, setShowProfile] = useState(false);
     const [isProfileVerified, setIsProfileVerified] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -126,6 +125,7 @@ function App() {
         setAdminStaffMode(false);
         setShowProfile(false);
         setIsProfileVerified(false);
+        resetAdminViews();
     }, []);
 
     // 사용자가 직접 로그아웃 버튼을 눌렀을 때 (자동/세션만료 경로와 구분해 성공 안내)
@@ -306,7 +306,7 @@ function App() {
             registerAlertAction('open_inventory_status', () => {
                 toMain();
                 setAdminStaffMode(false);
-                setAdminJump('inventory');
+                openAdminView('inventory');
             }),
         ];
         return () => offs.forEach((off) => off());
@@ -315,6 +315,11 @@ function App() {
     // 서비스 워커를 통해 들어온 동작을 받는다(탭이 닫혀 있을 때 온 푸시를 누른 경우).
     // 로그인 여부와 상관없이 한 번 연결한다 — 받은 동작은 위에서 등록될 때까지 맡아둔다.
     useEffect(() => listenForAlertActions(), []);
+
+    // 알림 제목에 붙는 매장명이 서비스 워커에도 전해지도록, 이미 등록된 워커를 지금 주소로 맞춘다.
+    useEffect(() => {
+        void syncWorker();
+    }, []);
 
     // 캐셔 사용 중 순단(재연결) 시 자리 자동 재선점.
     // 재연결되면 소켓 ID가 바뀌어 서버가 이전 소켓 기준으로 자리를 비워버리므로,
@@ -419,8 +424,6 @@ function App() {
                     onEditProfile={() => setShowProfile(true)}
                     onEnterStaffMode={() => setAdminStaffMode(true)}
                     onOpenAlerts={() => setShowAlerts(true)}
-                    jumpTo={adminJump}
-                    onJumped={() => setAdminJump(null)}
                 />
                 {showProfile && (
                     <ProfileAuth

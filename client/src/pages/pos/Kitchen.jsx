@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEmptyAfterExit } from '../../hooks/useEmptyAfterExit';
 import axios from 'axios';
 import { socket, onResync } from '../../utils/socket';
+import { oldestFirst } from '../../utils/orderCardOrder';
 import { useNotification } from '../../hooks/useNotification';
 
 /**
@@ -251,9 +252,9 @@ function Kitchen() {
 
             <div className="order-grid">
                 <AnimatePresence onExitComplete={onEmptyExitComplete}>
-                    {orderGroups.map((group) => (
+                    {oldestFirst(orderGroups).map((group) => (
                         <motion.div
-                            key={group.daily_number}
+                            key={group.display_id}
                             className="receipt-card"
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
