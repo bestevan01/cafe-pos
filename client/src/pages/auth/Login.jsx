@@ -406,6 +406,10 @@ function Login({ onLoginSuccess, onSwitchToRegister }) {
                         onChange={handleChange}
                         className="login-input"
                         autoComplete="username"
+                        // 휴대폰이 첫 글자를 대문자로 바꾸지 않게 한다. 대문자로 넣어도 서버가 소문자로 맞춘다.
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         required
                     />
                     <input

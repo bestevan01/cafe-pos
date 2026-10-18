@@ -24,7 +24,9 @@ function Register({ onSwitchToLogin }) {
 
     /** @param {import('react').ChangeEvent<HTMLInputElement>} e */
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        // 아이디는 소문자로만 가입된다(서버도 소문자로 바꿔 저장한다). 입력하는 순간 바꿔 보여 준다.
+        setFormData({ ...formData, [name]: name === 'username' ? value.toLowerCase() : value });
     };
 
     /** @param {import('react').FormEvent<HTMLFormElement>} e */
@@ -111,6 +113,9 @@ function Register({ onSwitchToLogin }) {
                         onChange={handleChange}
                         className="register-input"
                         autoComplete="username"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         required
                     />
                     <input

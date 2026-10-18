@@ -14,6 +14,18 @@ const JWT_SECRET = /** @type {string} */ (process.env.JWT_SECRET);
 const VALID_ROLES = ['admin', 'staff', 'pending'];
 
 /**
+ * 아이디는 앞뒤 공백을 빼고 소문자로만 다룬다. 가입·로그인 모두 이 값을 쓴다.
+ * 운영 DB(TiDB)의 users는 utf8mb4_bin이라 대소문자를 구분한다. 로컬 MySQL(general_ci)에서는
+ * 'Admin'으로도 로그인되지만 운영에서는 안 되고, 'admin'과 'Admin'이 따로 가입되기도 한다.
+ *
+ * @param {unknown} raw
+ */
+const normalizeUsername = (raw) =>
+    String(raw ?? '')
+        .trim()
+        .toLowerCase();
+
+/**
  * 해당 사용자의 열려 있는 소켓을 즉시 끊는다.
  *
  * HTTP는 다음 요청에서 걸러지지만 소켓은 연결할 때 한 번만 확인한다. 이미 붙어 있는
@@ -32,10 +44,20 @@ function disconnectUserSockets(req, userId) {
 }
 
 router.post('/register', async (req, res) => {
-    const { username, password, name } = req.body;
+    const { password, name } = req.body;
+    const username = normalizeUsername(req.body.username);
     try {
+        if (!username) {
+            return res.status(400).json({ success: false, message: '아이디를 입력해주세요.' });
+        }
         if (!isStrongPassword(password)) {
             return res.status(400).json({ success: false, message: PASSWORD_POLICY_MESSAGE });
+        }
+        // 이 규칙 전에 대문자로 가입한 아이디가 남아 있을 수 있어 LOWER()로 비교한다.
+        // UNIQUE 제약은 운영(utf8mb4_bin)에서 'Admin'과 'admin'을 다른 값으로 본다.
+        const [taken] = await pool.query('SELECT 1 FROM users WHERE LOWER(username) = ? LIMIT 1', [username]);
+        if (taken.length > 0) {
+            return res.status(409).json({ success: false, message: '이미 사용 중인 아이디입니다.' });
         }
         const hashedPassword = await bcrypt.hash(password, 10);
         await pool.query('INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)', [
@@ -56,9 +78,15 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', loginRateLimiter, async (req, res) => {
-    const { username, password } = req.body;
+    const { password } = req.body;
+    const username = normalizeUsername(req.body.username);
     try {
-        const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+        // 예전에 대문자로 가입한 계정도 소문자로 입력해 로그인할 수 있게 LOWER()로 비교한다.
+        // 대소문자만 다른 두 계정이 남아 있으면 철자가 정확히 같은 쪽을 고른다.
+        const [users] = await pool.query(
+            'SELECT * FROM users WHERE LOWER(username) = ? ORDER BY username = ? DESC LIMIT 1',
+            [username, username],
+        );
 
         if (users.length === 0 || !(await bcrypt.compare(password, users[0].password))) {
             await recordLoginFailure(req.loginKey ?? 'unknown');
