@@ -60,11 +60,14 @@ router.get('/calc', authenticateToken, async (req, res) => {
         const [settlement] = await pool.query('SELECT opening_amount FROM cash_settlements WHERE date = CURDATE()');
         if (settlement.length === 0) return res.status(400).json({ message: '미오픈 상태' });
 
+        // 날짜는 DATE(created_at) = CURDATE()가 아니라 범위로 건다. 컬럼에 함수를 씌우면
+        // idx_orders_created_at을 못 타고 orders 전체를 읽는다.
         const [orders] = await pool.query(`SELECT IFNULL(SUM(total_price), 0) as cash_sales
                                            FROM orders
                                            WHERE is_paid = 1
                                              AND payment_method = 'cash'
-                                             AND DATE(created_at) = CURDATE()`);
+                                             AND created_at >= CURDATE()
+                                             AND created_at < CURDATE() + INTERVAL 1 DAY`);
         const opening = settlement[0]['opening_amount'];
         const cashSales = parseInt(orders[0]['cash_sales']);
 
@@ -104,7 +107,8 @@ router.post('/close', authenticateToken, async (req, res) => {
                                            FROM orders
                                            WHERE is_paid = 1
                                              AND payment_method = 'cash'
-                                             AND DATE(created_at) = CURDATE()`);
+                                             AND created_at >= CURDATE()
+                                             AND created_at < CURDATE() + INTERVAL 1 DAY`);
         const salesCash = parseInt(orders[0]['cash_sales']);
         const diff = closingAmount - (rows[0]['opening_amount'] + salesCash);
 

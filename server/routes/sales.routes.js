@@ -5,13 +5,15 @@ const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
 
 // 요약 통계: 행을 받지 않고 서버에서 SUM 집계 → 데이터가 아무리 쌓여도 즉시.
+// 날짜는 DATE()·YEAR()·MONTH()를 씌우지 않고 created_at 범위로 건다. 컬럼에 함수를 씌우면
+// idx_orders_created_at을 못 타고 orders 전체를 읽는다.
 router.get('/summary', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const [[today]] = await pool.query(
-            'SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND DATE(created_at)=CURDATE()',
+            'SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY',
         );
         const [[month]] = await pool.query(
-            'SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())',
+            'SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND created_at >= CURDATE() - INTERVAL (DAY(CURDATE()) - 1) DAY AND created_at < LAST_DAY(CURDATE()) + INTERVAL 1 DAY',
         );
         const [[total]] = await pool.query(
             'SELECT IFNULL(SUM(total_price),0) AS s, COUNT(*) AS c FROM orders WHERE is_paid=1',
@@ -45,12 +47,16 @@ router.get('', authenticateToken, requireAdmin, async (req, res) => {
         /** @type {any[]} */
         let params;
         if (year && month) {
+            // 범위 조건은 '2026-13-01' 같은 없는 날짜를 넣으면 MySQL이 에러를 낸다.
+            // 예전 YEAR()·MONTH() 조건처럼 그런 달은 빈 목록으로 돌려준다.
+            if (year < 1000 || year > 9999 || month < 1 || month > 12) return res.json([]);
             sql =
-                'SELECT * FROM orders WHERE is_paid=1 AND YEAR(created_at)=? AND MONTH(created_at)=? ORDER BY created_at DESC';
-            params = [year, month];
+                'SELECT * FROM orders WHERE is_paid=1 AND created_at >= ? AND created_at < ? + INTERVAL 1 MONTH ORDER BY created_at DESC';
+            const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+            params = [monthStart, monthStart];
         } else {
             sql =
-                'SELECT * FROM orders WHERE is_paid=1 AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE()) ORDER BY created_at DESC';
+                'SELECT * FROM orders WHERE is_paid=1 AND created_at >= CURDATE() - INTERVAL (DAY(CURDATE()) - 1) DAY AND created_at < LAST_DAY(CURDATE()) + INTERVAL 1 DAY ORDER BY created_at DESC';
             params = [];
         }
         const [rows] = await pool.query(sql, params);
