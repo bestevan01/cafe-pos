@@ -4,6 +4,12 @@ const pool = require('../config/db');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const debugInfo = require('../utils/debugInfo');
 
+// 이번 달: 지난달 말일 다음 날 이상, 이번 달 말일 다음 날 미만.
+// 'CURDATE() - INTERVAL (DAY(CURDATE()) - 1) DAY'처럼 INTERVAL 뒤에 괄호를 쓰면 안 된다.
+// MySQL은 받아 주지만 TiDB는 INTERVAL() 함수로 읽어 문법 에러를 낸다.
+const THIS_MONTH =
+    'created_at >= LAST_DAY(CURDATE() - INTERVAL 1 MONTH) + INTERVAL 1 DAY AND created_at < LAST_DAY(CURDATE()) + INTERVAL 1 DAY';
+
 // 요약 통계: 행을 받지 않고 서버에서 SUM 집계 → 데이터가 아무리 쌓여도 즉시.
 // 날짜는 DATE()·YEAR()·MONTH()를 씌우지 않고 created_at 범위로 건다. 컬럼에 함수를 씌우면
 // idx_orders_created_at을 못 타고 orders 전체를 읽는다.
@@ -13,7 +19,7 @@ router.get('/summary', authenticateToken, requireAdmin, async (req, res) => {
             'SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY',
         );
         const [[month]] = await pool.query(
-            'SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND created_at >= CURDATE() - INTERVAL (DAY(CURDATE()) - 1) DAY AND created_at < LAST_DAY(CURDATE()) + INTERVAL 1 DAY',
+            `SELECT IFNULL(SUM(total_price),0) AS s FROM orders WHERE is_paid=1 AND ${THIS_MONTH}`,
         );
         const [[total]] = await pool.query(
             'SELECT IFNULL(SUM(total_price),0) AS s, COUNT(*) AS c FROM orders WHERE is_paid=1',
@@ -55,8 +61,7 @@ router.get('', authenticateToken, requireAdmin, async (req, res) => {
             const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
             params = [monthStart, monthStart];
         } else {
-            sql =
-                'SELECT * FROM orders WHERE is_paid=1 AND created_at >= CURDATE() - INTERVAL (DAY(CURDATE()) - 1) DAY AND created_at < LAST_DAY(CURDATE()) + INTERVAL 1 DAY ORDER BY created_at DESC';
+            sql = `SELECT * FROM orders WHERE is_paid=1 AND ${THIS_MONTH} ORDER BY created_at DESC`;
             params = [];
         }
         const [rows] = await pool.query(sql, params);
